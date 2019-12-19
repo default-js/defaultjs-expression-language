@@ -1,4 +1,5 @@
 const path = require('path');
+const webpackconf = require("./webpack.prod.js")
 
 module.exports = {
 	// base path that will be used to resolve all patterns (eg. files,
@@ -8,9 +9,15 @@ module.exports = {
 	// available frameworks: https://npmjs.org/browse/keyword/karma-adapter
 	frameworks : [ "jasmine" ],
 	// list of files / patterns to load in the browser
-	files : ["src/**/*.js", "test/index.js", "test/sites/**/*.html" ],
+	files : [
+		"src/**/*.js",
+		"test/index.js",
+		"test/sites/**/*.html" 
+	],
 	// list of files / patterns to exclude
-	exclude : [],
+	exclude : [
+		//"node_modules/*"
+	],
 	// available preprocessors:
 	// https://npmjs.org/browse/keyword/karma-preprocessor
 	preprocessors : {
@@ -18,10 +25,7 @@ module.exports = {
 		"test/*.js" : [ "webpack", "sourcemap"],
 		"test/sites/**/*.html" : [ "html2js" ]
 	},
-	webpack : {
-		mode : "development",
-		devtool : "inline-source-map"
-	},
+	webpack : webpackconf,
 	// test results reporter to use
 	// possible values: "dots", "progress"
 	// available reporters: https://npmjs.org/browse/keyword/karma-reporter

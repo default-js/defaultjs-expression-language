@@ -6,7 +6,7 @@ describe("Test resolve", function() {
 	});
 	
 	it("resolve \"${test}\"", function(done){
-		ExpressionResolver.resolveText("${test}", {"test":"success"}, "fail")
+		ExpressionResolver.resolve("${test}", {"test":"success"}, "fail")
 		.then(function(aResult){
 			expect(aResult).toBe("success");
 			done();	
@@ -14,7 +14,7 @@ describe("Test resolve", function() {
 	});
 	
 	it("resolve \"${test}\" to default", function(done){
-		ExpressionResolver.resolveText("${typeof test !== \"undefined\" ? test : undefined}", {}, "fail")
+		ExpressionResolver.resolve("${typeof test !== \"undefined\" ? test : undefined}", {}, "fail")
 		.then(function(aResult){
 			expect(aResult).toBe("fail");
 			done();	
@@ -22,9 +22,28 @@ describe("Test resolve", function() {
 	});
 	
 	it("resolve \"${test}\" throw an error", function(done){
-		ExpressionResolver.resolveText("${test}", {}, "fail")
+		ExpressionResolver.resolve("${test}", {}, "fail")
 		["catch"](function(aError){
 			expect(aError instanceof Error).toBe(true);
+			done();	
+		});		
+	});
+	
+	it("resolve \"${test}\" as Object", function(done){
+		ExpressionResolver.resolve("${test}", {"test": {"type" : "object"}}, "fail")
+		.then(function(aResult){
+			expect(typeof aResult).toBe("object");
+			expect(aResult.type).toBeDefined();
+			expect(aResult.type).toBe("object");
+			done();	
+		});		
+	});
+	
+	it("resolve \"${test}\" as function", function(done){
+		ExpressionResolver.resolve("${test}", {"test": function(){return "function";}}, "fail")
+		.then(function(aResult){
+			expect(typeof aResult).toBe("function");
+			expect(aResult()).toBe("function");
 			done();	
 		});		
 	});
@@ -54,7 +73,7 @@ describe("Test resolve", function() {
 	});
 	
 	it("resolve \"${getPromise()}\" as a promise", function(done){
-		ExpressionResolver.resolveText("${getPromise()}", {"getPromise":function(){
+		ExpressionResolver.resolve("${getPromise()}", {"getPromise":function(){
 			return Promise.resolve("success");
 		}}, "fail")
 		.then(function(aResult){

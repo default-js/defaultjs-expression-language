@@ -1,2 +1,3 @@
-import "./ResolveTest"
-import "./ResolveTextTest"
+import "./ResolveTest";
+import "./ResolveTextTest";
+import "./ContextBehaviorTest";

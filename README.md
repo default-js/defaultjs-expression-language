@@ -1,10 +1,9 @@
 # defaultjs-expression-language
 
-This lib provide functionallity similar to the text literals at javascript, but this lib supports Promise results from an Expression.
 
+** Table of Contents **
 
-** Content **
-
+- [Intro](#intro)
 - [Install](#install)
     - [Browser](#browser)
     - [Nodejs/NPM](#nodejs-npm)
@@ -17,7 +16,11 @@ This lib provide functionallity similar to the text literals at javascript, but 
     - [Timeout behavior](#timeout-behavior)  
 - [License](#license)
 
+## Intro
 
+This lib provide functionallity similar to the text literals at javascript, but this lib supports Promise results from an Expression.
+
+** Use this lib for dynamic content solutions. **
 
 ## Install
 
@@ -73,7 +76,6 @@ ExpressionResolver.resolveText("hello ${name}, nice to see you!", {"name": funct
 }).then(console.log); // hello max mustermann, nice to see you!
 ```
 
-
 ** promise value replacement **
 
 ```javascript
@@ -114,7 +116,7 @@ ExpressionResolver.resolveText("text ${test} text", {test: "local test var"}); /
 
 ```
 
-### Default value behavior **
+### Default value behavior
 
 ```javascript
 const global = window || global || self || this || {};
