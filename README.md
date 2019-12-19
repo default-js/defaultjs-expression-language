@@ -6,21 +6,28 @@ This lib provide functionallity similar to the text literals at javascript, but 
 ** **
 
 1. [Install](#install)
+    1.1. [Browser](#browser)
+    1.2. [Nodejs/NPM](#nodejs-npm)
 2. [Using](#using)
+    2.1. [Simple value replacement](#simple-value-replacement)
+    2.2. [Promise value replacement](#promise-value-replacement)  
 3. [API Documentation](#api-documentation)
-3. [License](#license)
+    3.1. [Context sensitive behavior](#context-sensitive-behavior)
+    3.2. [Default value behavior](#default-value-behavior)
+    3.3. [Timeout behavior](#timeout-behavior)  
+4. [License](#license)
 
 
 
-## install
+## Install
 
-### browser
+### Browser
 
 ```html
 <script type="text/javascript" src="defaultjs-expression-language.min.js"></script>
 ```
 
-### npm
+### Nodejs/NPM
 
 ````
 npm install defaultjs-expression-language
@@ -40,7 +47,7 @@ ExpressionResolver.resolveText("hello ${name}, nice to see you!", {"name": "max 
 
 ## Using
 
-** simple value replacement **
+### Simple value replacement
 
 ```javascript
 import ExpressionResolver from "@modules/ExpressionResolver"
@@ -53,7 +60,7 @@ ExpressionResolver.resolveText("hello ${name}, nice to see you!", {"name": "max 
 .then(console.log); // hello max mustermann, nice to see you!
 ```
 
-** promise value replacement **
+### Promise value replacement 
 
 ```javascript
 /*promise value replacement*/
@@ -92,7 +99,7 @@ ExpressionResolver.resolveText(aStatement, aContext, aDefault, aTimeout)
 ```
 
 
-** context sensitive behavior **
+### Context sensitive behavior
 
 ```javascript
 const global = window || global || self || this || {};
@@ -107,7 +114,7 @@ ExpressionResolver.resolveText("text ${test} text", {test: "local test var"}); /
 
 ```
 
-** default value behavior **
+### Default value behavior **
 
 ```javascript
 const global = window || global || self || this || {};
@@ -117,7 +124,7 @@ ExpressionResolver.resolveText("text ${test} text", global, "var is undefined");
 
 ```
 
-** timeout **
+### Timeout behavior**
 
 ```javascript
 const global = window || global || self || this || {};
