@@ -3,19 +3,19 @@
 This lib provide functionallity similar to the text literals at javascript, but this lib supports Promise results from an Expression.
 
 
-** **
+** Content **
 
-1. [Install](#install)
-    1.1. [Browser](#browser)
-    1.2. [Nodejs/NPM](#nodejs-npm)
-2. [Using](#using)
-    2.1. [Simple value replacement](#simple-value-replacement)
-    2.2. [Promise value replacement](#promise-value-replacement)  
-3. [API Documentation](#api-documentation)
-    3.1. [Context sensitive behavior](#context-sensitive-behavior)
-    3.2. [Default value behavior](#default-value-behavior)
-    3.3. [Timeout behavior](#timeout-behavior)  
-4. [License](#license)
+- [Install](#install)
+    - [Browser](#browser)
+    - [Nodejs/NPM](#nodejs-npm)
+- [Using](#using)
+    - [Simple value replacement](#simple-value-replacement)
+    - [Promise value replacement](#promise-value-replacement)  
+- [API Documentation](#api-documentation)
+    - [Context sensitive behavior](#context-sensitive-behavior)
+    - [Default value behavior](#default-value-behavior)
+    - [Timeout behavior](#timeout-behavior)  
+- [License](#license)
 
 
 
