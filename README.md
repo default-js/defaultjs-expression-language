@@ -33,7 +33,7 @@ This lib provide functionallity similar to the text literals at javascript, but 
 ### Nodejs/NPM
 
 ````
-npm install defaultjs-expression-language
+npm install @default-js/defaultjs-expression-language
 
 ````
 

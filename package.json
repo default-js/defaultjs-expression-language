@@ -1,5 +1,5 @@
 {
-  "name": "defaultjs-expression-language",
+  "name": "@default-js/defaultjs-expression-language",
   "version": "1.0.0-beta.1",
   "description": "",
   "main": "./index.js",
@@ -10,7 +10,7 @@
     "karma:integration": "karma start karma.integration.js",
     "test": "npm run karma:integration"
   },
-  "keywords": [],
+  "keywords": ["expression language", "dynamic expressions"],
   "author": "Frank Schüler",
   "license": "MIT",
   "devDependencies": {
