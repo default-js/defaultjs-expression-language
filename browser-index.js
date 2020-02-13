@@ -1,8 +1,7 @@
 import pack from "./src"
+import GLOBAL from "@modules/@default-js/defaultjs-common-utils/src/Global";
 
-const global = window || global || self || this || {};
-global.defaultjs = global.defaultjs || {};
-global.defaultjs.el = global.defaultjs.el || {
-	VERSION : "${version}",
-	ExpressionResolver : pack.ExpressionResolver
-};
+GLOBAL.defaultjs.el = GLOBAL.defaultjs.el || (() => {
+	pack.VERSION = "${version}";
+	return pack;
+})();
