@@ -102,7 +102,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 _modules_default_js_defaultjs_common_utils_src_Global__WEBPACK_IMPORTED_MODULE_1__[/* default */ "a"].defaultjs.el = _modules_default_js_defaultjs_common_utils_src_Global__WEBPACK_IMPORTED_MODULE_1__[/* default */ "a"].defaultjs.el || (() => {
-	_src__WEBPACK_IMPORTED_MODULE_0__[/* default */ "a"].VERSION = "1.0.0-beta.1";
+	_src__WEBPACK_IMPORTED_MODULE_0__[/* default */ "a"].VERSION = "1.0.0-beta.2";
 	return _src__WEBPACK_IMPORTED_MODULE_0__[/* default */ "a"];
 })();
 

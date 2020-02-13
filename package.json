@@ -1,7 +1,7 @@
 {
   "name": "@default-js/defaultjs-expression-language",
   "buildname": "defaultjs-expression-language",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "this provides an expression resolver",
   "main": "./index.js",
   "scripts": {
