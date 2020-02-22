@@ -7,9 +7,10 @@ const project = require("./package.json");
 module.exports = merge(common, {
     mode : 'development',
     optimization : {
+    	minimize : false,
 	    usedExports : true
     },
-    devtool : 'source-map',
+    devtool : 'inline-source-map',
     devServer : {
         contentBase : './WebContent',
         hot : true,
@@ -17,7 +18,7 @@ module.exports = merge(common, {
         port : 80
     },
     output : {
-	    filename : project.buildname + '.js',
+	    filename : project.name + '.js',
         path : path.resolve(__dirname, 'dist')
     },
     plugins : [ new webpack.HotModuleReplacementPlugin() ]  

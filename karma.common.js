@@ -1,5 +1,4 @@
 const path = require('path');
-const webpackconf = require("./webpack.prod.js")
 
 module.exports = {
 	// base path that will be used to resolve all patterns (eg. files,
@@ -12,8 +11,14 @@ module.exports = {
 	files : [
 		"src/**/*.js",
 		"test/index.js",
-		"test/sites/**/*.html" 
+		"test/sites/**/*.html",
+		{pattern: "test/data/**/*", included: false, served: true, watched: false, nocache: false},
+		{pattern: "test/templates/**/*", included: false, served: true, watched: true, nocache: false}	
 	],
+	proxies: {
+		"/data/": "/base/test/data/",
+		"/templates/": "/base/test/templates/"
+	},
 	// list of files / patterns to exclude
 	exclude : [
 		//"node_modules/*"
@@ -25,7 +30,6 @@ module.exports = {
 		"test/*.js" : [ "webpack", "sourcemap"],
 		"test/sites/**/*.html" : [ "html2js" ]
 	},
-	webpack : webpackconf,
 	// test results reporter to use
 	// possible values: "dots", "progress"
 	// available reporters: https://npmjs.org/browse/keyword/karma-reporter
@@ -49,6 +53,6 @@ module.exports = {
 		clearContext : true
 	},
 	singleRun : false,
-	concurrency : Infinity
-// browserNoActivityTimeout: 60000
+	concurrency : Infinity,
+	browserNoActivityTimeout: 600000
 };
