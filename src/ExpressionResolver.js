@@ -1,4 +1,5 @@
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js"
+import ObjectProperty from "@default-js/defaultjs-common-utils/src/ObjectProperty.js"
 import DefaultValue from "./DefaultValue.js";
 
 /*
@@ -13,7 +14,8 @@ const toDefaultValue = value => {
 		return value;
 	
 	return new DefaultValue(value);
-} 
+};
+
 const execute = async function(aStatement, aContext) {
     if (typeof aStatement !== "string")
 	    return aStatement;
@@ -52,12 +54,36 @@ const normalize = value => {
 	return null;
 };
 
-export class ExpressionResolver {
+export default class ExpressionResolver {
 	constructor({context = GLOBAL, parent = null, name = null}){
 		this.name = name;
 		this.context = context;
 		this.parent = (parent instanceof ExpressionResolver) ? parent : null;
-	}		
+	}
+		
+	async getData (key, filter) {
+		if(!key)
+			return;		
+		else if(filter && filter != this.name)
+			if(this.parent)
+				this.parent.updateData(key, value, filter) ;
+		else{
+			const property = ObjectProperty.load(this.context, key, false);
+			return property ? property.value : null;
+		}			
+	};
+	
+	async updateData (key, value, filter) {
+		if(!key)
+			return;		
+		else if(filter && filter != this.name)
+			if(this.parent)
+				this.parent.updateData(key, value, filter) ;
+		else{
+			const property = ObjectProperty.load(this.context, key);
+			property.value = value;
+		}			
+	};
 	
 	async resolve(aExpression, aDefault){
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
@@ -113,4 +139,3 @@ export class ExpressionResolver {
 		return resolver.resolveText(aText, defaultValue);
 	}
 };
-export default ExpressionResolver;
