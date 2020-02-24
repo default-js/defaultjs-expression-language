@@ -54,11 +54,21 @@ const normalize = value => {
 	return null;
 };
 
+const toFullname = (resolver) => {
+	if(resolver)
+		return toFullname(resolver.parent) + "/" + resolver.name;
+	return ""
+}
+
 export default class ExpressionResolver {
 	constructor({context = GLOBAL, parent = null, name = null}){
+		this.parent = (parent instanceof ExpressionResolver) ? parent : null;
 		this.name = name;
 		this.context = context;
-		this.parent = (parent instanceof ExpressionResolver) ? parent : null;
+	}
+	
+	get fullname(){
+		return toFullname(this);
 	}
 		
 	async getData (key, filter) {
