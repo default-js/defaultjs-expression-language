@@ -16,30 +16,39 @@ const toDefaultValue = value => {
 	return new DefaultValue(value);
 };
 
+
 const execute = async function(aStatement, aContext) {
     if (typeof aStatement !== "string")
 	    return aStatement;
     
-    const expression = new Function("aContext", "try{" +
-    		"	with(aContext) {" +
-    		"		return " + aStatement + ";" +
-    		"	}" +
-    		"}catch(e){" +
-    		"	throw e;" +
-    		"}");
+    const expression = new Function("aContext", 
+			`try{
+				with(aContext) {
+					return ${aStatement};
+				}
+			}catch(e){
+				throw e;
+			}`);
     
     return await expression(aContext);
 };
 
 const resolve = async function(aResolver, aExpression, aFilter, aDefault) {
 	if(aFilter && aResolver.name != aFilter)
-		return aResolver.parent ? resolve(aResolver.parent, aExpression, aFilter, aDefault) : null;	
-	
-	const result = await execute(aExpression, aResolver.context);
+		return aResolver.parent ? resolve(aResolver.parent, aExpression, aFilter, aDefault) : null;
+			
+	let result = null;
+	try {
+		result = await execute(aExpression, aResolver.context);
+	}catch(e){
+		if(e instanceof ReferenceError && aResolver.parent !== null && !aFilter)
+			result = await resolve(aResolver.parent, aExpression, aFilter, aDefault);
+		else
+			throw e;
+	}
 	if(result !== null && typeof result !== "undefined")
 		return result;
-	else if(aResolver.parent !== null)
-		return await resolve(aResolver.parent, aExpression, aFilter, aDefault);
+	
 	else if(aDefault instanceof DefaultValue && aDefault.hasValue)
 		return aDefault.value;
 	
@@ -54,12 +63,6 @@ const normalize = value => {
 	return null;
 };
 
-const toFullname = (resolver) => {
-	if(resolver)
-		return toFullname(resolver.parent) + "/" + resolver.name;
-	return ""
-}
-
 export default class ExpressionResolver {
 	constructor({context = GLOBAL, parent = null, name = null}){
 		this.parent = (parent instanceof ExpressionResolver) ? parent : null;
@@ -67,8 +70,8 @@ export default class ExpressionResolver {
 		this.context = context;
 	}
 	
-	get fullname(){
-		return toFullname(this);
+	get chain(){
+		return this.parent ? this.parent.chain + "/" + this.name : "/" + this.name;
 	}
 		
 	async getData (key, filter) {
