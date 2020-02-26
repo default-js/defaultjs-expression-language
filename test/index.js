@@ -1,4 +1,5 @@
-import "./ResolveTest";
+/*import "./ResolveTest";
 import "./ResolveTextTest";
 import "./ContextBehaviorTest";
-import "./ResolverChainTest.js";
+import "./ResolverChainTest.js";*/
+import "./ContextManipulationTest.js";
