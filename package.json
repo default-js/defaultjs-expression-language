@@ -1,7 +1,7 @@
 {
 	"name": "@default-js/defaultjs-expression-language",
 	"buildname": "defaultjs-expression-language",
-	"version": "1.0.0-beta.7",
+	"version": "1.0.0-beta.8",
 	"description": "This provides an expression resolver. You can build an resolver chain to solve hierarchic scopes!",
 	"main": "./index.js",
 	"scripts": {
@@ -30,7 +30,7 @@
 		"karma-webpack": "^4.0.2",
 		"puppeteer": "^2.1.1",
 		"replace-in-file-webpack-plugin": "^1.0.6",
-		"webpack": "^4.41.6",
+		"webpack": "^4.42.0",
 		"webpack-cli": "^3.3.11",
 		"webpack-dev-server": "^3.10.3",
 		"webpack-merge": "^4.2.2"
@@ -44,7 +44,7 @@
 	},
 	"homepage": "https://github.com/default-js/defaultjs-expression-language#readme",
 	"dependencies": {
-		"@default-js/defaultjs-common-utils": "^0.8.0"
+		"@default-js/defaultjs-common-utils": "^0.9.0"
 	},
 	"directories": {
 		"test": "test"

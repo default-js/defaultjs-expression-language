@@ -17,47 +17,76 @@ const toDefaultValue = value => {
 	return new DefaultValue(value);
 };
 
+const getFromChain = function(resolver, prop) {	
+	while (resolver) {
+		const context = resolver.context;
+		if (context && prop in context)
+			return { context, resolver, value: context[prop] };
 
-const execute = async function(aStatement, aContext) {
+		resolver = resolver.parent;
+	}
+
+	return { context: null, value: null };
+};
+
+const buildProxy = function(aResolver) {
+	//@TODO support only the top level properties of resolver context -> is't required to support deep object structures??? answer: actual, no use case of deep structure support!		
+	//@TODO write test cases!!!
+	return new Proxy({}, {
+		has : function(data, property) {
+			//@TODO write tests!!!
+			const { value } = getFromChain(aResolver, property);
+			return !!value;
+		}, 
+		get: function(data, property) {
+			//@TODO write tests!!!	
+			const { value } = getFromChain(aResolver, property);
+			return value;
+		},
+		set: function(data, property, value) {
+			//@TODO would support this action on an proxied resolver context??? write tests!!!
+			const { context, resolver} = getFromChain(aResolver, property);
+			if(context)
+				context[property] = value;
+			else if(resolver.context)
+				resolver.context[property] = value;
+			else {
+				resolve.context = {}
+				resolve.context[property] = value;
+			}			
+		},
+		deleteProperty: function(data, property) {
+			//@TODO would support this action on an proxied resolver context??? write tests!!!		
+			let { context, resolver} = getFromChain(aResolver, property);
+			while(context){
+				delete context[property];				
+				const result = getFromChain(resolver, property);
+				context = result.context;
+				resolver = result.resolver;
+			}
+		}		
+		//@TODO need to support the other proxy actions		
+	});
+};
+
+const execute = function(aStatement, aContext) {
 	if (typeof aStatement !== "string")
 		return aStatement;
-
-	const expression = new Function("aContext",
-		`try{
-				with(aContext) {
-					return ${aStatement};
-				}
-			}catch(e){
-				throw e;
-			}`);
-
-	return await expression(aContext);
+		
+	const expression = new Function("context", `try{with(context){return ${aStatement}}}catch(e){throw e;}`);
+	return expression(aContext);
 };
 
 const resolve = async function(aResolver, aExpression, aFilter, aDefault) {
 	if (aFilter && aResolver.name != aFilter)
 		return aResolver.parent ? resolve(aResolver.parent, aExpression, aFilter, aDefault) : null;
-
-	let result = null;
-	if (!aResolver.context && !aFilter) //SKIP resolver if context not available
-		result = resolve(aResolver.parent, aExpression, aFilter, aDefault);
-	else {
-		try {
-			result = await execute(aExpression, aResolver.context);
-		} catch (e) {
-			if (e instanceof ReferenceError && aResolver.parent !== null && !aFilter)
-				result = await resolve(aResolver.parent, aExpression, aFilter, aDefault);
-			else
-				throw e;
-		}
-	}
-
+	
+	const result = await execute(aExpression, aResolver.___proxy___);
 	if (result !== null && typeof result !== "undefined")
 		return result;
 
 	else if (aDefault instanceof DefaultValue && aDefault.hasValue)
 		return aDefault.value;
-
 
 	return result;
 };
@@ -75,6 +104,7 @@ export default class ExpressionResolver {
 		this.parent = (parent instanceof ExpressionResolver) ? parent : null;
 		this.name = name;
 		this.context = context;
+		this.___proxy___ = buildProxy(this);
 	}
 
 	get chain() {
@@ -85,6 +115,19 @@ export default class ExpressionResolver {
 		if (!this.context)
 			return this.parent ? this.parent.effectiveChain : "";
 		return this.parent ? this.parent.effectiveChain + "/" + this.name : "/" + this.name;
+	}
+
+	get contextChain() {
+		const result = [];
+		let resolver = this;
+		while (resolver) {
+			if (resolver.context)
+				result.push(resolver.context);
+
+			resolver = resolver.parent;
+		}
+
+		return result;
 	}
 
 	getData(key, filter) {
@@ -127,7 +170,7 @@ export default class ExpressionResolver {
 			if (match)
 				return await resolve(this, match[3], normalize(match[2]), defaultValue);
 			else
-				return await resolve(this, aExpression, null, defaultValue);
+				return await resolve(this, normalize(aExpression), null, defaultValue);
 		} catch (e) {
 			console.error("error at executing statment\"", aExpression, "\":", e);
 			return defaultValue.hasValue ? defaultValue.value : aExpression;
@@ -172,5 +215,10 @@ export default class ExpressionResolver {
 			});
 
 		return resolver.resolveText(aText, defaultValue);
+	}
+	
+	static buildSecure({context, propFilter, option={deep:true}, name, parent}){
+		context = ObjectUtils.filter({data: context, propFilter, option});
+		return new ExpressionResolver({context, name, parent});
 	}
 };

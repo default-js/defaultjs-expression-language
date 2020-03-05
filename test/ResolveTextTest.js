@@ -72,7 +72,6 @@ describe("Test resolveText", () => {
 	});
 	
 	it("resolveText \"text ${test1} ${test2} ${test3()} ${test4()} ${test5()} text\"", async () => {
-		debugger;
 		const result = await ExpressionResolver.resolveText("text ${test0} ${test1} ${test2} ${test3()} ${test4()} ${test5()} text", CONTEXT, "fail", 1000)
 		expect(result).toBe("text fail value1 value2 value3 value4 value5 text");
 	});
