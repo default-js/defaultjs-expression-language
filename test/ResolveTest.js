@@ -64,4 +64,9 @@ describe("Test resolve", () => {
 		const result = await ExpressionResolver.resolve("${getPromise()}", {"getPromise":async () => "success"}, "fail");
 		expect(result).toBe("success");
 	});
+	
+	it("resolve \"${value}\" value = 0", async () => {
+		const result = await ExpressionResolver.resolve("${value}", {"value":0}, "fail");
+		expect(result).toBe(0);
+	});
 });

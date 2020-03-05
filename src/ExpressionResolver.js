@@ -17,16 +17,16 @@ const toDefaultValue = value => {
 	return new DefaultValue(value);
 };
 
-const getFromChain = function(resolver, prop) {	
+const getFromChain = function(resolver, property) {	
 	while (resolver) {
 		const context = resolver.context;
-		if (context && prop in context)
-			return { context, resolver, value: context[prop] };
+		if (context && property in context)
+			return { context, resolver, value: context[property], defined: true };
 
 		resolver = resolver.parent;
 	}
 
-	return { context: null, value: null };
+	return { context: null, resolver: null, value: undefined, defined: false };
 };
 
 const buildProxy = function(aResolver) {
@@ -35,25 +35,25 @@ const buildProxy = function(aResolver) {
 	return new Proxy({}, {
 		has : function(data, property) {
 			//@TODO write tests!!!
-			const { value } = getFromChain(aResolver, property);
-			return !!value;
+			const {defined } = getFromChain(aResolver, property);	
+			return defined;
 		}, 
 		get: function(data, property) {
 			//@TODO write tests!!!	
-			const { value } = getFromChain(aResolver, property);
+			const { value} = getFromChain(aResolver, property);
 			return value;
 		},
 		set: function(data, property, value) {
 			//@TODO would support this action on an proxied resolver context??? write tests!!!
-			const { context, resolver} = getFromChain(aResolver, property);
-			if(context)
+			const { context, defined} = getFromChain(aResolver, property);
+			if(defined)
 				context[property] = value;
-			else if(resolver.context)
-				resolver.context[property] = value;
+			else if(aResolver.context)
+				aResolver.context[property] = value;
 			else {
-				resolve.context = {}
-				resolve.context[property] = value;
-			}			
+				aResolver.context = {}
+				aResolver.context[property] = value;
+			}
 		},
 		deleteProperty: function(data, property) {
 			//@TODO would support this action on an proxied resolver context??? write tests!!!		
