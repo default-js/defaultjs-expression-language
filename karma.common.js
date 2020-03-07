@@ -54,5 +54,6 @@ module.exports = {
 	},
 	singleRun : false,
 	concurrency : Infinity,
-	browserNoActivityTimeout: 600000
+	browserDisconnectTimeout: 120000,
+	browserNoActivityTimeout: 120000
 };

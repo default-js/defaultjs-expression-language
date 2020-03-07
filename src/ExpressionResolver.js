@@ -2,6 +2,7 @@ import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js"
 import ObjectProperty from "@default-js/defaultjs-common-utils/src/ObjectProperty.js";
 import ObjectUtils from "@default-js/defaultjs-common-utils/src/ObjectUtils.js"
 import DefaultValue from "./DefaultValue.js";
+import Context from "./Context.js";
 
 /*
  * 1 : resolver filter
@@ -17,58 +18,6 @@ const toDefaultValue = value => {
 	return new DefaultValue(value);
 };
 
-const getFromChain = function(resolver, property) {	
-	while (resolver) {
-		const context = resolver.context;
-		if (context && property in context)
-			return { context, resolver, value: context[property], defined: true };
-
-		resolver = resolver.parent;
-	}
-
-	return { context: null, resolver: null, value: undefined, defined: false };
-};
-
-const buildProxy = function(aResolver) {
-	//@TODO support only the top level properties of resolver context -> is't required to support deep object structures??? answer: actual, no use case of deep structure support!		
-	//@TODO write test cases!!!
-	return new Proxy({}, {
-		has : function(data, property) {
-			//@TODO write tests!!!
-			const {defined } = getFromChain(aResolver, property);	
-			return defined;
-		}, 
-		get: function(data, property) {
-			//@TODO write tests!!!	
-			const { value} = getFromChain(aResolver, property);
-			return value;
-		},
-		set: function(data, property, value) {
-			//@TODO would support this action on an proxied resolver context??? write tests!!!
-			const { context, defined} = getFromChain(aResolver, property);
-			if(defined)
-				context[property] = value;
-			else if(aResolver.context)
-				aResolver.context[property] = value;
-			else {
-				aResolver.context = {}
-				aResolver.context[property] = value;
-			}
-		},
-		deleteProperty: function(data, property) {
-			//@TODO would support this action on an proxied resolver context??? write tests!!!		
-			let { context, resolver} = getFromChain(aResolver, property);
-			while(context){
-				delete context[property];				
-				const result = getFromChain(resolver, property);
-				context = result.context;
-				resolver = result.resolver;
-			}
-		}		
-		//@TODO need to support the other proxy actions		
-	});
-};
-
 const execute = function(aStatement, aContext) {
 	if (typeof aStatement !== "string")
 		return aStatement;
@@ -81,7 +30,7 @@ const resolve = async function(aResolver, aExpression, aFilter, aDefault) {
 	if (aFilter && aResolver.name != aFilter)
 		return aResolver.parent ? resolve(aResolver.parent, aExpression, aFilter, aDefault) : null;
 	
-	const result = await execute(aExpression, aResolver.___proxy___);
+	const result = await execute(aExpression, aResolver.proxy.data);
 	if (result !== null && typeof result !== "undefined")
 		return result;
 
@@ -104,7 +53,7 @@ export default class ExpressionResolver {
 		this.parent = (parent instanceof ExpressionResolver) ? parent : null;
 		this.name = name;
 		this.context = context;
-		this.___proxy___ = buildProxy(this);
+		this.proxy = new Context(context, this);
 	}
 
 	get chain() {
