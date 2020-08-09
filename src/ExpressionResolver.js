@@ -53,7 +53,7 @@ export default class ExpressionResolver {
 		this.parent = (parent instanceof ExpressionResolver) ? parent : null;
 		this.name = name;
 		this.context = context;
-		this.proxy = new Context(context, this);
+		this.proxy = new Context(this.context, this);
 	}
 
 	get chain() {
@@ -84,7 +84,7 @@ export default class ExpressionResolver {
 			return;
 		else if (filter && filter != this.name) {
 			if (this.parent)
-				this.parent.updateData(key, value, filter);
+				this.parent.getData(key, filter);
 		} else {
 			const property = ObjectProperty.load(this.context, key, false);
 			return property ? property.value : null;
@@ -98,8 +98,13 @@ export default class ExpressionResolver {
 			if (this.parent)
 				this.parent.updateData(key, value, filter);
 		} else {
+			if(this.context == null || typeof this.context === "undefined"){
+				this.context = {};				
+				this.proxy.updateData(this.context);
+			}
 			const property = ObjectProperty.load(this.context, key);
 			property.value = value;
+			this.proxy.resetCache();
 		}
 	}
 

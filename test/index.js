@@ -3,4 +3,4 @@ import "./ResolveTextTest";
 import "./ContextBehaviorTest";
 import "./ResolverChainTest.js";
 import "./ContextManipulationTest.js";
-import "./PerformanceTests";
+//import "./PerformanceTests";

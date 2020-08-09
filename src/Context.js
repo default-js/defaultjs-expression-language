@@ -15,6 +15,15 @@ class Handle {
 		this.resolver = resolver;
 		this.cache = new Map();
 	}
+	
+	updateData(data){
+		this.data = data;
+		this.cache = new Map();
+	}
+	
+	resetCache(){
+		this.cache = new Map();
+	}
 
 	getPropertyDef(property, seek = true) {
 		if (this.cache.has(property))
@@ -27,8 +36,8 @@ class Handle {
 			def = seekAtChain(this.resolver.parent, property);
 		else
 			return null;
-			
-		this.cache.set(property, def);
+		if(def.defined)
+			this.cache.set(property, def);
 		return def;
 	}
 
@@ -81,5 +90,13 @@ export default class Context {
 			}
 			//@TODO need to support the other proxy actions		
 		});;
+	}
+	
+	updateData(data){
+		this.handle.updateData(data)		
+	}
+	
+	resetCache(){
+		this.handle.resetCache();
 	}
 };

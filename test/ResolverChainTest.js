@@ -86,4 +86,33 @@ describe("Resolver chain", () => {
 		const result = await third.resolve("${first == 'first' && second == 'second' && third =='third'}", "fail");
 		expect(result).toBe(true);
 	});
+	
+	it("resolve \"${first == 'first' && second == 'second' && third =='third'}\" one expression over multible resolver with updated context", async () => {
+		const first = new ExpressionResolver({name: "first" });
+		const second = new ExpressionResolver({ context: { second: "second" }, name: "second", parent: first });
+		const third = new ExpressionResolver({ context: { third: "third" }, name: "third", parent: second });
+		
+		let result = await third.resolve("${first == 'first' && second == 'second' && third =='third'}", "fail");			
+		expect(result).toBe("fail");
+		
+		first.updateData("first", "first");
+
+		result = await third.resolve("${first == 'first' && second == 'second' && third =='third'}", "fail");
+		expect(result).toBe(true);
+	});
+	
+	it("resolveText \"${first == 'first' && second == 'second' && third =='third'}\" one expression over multible resolver with updated context", async () => {
+		const first = new ExpressionResolver({context: null, name: "first" });
+		const second = new ExpressionResolver({ context: { second: "second" }, name: "second", parent: first });
+		const third = new ExpressionResolver({ context: { third: "third" }, name: "third", parent: second });
+		debugger;
+		let result = await third.resolveText("${first == 'first' && second == 'second' && third =='third'}", "fail");
+		expect(result).toBe("fail");	
+		
+		first.updateData("first", "first");
+
+		result = await third.resolveText("${first == 'first' && second == 'second' && third =='third'}", "fail");
+		expect(result).toBe("true");
+	});
+	
 });

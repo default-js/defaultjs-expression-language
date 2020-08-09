@@ -1,7 +1,7 @@
 {
 	"name": "@default-js/defaultjs-expression-language",
 	"buildname": "defaultjs-expression-language",
-	"version": "1.0.0-beta.10",
+	"version": "1.0.0-beta.11",
 	"description": "This provides an expression resolver. You can build an resolver chain to solve hierarchic scopes!",
 	"main": "./index.js",
 	"scripts": {
