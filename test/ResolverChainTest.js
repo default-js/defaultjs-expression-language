@@ -88,7 +88,7 @@ describe("Resolver chain", () => {
 	});
 	
 	it("resolve \"${first == 'first' && second == 'second' && third =='third'}\" one expression over multible resolver with updated context", async () => {
-		const first = new ExpressionResolver({name: "first" });
+		const first = new ExpressionResolver({context: {}, name: "first" });
 		const second = new ExpressionResolver({ context: { second: "second" }, name: "second", parent: first });
 		const third = new ExpressionResolver({ context: { third: "third" }, name: "third", parent: second });
 		

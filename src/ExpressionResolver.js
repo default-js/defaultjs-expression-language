@@ -4,11 +4,8 @@ import ObjectUtils from "@default-js/defaultjs-common-utils/src/ObjectUtils.js"
 import DefaultValue from "./DefaultValue.js";
 import Context from "./Context.js";
 
-/*
- * 1 : resolver filter
- * 2 : resolver name
- * 3 : expression
- */
+
+const EXECUTION_WARN_TIMEOUT = 1000;
 const EXPRESSION = /\$\{(([a-zA-Z0-9\-_\s]+)::)?([^\{\}]+)\}/;
 const DEFAULT_NOT_DEFINED = new DefaultValue();
 const toDefaultValue = value => {
@@ -18,12 +15,33 @@ const toDefaultValue = value => {
 	return new DefaultValue(value);
 };
 
-const execute = function(aStatement, aContext) {
+const execute = async function(aStatement, aContext) {
 	if (typeof aStatement !== "string")
 		return aStatement;
 		
-	const expression = new Function("context", `try{with(context){return ${aStatement}}}catch(e){throw e;}`);
-	return expression(aContext);
+	const expression = new Function("context", 
+`
+return (async (context) => {
+	try{ 
+		with(context){
+			 return ${aStatement}
+		}
+	}catch(e){
+		throw e;
+	}
+})(context)`
+	);
+	
+	let timeout = setTimeout(() => {
+		timeout = null;
+		console.warn("long running statement:", aStatement, new Error());
+	}, EXECUTION_WARN_TIMEOUT)
+	
+	const result = await expression(aContext);
+	
+	if(timeout)
+		clearTimeout(timeout)
+	return result;
 };
 
 const resolve = async function(aResolver, aExpression, aFilter, aDefault) {
