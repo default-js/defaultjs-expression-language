@@ -1,85 +1,79 @@
 import ExpressionResolver from "../src/ExpressionResolver";
 
-describe("Test resolve", function() {
-	beforeAll(function(done){		
-		done();
+describe("Test resolve", () => {
+	beforeAll(() => {});
+	
+	it("resolve \"${test}\"", async () => {
+		const result = await ExpressionResolver.resolve("${test}", {"test":"success"}, "fail");
+		expect(result).toBe("success");
 	});
 	
-	it("resolve \"${test}\"", function(done){
-		ExpressionResolver.resolve("${test}", {"test":"success"}, "fail")
-		.then(function(aResult){
-			expect(aResult).toBe("success");
-			done();	
-		});		
+	it("resolve \"${test}\" to default", async () => {
+		const expression = "${typeof test !== \"undefined\" ? test : undefined}";
+		const result = await ExpressionResolver.resolve(expression, {}, "fail");
+		expect(result).toBe("fail");
 	});
 	
-	it("resolve \"${test}\" to default", function(done){
-		ExpressionResolver.resolve("${typeof test !== \"undefined\" ? test : undefined}", {}, "fail")
-		.then(function(aResult){
-			expect(aResult).toBe("fail");
-			done();	
-		});		
+	it("resolve \"${test}\" but no default", async () => {
+		const expression = "${typeof test !== \"undefined\" ? test : undefined}";
+		const result = await ExpressionResolver.resolve(expression, {});
+		expect(result).toBeUndefined();
 	});
 	
-	it("resolve \"${test}\" throw an error", function(done){
-		ExpressionResolver.resolve("${test}", {}, "fail")
-		["catch"](function(aError){
-			expect(aError instanceof Error).toBe(true);
-			done();	
-		});		
+	it("resolve \"${test}\" throw an error with default", async () => {
+		const expression = "${test}";
+		const result = await ExpressionResolver.resolve(expression, {}, "fail");
+		expect(result).toBe("fail");
 	});
 	
-	it("resolve \"${test}\" as Object", function(done){
-		ExpressionResolver.resolve("${test}", {"test": {"type" : "object"}}, "fail")
-		.then(function(aResult){
-			expect(typeof aResult).toBe("object");
-			expect(aResult.type).toBeDefined();
-			expect(aResult.type).toBe("object");
-			done();	
-		});		
+	it("resolve \"${test}\" throw an error with no default", async () => {
+		const expression = "${test}";
+		const result = await ExpressionResolver.resolve(expression, {});
+		expect(result).toBe(expression);
 	});
 	
-	it("resolve \"${test}\" as function", function(done){
-		ExpressionResolver.resolve("${test}", {"test": function(){return "function";}}, "fail")
-		.then(function(aResult){
-			expect(typeof aResult).toBe("function");
-			expect(aResult()).toBe("function");
-			done();	
-		});		
+	it("resolve \"${test}\" as Object", async () => {
+		const result = await ExpressionResolver.resolve("${test}", {"test": {"type" : "object"}}, "fail");
+		expect(typeof result).toBe("object");
+		expect(result.type).toBeDefined();
+		expect(result.type).toBe("object");
 	});
 	
-	it("resolve \"${test}\" with timeout", function(done){
-		ExpressionResolver.resolve("${test}", {"test":"success"}, "fail", 1000)
-		.then(function(aResult){
-			expect(aResult).toBe("success");
-			done();	
-		});		
+	it("resolve \"${test}\" as function", async () => {
+		const result = await ExpressionResolver.resolve("${test}", {"test": function(){return "function";}}, "fail");
+		expect(typeof result).toBe("function");
+		expect(result()).toBe("function");
 	});
 	
-	it("resolve \"test\"", function(done){
-		ExpressionResolver.resolve("test", {"test":"success"}, "fail")
-		.then(function(aResult){
-			expect(aResult).toBe("success");
-			done();	
-		});		
+	it("resolve \"${test}\" with timeout", async () => {
+		const result = await ExpressionResolver.resolve("${test}", {"test":"success"}, "fail", 1000);
+		expect(result).toBe("success");
 	});
 	
-	it("resolve \"test\" with timeout", function(done){
-		ExpressionResolver.resolve("test", {"test":"success"}, "fail", 1000)
-		.then(function(aResult){
-			expect(aResult).toBe("success");
-			done();	
-		});		
+	it("resolve \"test\"", async () => {
+		const result = await ExpressionResolver.resolve("test", {"test":"success"}, "fail");
+		expect(result).toBe("success");
 	});
 	
-	it("resolve \"${getPromise()}\" as a promise", function(done){
-		ExpressionResolver.resolve("${getPromise()}", {"getPromise":function(){
-			return Promise.resolve("success");
-		}}, "fail")
-		.then(function(aResult){
-			expect(aResult).toBe("success");
-			done();	
-		});		
+	it("resolve \"test\" with timeout", async () => {
+		const result = await ExpressionResolver.resolve("test", {"test":"success"}, "fail", 1000);
+		expect(result).toBe("success");
 	});
 	
+	it("resolve \"${getPromise()}\" as a promise", async () => {
+		const result = await ExpressionResolver.resolve("${getPromise()}", {"getPromise":async () => "success"}, "fail");
+		expect(result).toBe("success");
+	});
+	
+	it("resolve \"${await promise1 + ' ' + await promise2}\" combine multiple promises", async () => {
+		const toPromise = async (value) => value;
+		
+		const result = await ExpressionResolver.resolve("${await promise1 + ' ' + await promise2}", {"promise1":toPromise("value1"), "promise2":toPromise("value2")}, "fail");
+		expect(result).toBe("value1 value2");
+	});
+	
+	it("resolve \"${value}\" value = 0", async () => {
+		const result = await ExpressionResolver.resolve("${value}", {"value":0}, "fail");
+		expect(result).toBe(0);
+	});
 });

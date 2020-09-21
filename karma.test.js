@@ -1,4 +1,4 @@
-const webpackconf = require("./webpack.prod.js")
+const webpackconf = require("./webpack.dev.js")
 const merge = require('webpack-merge');
 const common = require('./karma.common.js');
 const puppeteer = require('puppeteer');

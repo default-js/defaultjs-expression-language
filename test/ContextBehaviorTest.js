@@ -1,65 +1,46 @@
 import ExpressionResolver from "../src/ExpressionResolver";
 
-describe("Context Behavior Test", function() {
-	
-	beforeAll(function(done){	
-		const global = window || global || self || this || {};		
+describe("Context Behavior Test", () => {
+
+	beforeAll(() => {
+		const global = window || global || self || this || {};
 		global.test = "global context";
-		
-		done();
 	});
-	
+
 	afterAll(function() {
-		const global = window || global || self || this || {};		
+		const global = window || global || self || this || {};
 		delete global.test;
 	});
-	
-	it("resolve \"${test}\" from global context", function(done){
-		ExpressionResolver.resolveText("${test}")
-		.then(function(aResult){
-			expect(aResult).toBe("global context");
-			done();	
-		});		
+
+	it("resolve \"${test}\" from global context", async () => {
+		const result = await ExpressionResolver.resolveText("${test}");
+		expect(result).toBe("global context");
 	});
-	
-	it("resolve \"${test}\" from local context (override global context)", function(done){
-		ExpressionResolver.resolveText("${test}", {test: "local context"})
-		.then(function(aResult){
-			expect(aResult).toBe("local context");
-			done();	
-		});		
+
+	it("resolve \"${test}\" from local context (override global context)", async () => {
+		const result = await ExpressionResolver.resolveText("${test}", { test: "local context" });
+		expect(result).toBe("local context");
 	});
-	
-	it("resolve \"${document.location}\" from browser window context", function(done){
-		ExpressionResolver.resolveText("${document.location}")
-		.then(function(aResult){
-			expect(aResult).toBeDefined();
-			expect(aResult == document.location).toBe(true);
-			done();	
-		});		
+
+	it("resolve \"${document.location}\" from browser window context", async () => {
+		const result = await ExpressionResolver.resolveText("${document.location}");
+		expect(result).toBeDefined();
+		expect(result == document.location).toBe(true);
 	});
-	
-	it("resolve \"${document.location}\" with overrided browser window context", function(done){
-		ExpressionResolver.resolveText("${document.location}", {document : {location : "overrided"}})
-		.then(function(aResult){
-			expect(aResult).toBeDefined();
-			expect(aResult == document.location).toBe(false);
-			expect(aResult == "overrided").toBe(true);
-			done();	
-		});		
+
+	it("resolve \"${document.location}\" with overrided browser window context", async () => {
+		const result = await ExpressionResolver.resolveText("${document.location}", { document: { location: "overrided" } });
+		expect(result).toBeDefined();
+		expect(result == document.location).toBe(false);
+		expect(result == "overrided").toBe(true);
 	});
-	
-	it("resolve \"${document.location}\" from browser window context and local context", function(done){
-		ExpressionResolver.resolveText("${document.location}", {test:"local context"})
-		.then(function(aResult){
-			expect(aResult).toBeDefined();
-			expect(aResult == document.location).toBe(true);
-			return ExpressionResolver.resolveText("${test}", {test:"local context"})
-			.then(function(aResult){
-				expect(aResult == "local context").toBe(true);
-			});
-		})["finally"](function(){
-			done();
-		});		
-	});	
+
+	it("resolve \"${document.location}\" from browser window context and local context", async () => {
+		let result = await ExpressionResolver.resolveText("${document.location}", { test: "local context" });
+		expect(result).toBeDefined();
+		expect(result == document.location).toBe(true);
+		
+		result = await ExpressionResolver.resolveText("${test}", { test: "local context" });
+		expect(result == "local context").toBe(true);
+	});
 });
