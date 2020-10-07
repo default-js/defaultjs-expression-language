@@ -28,7 +28,7 @@ describe("Test resolve", () => {
 	
 	it("resolve \"${test}\" throw an error with no default", async () => {
 		const expression = "${test}";
-		const result = await ExpressionResolver.resolve(expression, {});
+		const result = await ExpressionResolver.resolve(expression, {}, expression);
 		expect(result).toBe(expression);
 	});
 	
@@ -75,5 +75,11 @@ describe("Test resolve", () => {
 	it("resolve \"${value}\" value = 0", async () => {
 		const result = await ExpressionResolver.resolve("${value}", {"value":0}, "fail");
 		expect(result).toBe(0);
+	});
+	
+	it("resolve escaped expression \"\\${test}\" to \"${test}\"", async () => {
+		const expression = "${test}";
+		const result = await ExpressionResolver.resolve("\\" + expression, {}, "fail");
+		expect(result).toBe(expression);
 	});
 });

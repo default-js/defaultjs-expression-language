@@ -6,7 +6,12 @@ import Context from "./Context.js";
 
 
 const EXECUTION_WARN_TIMEOUT = 1000;
-const EXPRESSION = /\$\{(([a-zA-Z0-9\-_\s]+)::)?([^\{\}]+)\}/;
+const EXPRESSION = /(\\?)(\$\{(([a-zA-Z0-9\-_\s]+)::)?([^\{\}]+)\})/;
+const MATCH_ESCAPED = 1;
+const MATCH_FULL_EXPRESSION = 2;
+const MATCH_EXPRESSION_SCOPE = 4;
+const MATCH_EXPRESSION_STATEMENT = 5;
+
 const DEFAULT_NOT_DEFINED = new DefaultValue();
 const toDefaultValue = value => {
 	if (value instanceof DefaultValue)
@@ -36,8 +41,10 @@ return (async (context) => {
 		timeout = null;
 		console.warn("long running statement:", aStatement, new Error());
 	}, EXECUTION_WARN_TIMEOUT)
-	
-	const result = await expression(aContext);
+	let result = undefined;
+	try{
+		result = await expression(aContext);
+	}catch(e){}
 	
 	if(timeout)
 		clearTimeout(timeout)
@@ -54,9 +61,14 @@ const resolve = async function(aResolver, aExpression, aFilter, aDefault) {
 
 	else if (aDefault instanceof DefaultValue && aDefault.hasValue)
 		return aDefault.value;
-
-	return result;
 };
+
+const resolveMatch = async (resolver, match, defaultValue) => {
+	if(match[MATCH_ESCAPED])
+		return match[MATCH_FULL_EXPRESSION]; 
+		
+	return resolve(resolver, match[MATCH_EXPRESSION_STATEMENT], normalize(match[MATCH_EXPRESSION_SCOPE]), defaultValue);
+}
 
 const normalize = value => {
 	if (value) {
@@ -140,7 +152,7 @@ export default class ExpressionResolver {
 		try {
 			const match = EXPRESSION.exec(aExpression);
 			if (match)
-				return await resolve(this, match[3], normalize(match[2]), defaultValue);
+				return await resolveMatch(this, match, defaultValue);
 			else
 				return await resolve(this, normalize(aExpression), null, defaultValue);
 		} catch (e) {
@@ -155,7 +167,7 @@ export default class ExpressionResolver {
 		let match = EXPRESSION.exec(text);
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED
 		while (match != null) {
-			const result = await this.resolve(match[0], defaultValue);
+			const result = await resolveMatch(this, match, defaultValue);
 			temp = temp.split(match[0]).join(); // remove current match for next loop
 			text = text.split(match[0]).join(typeof result === "undefined" ? "undefined" : (result == null ? "null" : result));
 			match = EXPRESSION.exec(temp);
