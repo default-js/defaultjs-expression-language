@@ -7,10 +7,21 @@ module.exports = {
 	// frameworks to use
 	// available frameworks: https://npmjs.org/browse/keyword/karma-adapter
 	frameworks : [ "jasmine" ],
+	plugins : [
+		"karma-webpack",
+		"karma-jasmine",
+		"karma-coverage",
+		"karma-html2js-preprocessor",
+		"karma-sourcemap-loader",
+		"karma-firefox-launcher",
+		"karma-chrome-launcher",
+		"karma-safari-launcher"
+	],
 	// list of files / patterns to load in the browser
 	files : [
 		//"src/**/*.js",
 		"test/index.js",
+		//"test/**/*Test.js",
 		"test/sites/**/*.html",
 		{pattern: "test/data/**/*", included: false, served: true, watched: false, nocache: false},
 		{pattern: "test/templates/**/*", included: false, served: true, watched: true, nocache: false}	
@@ -21,13 +32,14 @@ module.exports = {
 	},
 	// list of files / patterns to exclude
 	exclude : [
-		//"node_modules/*"
+		"node_modules/*"
 	],
 	// available preprocessors:
 	// https://npmjs.org/browse/keyword/karma-preprocessor
 	preprocessors : {
-		"src/**/*.js" : [ "webpack", "sourcemap", "coverage"],
-		"test/*.js" : [ "webpack", "sourcemap"],
+		"src/**/*.js" : [ "webpack", "coverage"],
+		"test/index.js" : [ "webpack", "sourcemap"],
+		//"test/**/*Test.js" : [ "webpack", "sourcemap"],
 		"test/sites/**/*.html" : [ "html2js" ]
 	},
 	// test results reporter to use
@@ -50,10 +62,13 @@ module.exports = {
 	colors : true,
 	autoWatch : true,
 	client : {
-		clearContext : true
+		clearContext : true,
+		//useIframe : false,
+		runInParent : false,
+		captureConsole: true		
 	},
 	singleRun : false,
 	concurrency : Infinity,
-	browserDisconnectTimeout: 120000,
-	browserNoActivityTimeout: 120000
+	browserDisconnectTimeout: 60000,
+	browserNoActivityTimeout: 60000
 };

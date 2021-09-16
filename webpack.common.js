@@ -1,13 +1,9 @@
-const path = require('path');
+const path = require("path");
+
+const entries = {};
+entries["defaultjs-expression-language"] = "./browser.js";
 
 module.exports = {
-    entry : './browser.js',
-    resolve : {
-		alias : { 
-			"@src" : path.resolve(__dirname + '/src'),
-			"@test" : path.resolve(__dirname + '/test'),
-			"@modules": path.resolve(__dirname + '/node_modules') 
-		}
-	},
-	target : "web"
+	entry: entries,
+	target: "web",
 };
