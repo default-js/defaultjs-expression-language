@@ -1,5 +1,4 @@
 import ExpressionResolver from "./ExpressionResolver";
+import Context from "./Context";
 
-export default {
-	ExpressionResolver:ExpressionResolver
-};
+export { ExpressionResolver, Context };
