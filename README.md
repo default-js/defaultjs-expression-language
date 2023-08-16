@@ -1,7 +1,6 @@
 # defaultjs-expression-language
 
-
-** Table of Contents **
+** Table of Contents
 
 - [defaultjs-expression-language](#defaultjs-expression-language)
   - [Intro](#intro)
@@ -14,14 +13,14 @@
   - [API Documentation](#api-documentation)
     - [Context sensitive behavior](#context-sensitive-behavior)
     - [Default value behavior](#default-value-behavior)
-    - [Timeout behavior\*\*](#timeout-behavior)
+    - [Timeout behavior](#timeout-behavior)
   - [License](#license)
 
 ## Intro
 
 This lib provide functionallity similar to the text literals at javascript, but this lib supports Promise results from an Expression.
 
-** Use this lib for dynamic content solutions. **
+** Use this lib for dynamic content solutions.
 
 ## Install
 
@@ -113,7 +112,7 @@ ExpressionResolver.resolve("${test}", global, "var is undefined"); // var is und
 ExpressionResolver.resolveText("text ${test} text", global, "var is undefined"); // text var is undefined text 
 ```
 
-### Timeout behavior**
+### Timeout behavior
 
 ```javascript
 const global = window || global || self || this || {};
