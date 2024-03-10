@@ -1,3 +1,5 @@
+import ExpressionResolver from "./ExpressionResolver";
+
 const seekAtChain = (resolver, property) => {
 	while(resolver){
 		const def = resolver.proxy.handle.getPropertyDef(property, false);
@@ -9,7 +11,20 @@ const seekAtChain = (resolver, property) => {
 	return { data: null, resolver: null, defined: false };
 }
 
-class Handle {
+/**
+ * cached proxy handle
+ *
+ * @class CachedProxyHandle
+ * @typedef {CachedProxyHandle}
+ */
+class CachedProxyHandle {
+	/**
+	 * Creates an instance of Handle.
+	 *
+	 * @constructor
+	 * @param {object} data
+	 * @param {ExpressionResolver} resolver
+	 */
 	constructor(data, resolver) {
 		this.data = data;
 		this.resolver = resolver;
@@ -72,10 +87,28 @@ class Handle {
 	}
 }
 
+/**
+ * Context object to handle data access
+ *
+ * @export
+ * @class Context
+ * @typedef {Context}
+ */
 export default class Context {
+
+	#handle = null;
+	#data = null;
+
+	/**
+	 * Creates an instance of Context.
+	 *
+	 * @constructor
+	 * @param {object} context
+	 * @param {ExpressionResolver} resolver
+	 */
 	constructor(context, resolver) {
-		this.handle = new Handle(context, resolver);		
-		this.data = new Proxy(this.handle, {
+		this.#handle = new CachedProxyHandle(context, resolver);		
+		this.#data = new Proxy(this.#handle, {
 			has: function(data, property) {
 				return data.hasProperty(property);
 			},
@@ -92,11 +125,27 @@ export default class Context {
 		});;
 	}
 	
+	get data(){
+		return this.#data;
+	}
+
+	get handle(){
+		return this.#handle;
+	}
+
+	/**
+	 * update data
+	 *
+	 * @param {*} data
+	 */
 	updateData(data){
-		this.handle.updateData(data)		
+		this.#handle.updateData(data)		
 	}
 	
+	/**
+	 * reset cache
+	 */
 	resetCache(){
-		this.handle.resetCache();
+		this.#handle.resetCache();
 	}
 };
