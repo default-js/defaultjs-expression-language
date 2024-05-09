@@ -11,6 +11,8 @@ const MATCH_FULL_EXPRESSION = 2;
 const MATCH_EXPRESSION_SCOPE = 4;
 const MATCH_EXPRESSION_STATEMENT = 5;
 
+const EXPRESSION_CACHE = new Map();
+
 const DEFAULT_NOT_DEFINED = new DefaultValue();
 const toDefaultValue = (value) => {
 	if (value instanceof DefaultValue) return value;
@@ -18,8 +20,9 @@ const toDefaultValue = (value) => {
 	return new DefaultValue(value);
 };
 
-const execute = async function (aStatement, aContext) {
-	if (typeof aStatement !== "string") return aStatement;
+const getOrCreateFunction = (aStatement) => {
+	if(EXPRESSION_CACHE.has(aStatement))
+		return EXPRESSION_CACHE.get(aStatement);
 
 	const expression = new Function(
 		"context",
@@ -35,17 +38,22 @@ return (async (context) => {
 })(context);`,
 	);
 
-	let timeout = setTimeout(() => {
-		timeout = null;
-		console.warn("long running statement:", aStatement, new Error());
-	}, EXECUTION_WARN_TIMEOUT);
-	let result = undefined;
-	try {
-		result = await expression(aContext);
-	} catch (e) {}
+	EXPRESSION_CACHE.set(aStatement, expression);
 
-	if (timeout) clearTimeout(timeout);
-	return result;
+	return expression;
+}
+
+const execute = async function (aStatement, aContext) {
+	if (typeof aStatement !== "string") return aStatement;
+	aStatement = normalize(aStatement);
+	if (aStatement == null) return aStatement;
+
+	try {
+		const expression = getOrCreateFunction(aStatement);
+		return await expression(aContext);
+	} catch (e) {
+		console.error(`Error by statement "${aStatement}":`, e)
+	}
 };
 
 const resolve = async function (aResolver, aExpression, aFilter, aDefault) {
