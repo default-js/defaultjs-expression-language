@@ -1,4 +1,4 @@
-import ExpressionResolver from "../src/ExpressionResolver";
+import {ExpressionResolver} from "../index.js";
 
 describe("Resolver chain", () => {
 	jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;

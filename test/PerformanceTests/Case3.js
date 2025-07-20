@@ -1,4 +1,4 @@
-import ExpressionResolver from "../../../src/ExpressionResolver";
+import {ExpressionResolver} from "../../index.js";
 const TEST__DEEPCHAINCOUNT = 1000000;
 const MAX_VARNAMES = 100;
 const nextInt = function(max, min = 0) {

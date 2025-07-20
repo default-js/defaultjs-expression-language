@@ -1,4 +1,4 @@
-import { ExpressionResolver } from "../../src/index.js";
+import {ExpressionResolver} from "../../index.js";
 import {EXECUTERNAME} from "../../src/executer/WithScopedExecuter.js"
 
 describe("Test resolve", () => {

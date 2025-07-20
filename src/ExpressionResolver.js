@@ -6,7 +6,14 @@ import Context from "./Context.js";
 import getExecuterType from "./ExecuterRegistry.js";
 
 const DEFAULT_EXECUTER_NAME = "with-scoped";
-let DEFAULT_EXECUTER = getExecuterType(DEFAULT_EXECUTER_NAME);
+let DEFAULT_EXECUTER = (() => {
+	let executer = null;
+	(aStatement, aContext) => {
+		if (executer == null) executer = getExecuterType(DEFAULT_EXECUTER_NAME);
+		return executer(aStatement, aContext);
+	};
+})();
+
 const EXECUTION_WARN_TIMEOUT = 1000;
 const EXPRESSION = /(\\?)(\$\{(([a-zA-Z0-9\-_\s]+)::)?([^\{\}]+)\})/;
 const MATCH_ESCAPED = 1;
@@ -27,16 +34,22 @@ const execute = async function (anExecuter, aStatement, aContext) {
 	if (aStatement == null) return aStatement;
 
 	try {
-		return await (new Promise((resolve) => {
-			const timeout =  setTimeout(() => console.warn(`Long running statement:
+		return await new Promise((resolve) => {
+			const timeout = setTimeout(
+				() =>
+					console.warn(`Long running statement:
 				"${aStatement}"
-			`), EXECUTION_WARN_TIMEOUT);
-			resolve((async () => {
-				const result = await anExecuter(aStatement, aContext);
-				clearTimeout(timeout);
-				return result;
-			})());
-		}));
+			`),
+				EXECUTION_WARN_TIMEOUT,
+			);
+			resolve(
+				(async () => {
+					const result = await anExecuter(aStatement, aContext);
+					clearTimeout(timeout);
+					return result;
+				})(),
+			);
+		});
 	} catch (e) {
 		console.error(`Error by statement "${aStatement}":`, e);
 	}

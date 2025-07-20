@@ -1,4 +1,4 @@
-import {ExpressionResolver} from "../../src/index.js";
+import {ExpressionResolver} from "../../index.js";
 import getExecuter from "../../src/ExecuterRegistry.js";
 import {EXECUTERNAME } from "../../src/executer/DirectExecuter.js";
 
