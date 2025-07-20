@@ -1,5 +1,10 @@
 import * as esprima from "esprima";
 import escodegen from "escodegen";
+import { registrate } from "../ExecuterRegistry.js";
+
+export const EXECUTERNAME = "esprima";
+
+const CONTEXT_NAME = "this.ctx";
 
 const RESERVED_NAMES = ["await", "async", "this", "undefined", "Object", "Array", "Map", "Set", "fetch", "console", "instanceof", "typeof"];
 const CALLEXPRESSION__RESERVED__CALLEES = ["fetch", "console"];
@@ -14,9 +19,12 @@ const TYPE_HANDLE_DEFAULT = (ast) => {
 };
 
 const TYPE_HANDLES = new Map([
-    ["TemplateLiteral", (ast) => {
-        traverse(ast.expressions);
-    }],
+	[
+		"TemplateLiteral",
+		(ast) => {
+			traverse(ast.expressions);
+		},
+	],
 	[
 		"CallExpression",
 		(ast) => {
@@ -43,10 +51,12 @@ const TYPE_HANDLES = new Map([
 		"Identifier",
 		(ast) => {
 			const { name } = ast;
-			if (!RESERVED_NAMES.includes(name)) ast.name = `this.${name}`;
+			if (!RESERVED_NAMES.includes(name)) ast.name = `${CONTEXT_NAME}.${name}`;
 		},
 	],
 ]);
+
+const EXPRESSION_CACHE = new Map();
 
 const traverse = function (ast) {
 	if (ast == null) return;
@@ -81,9 +91,35 @@ const generate = (aStatement) => {
 		"context",
 		`
 ${code};
-return fn.call(context || {});
+return fn.call({ctx:context});
 		`,
 	);
 };
 
-export default generate;
+/**
+ *
+ * @param {string} aStatement
+ * @returns {Function}
+ */
+const getOrCreateFunction = (aStatement) => {
+	if (EXPRESSION_CACHE.has(aStatement)) {
+		return EXPRESSION_CACHE.get(aStatement);
+	}
+	const expression = generate(aStatement);
+	EXPRESSION_CACHE.set(aStatement, expression);
+	return expression;
+};
+
+/**
+ *
+ * @param {string} aStatement
+ * @param {object} aContext
+ * @returns {Promise}
+ */
+function esprimaExecute (aStatement, aContext) {
+	const expression = getOrCreateFunction(aStatement);
+	return expression(aContext);
+};
+registrate(EXECUTERNAME, esprimaExecute);
+
+export default esprimaExecute;

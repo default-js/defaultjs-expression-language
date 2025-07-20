@@ -1,5 +1,4 @@
 const path = require("path");
-const { merge } = require("webpack-merge");
 const project = require("./package.json");
 const ReplaceInFileWebpackPlugin = require("replace-in-file-webpack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");

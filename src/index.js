@@ -1,4 +1,5 @@
-import ExpressionResolver from "./ExpressionResolver";
-import Context from "./Context";
+import "./executer/index.js";
+import ExpressionResolver from "./ExpressionResolver.js";
+import Context from "./Context.js";
 
 export { ExpressionResolver, Context };

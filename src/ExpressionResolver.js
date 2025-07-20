@@ -3,17 +3,16 @@ import ObjectProperty from "@default-js/defaultjs-common-utils/src/ObjectPropert
 import ObjectUtils from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 import DefaultValue from "./DefaultValue.js";
 import Context from "./Context.js";
-import FunctionGeneratorLegacy from "./FunctionGeneratorLegacy/index.js";
-import FunctionGeneratroEsprima from "./FunctionGeneartorEsprima/index.js";
+import getExecuterType from "./ExecuterRegistry.js";
 
+const DEFAULT_EXECUTER_NAME = "with-scoped";
+let DEFAULT_EXECUTER = getExecuterType(DEFAULT_EXECUTER_NAME);
 const EXECUTION_WARN_TIMEOUT = 1000;
 const EXPRESSION = /(\\?)(\$\{(([a-zA-Z0-9\-_\s]+)::)?([^\{\}]+)\})/;
 const MATCH_ESCAPED = 1;
 const MATCH_FULL_EXPRESSION = 2;
 const MATCH_EXPRESSION_SCOPE = 4;
 const MATCH_EXPRESSION_STATEMENT = 5;
-
-const EXPRESSION_CACHE = new Map();
 
 const DEFAULT_NOT_DEFINED = new DefaultValue();
 const toDefaultValue = (value) => {
@@ -22,39 +21,39 @@ const toDefaultValue = (value) => {
 	return new DefaultValue(value);
 };
 
-const getOrCreateFunction = (aStatement) => {
-	if (EXPRESSION_CACHE.has(aStatement)) return EXPRESSION_CACHE.get(aStatement);
-	const expression = FunctionGeneratroEsprima(aStatement);
-	EXPRESSION_CACHE.set(aStatement, expression);
-
-	return expression;
-};
-
-const execute = async function (aStatement, aContext) {
+const execute = async function (anExecuter, aStatement, aContext) {
 	if (typeof aStatement !== "string") return aStatement;
 	aStatement = normalize(aStatement);
 	if (aStatement == null) return aStatement;
 
 	try {
-		const expression = getOrCreateFunction(aStatement);
-		return await expression(aContext);
+		return await (new Promise((resolve) => {
+			const timeout =  setTimeout(() => console.warn(`Long running statement:
+				"${aStatement}"
+			`), EXECUTION_WARN_TIMEOUT);
+			resolve((async () => {
+				const result = await anExecuter(aStatement, aContext);
+				clearTimeout(timeout);
+				return result;
+			})());
+		}));
 	} catch (e) {
 		console.error(`Error by statement "${aStatement}":`, e);
 	}
 };
 
-const resolve = async function (aResolver, aExpression, aFilter, aDefault) {
-	if (aFilter && aResolver.name != aFilter) return aResolver.parent ? resolve(aResolver.parent, aExpression, aFilter, aDefault) : null;
+const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpression, aFilter, aDefault) {
+	if (aFilter && aResolver.name != aFilter) return aResolver.parent ? resolve(aResolver.parent, aExpression, aFilter, aDefault, aExecuter) : null;
 
-	const result = await execute(aExpression, aResolver.proxy.data);
+	const result = await execute(aExecuter, aExpression, aResolver.proxy.data);
 	if (result !== null && typeof result !== "undefined") return result;
 	else if (aDefault instanceof DefaultValue && aDefault.hasValue) return aDefault.value;
 };
 
-const resolveMatch = async (resolver, match, defaultValue) => {
+const resolveMatch = async (aExecuter, resolver, match, defaultValue) => {
 	if (match[MATCH_ESCAPED]) return match[MATCH_FULL_EXPRESSION];
 
-	return resolve(resolver, match[MATCH_EXPRESSION_STATEMENT], normalize(match[MATCH_EXPRESSION_SCOPE]), defaultValue);
+	return resolve(aExecuter, resolver, match[MATCH_EXPRESSION_STATEMENT], normalize(match[MATCH_EXPRESSION_SCOPE]), defaultValue);
 };
 
 const normalize = (value) => {
@@ -74,6 +73,21 @@ const normalize = (value) => {
  */
 export default class ExpressionResolver {
 	/**
+	 * @param {string} anExecuterName
+	 */
+	static set defaultExecuter(anExecuter) {
+		if (typeof anExecuter === "function") DEFAULT_EXECUTER = anExecuter;
+		else DEFAULT_EXECUTER = getExecuterType(anExecuter);
+		console.info(`Changed default executer for ExpressionResolver!`);
+	}
+
+	static get defaultExecuter() {
+		return DEFAULT_EXECUTER;
+	}
+
+	#executer = null;
+
+	/**
 	 * Creates an instance of ExpressionResolver.
 	 * @date 3/10/2024 - 7:27:57 PM
 	 *
@@ -83,11 +97,12 @@ export default class ExpressionResolver {
 	 * @param {ExpressionResolver} [param0.parent=null]
 	 * @param {?string} [param0.name=null]
 	 */
-	constructor({ context = GLOBAL, parent = null, name = null }) {
+	constructor({ context = GLOBAL, parent = null, name = null, executer }) {
 		this.parent = parent instanceof ExpressionResolver ? parent : null;
 		this.name = name;
 		this.context = context;
 		this.proxy = new Context(this.context, this);
+		this.#executer = typeof executer === "string" ? getExecuterType(executer) : undefined;
 	}
 
 	/**
@@ -193,13 +208,11 @@ export default class ExpressionResolver {
 	async resolve(aExpression, aDefault) {
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		try {
-			if(aExpression.startsWith("\\${"))
-				return aExpression.substring(1);
-			else if(aExpression.startsWith("${"))
-				return await resolve(this, normalize(aExpression.substring(2, aExpression.length - 1)), null, defaultValue);
+			if (aExpression.startsWith("\\${")) return aExpression.substring(1);
+			else if (aExpression.startsWith("${")) return await resolve(this.#executer, this, normalize(aExpression.substring(2, aExpression.length - 1)), null, defaultValue);
 			//const match = EXPRESSION.exec(aExpression);
 			//if (match) return await resolveMatch(this, match, defaultValue);
-			else return await resolve(this, normalize(aExpression), null, defaultValue);
+			else return await resolve(this.#executer, this, normalize(aExpression), null, defaultValue);
 		} catch (e) {
 			console.error('error at executing statment"', aExpression, '":', e);
 			return defaultValue.hasValue ? defaultValue.value : aExpression;
@@ -219,7 +232,7 @@ export default class ExpressionResolver {
 		let match = EXPRESSION.exec(text);
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		while (match != null) {
-			const result = await resolveMatch(this, match, defaultValue);
+			const result = await resolveMatch(this.#executer, this, match, defaultValue);
 			temp = temp.split(match[0]).join(); // remove current match for next loop
 			text = text.split(match[0]).join(typeof result === "undefined" ? "undefined" : result == null ? "null" : result);
 			match = EXPRESSION.exec(temp);
