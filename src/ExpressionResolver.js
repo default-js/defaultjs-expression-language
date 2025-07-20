@@ -3,6 +3,8 @@ import ObjectProperty from "@default-js/defaultjs-common-utils/src/ObjectPropert
 import ObjectUtils from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 import DefaultValue from "./DefaultValue.js";
 import Context from "./Context.js";
+import FunctionGeneratorLegacy from "./FunctionGeneratorLegacy/index.js";
+import FunctionGeneratroEsprima from "./FunctionGeneartorEsprima/index.js";
 
 const EXECUTION_WARN_TIMEOUT = 1000;
 const EXPRESSION = /(\\?)(\$\{(([a-zA-Z0-9\-_\s]+)::)?([^\{\}]+)\})/;
@@ -21,27 +23,12 @@ const toDefaultValue = (value) => {
 };
 
 const getOrCreateFunction = (aStatement) => {
-	if(EXPRESSION_CACHE.has(aStatement))
-		return EXPRESSION_CACHE.get(aStatement);
-
-	const expression = new Function(
-		"context",
-		`
-return (async (context) => {
-	try{ 
-		with(context){
-			 return ${aStatement}
-		}
-	}catch(e){
-		throw e;
-	}
-})(context);`,
-	);
-
+	if (EXPRESSION_CACHE.has(aStatement)) return EXPRESSION_CACHE.get(aStatement);
+	const expression = FunctionGeneratroEsprima(aStatement);
 	EXPRESSION_CACHE.set(aStatement, expression);
 
 	return expression;
-}
+};
 
 const execute = async function (aStatement, aContext) {
 	if (typeof aStatement !== "string") return aStatement;
@@ -52,7 +39,7 @@ const execute = async function (aStatement, aContext) {
 		const expression = getOrCreateFunction(aStatement);
 		return await expression(aContext);
 	} catch (e) {
-		console.error(`Error by statement "${aStatement}":`, e)
+		console.error(`Error by statement "${aStatement}":`, e);
 	}
 };
 
@@ -86,7 +73,6 @@ const normalize = (value) => {
  * @typedef {ExpressionResolver}
  */
 export default class ExpressionResolver {
-	
 	/**
 	 * Creates an instance of ExpressionResolver.
 	 * @date 3/10/2024 - 7:27:57 PM
@@ -207,8 +193,12 @@ export default class ExpressionResolver {
 	async resolve(aExpression, aDefault) {
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		try {
-			const match = EXPRESSION.exec(aExpression);
-			if (match) return await resolveMatch(this, match, defaultValue);
+			if(aExpression.startsWith("\\${"))
+				return aExpression.substring(1);
+			else if(aExpression.startsWith("${"))
+				return await resolve(this, normalize(aExpression.substring(2, aExpression.length - 1)), null, defaultValue);
+			//const match = EXPRESSION.exec(aExpression);
+			//if (match) return await resolveMatch(this, match, defaultValue);
 			else return await resolve(this, normalize(aExpression), null, defaultValue);
 		} catch (e) {
 			console.error('error at executing statment"', aExpression, '":', e);

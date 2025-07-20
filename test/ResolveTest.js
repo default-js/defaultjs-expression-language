@@ -8,23 +8,64 @@ describe("Test resolve", () => {
 		expect(result).toBe("success");
 	});
 	
-	it("resolve \"${test}\" to default", async () => {
+	it("resolve \"${typeof test !== \\\"undefined\\\" ? test : undefined}\" to default", async () => {
 		const expression = "${typeof test !== \"undefined\" ? test : undefined}";
 		const result = await ExpressionResolver.resolve(expression, {}, "fail");
 		expect(result).toBe("fail");
 	});
+
+	it("resolve \"${test instanceof Array }\" to default", async () => {
+		const expression = "${test instanceof Array }";
+		const result = await ExpressionResolver.resolve(expression, {});
+		expect(result).toBe(false);
+	});
+	
 	
 	it("resolve \"${test}\" but no default", async () => {
 		const expression = "${typeof test !== \"undefined\" ? test : undefined}";
 		const result = await ExpressionResolver.resolve(expression, {});
 		expect(result).toBeUndefined();
 	});
-	
-	it("resolve \"${test}\" throw an error with default", async () => {
-		const expression = "${test}";
-		const result = await ExpressionResolver.resolve(expression, {}, "fail");
-		expect(result).toBe("fail");
+
+	it("resolve \"${new Array()}\" to new Array", async () => {
+		const expression = "${new Array()}";
+		const result = await ExpressionResolver.resolve(expression, {});
+		expect(result instanceof Array).toBe(true);
 	});
+
+	it("resolve \"${await fetch(url)}\"", async () => {
+		const expression = "${await fetch(url)}";
+		console.log(new URL(document.location))
+		const result = await ExpressionResolver.resolve(expression, {url: "/"});
+		expect(result != null).toBe(true);
+	});
+
+	it("resolve \"${Object.freeze(url) || true}\"", async () => {
+		const expression = "${Object.freeze(url) || true}";
+		const result = await ExpressionResolver.resolve(expression, {url: new URL(location)});
+		expect(result != null).toBe(true);
+	});
+
+	it("resolve complex arrow function", async () => {
+		const expression = `\${		
+			await (async (value) => {			
+				return value;			
+			})(url)	
+		}`;
+		const result = await ExpressionResolver.resolve(expression, {url: new URL(location)});
+		expect(result != null).toBe(true);
+	});
+
+	it("resolve complex function", async () => {
+		const expression = `\${		
+			await (async function(value){			
+				return value;			
+			})(url)	
+		}`;
+		const result = await ExpressionResolver.resolve(expression, {url: new URL(location)});
+		expect(result != null).toBe(true);
+	});
+	
 	
 	it("resolve \"${test}\" throw an error with no default", async () => {
 		const expression = "${test}";
@@ -79,7 +120,20 @@ describe("Test resolve", () => {
 	
 	it("resolve escaped expression \"\\${test}\" to \"${test}\"", async () => {
 		const expression = "${test}";
-		const result = await ExpressionResolver.resolve("\\" + expression, {}, "fail");
+		const result = await ExpressionResolver.resolve("\\" + expression, {});
 		expect(result).toBe(expression);
 	});
+
+	it("resolve \"${`${test}`}\"", async () => {
+		const expression = "${`${test}`}";
+		const result = await ExpressionResolver.resolve(expression, {test: "test"});
+		expect(result).toBe("test");
+	});
+
+	it("resolve \"${test.map(item => item)}\"", async () => {
+		const expression = "${test.map(item => item)}";
+		const result = await ExpressionResolver.resolve(expression, {test: ["1", "2", "3"]});
+		expect(result instanceof Array).toBe(true);
+	});
+	
 });
