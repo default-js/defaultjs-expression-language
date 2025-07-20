@@ -1,6 +1,16 @@
-import {ExpressionResolver} from "../index.js";
+import {ExpressionResolver} from "../../../index.js";
+import {EXECUTERNAME} from "../../../src/executer/WithScopedExecuter.js"
 
 describe("Resolver context manipulation test - ", () => {
+
+	const executerReset = ExpressionResolver.defaultExecuter;
+	beforeAll(() => {
+		ExpressionResolver.defaultExecuter = EXECUTERNAME;
+	});
+
+	afterAll(() => {
+		ExpressionResolver.defaultExecuter = executerReset;
+	});
 
 	it("merge", async () => {
 		const resolver = new ExpressionResolver({ context: { first: "first" }});		

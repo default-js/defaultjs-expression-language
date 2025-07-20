@@ -1,0 +1,6 @@
+{
+  "inputs": ["./package.json"],
+  "output": "./LICENSE-OF-THIRD-PARTY",
+  "lineEnding": "ln",
+  "omitVersion": true
+}

@@ -8,7 +8,7 @@ import getExecuterType from "./ExecuterRegistry.js";
 const DEFAULT_EXECUTER_NAME = "with-scoped";
 let DEFAULT_EXECUTER = (() => {
 	let executer = null;
-	(aStatement, aContext) => {
+	return (aStatement, aContext) => {
 		if (executer == null) executer = getExecuterType(DEFAULT_EXECUTER_NAME);
 		return executer(aStatement, aContext);
 	};
@@ -44,8 +44,19 @@ const execute = async function (anExecuter, aStatement, aContext) {
 			);
 			resolve(
 				(async () => {
-					const result = await anExecuter(aStatement, aContext);
-					clearTimeout(timeout);
+					let result = undefined;
+					try {
+						result = await anExecuter(aStatement, aContext);
+					} catch (e) {
+						console.warn(`Execution error on statement!
+							statement: 
+							${aStatement}
+							error:
+							${e}
+							`)
+					} finally {
+						clearTimeout(timeout);
+					}
 					return result;
 				})(),
 			);
@@ -110,7 +121,7 @@ export default class ExpressionResolver {
 	 * @param {ExpressionResolver} [param0.parent=null]
 	 * @param {?string} [param0.name=null]
 	 */
-	constructor({ context = GLOBAL, parent = null, name = null, executer }) {
+	constructor({ context = GLOBAL, parent = null, name = null, executer } = {}) {
 		this.parent = parent instanceof ExpressionResolver ? parent : null;
 		this.name = name;
 		this.context = context;
@@ -319,3 +330,4 @@ export default class ExpressionResolver {
 		return new ExpressionResolver({ context, name, parent });
 	}
 }
+

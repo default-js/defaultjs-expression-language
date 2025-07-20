@@ -1,4 +1,5 @@
 {
 	"module": "./index.js",
-	"browser": "./browser.js"
+	"browser": "./browser.js",
+	"browser-all-executers": "./browser-all-executers.js"
 }

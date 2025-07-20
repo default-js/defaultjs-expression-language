@@ -1,12 +1,18 @@
-import * as esprima from "esprima";
+//import * as esprima from "esprima";
+import * as espree from "espree";
 import escodegen from "escodegen";
 import { registrate } from "../ExecuterRegistry.js";
 
 export const EXECUTERNAME = "esprima";
 
-const CONTEXT_NAME = "this.ctx";
+let DEBUG = false;
+export const setDebug = (value = true) => {
+	DEBUG = value;
+}
 
-const RESERVED_NAMES = ["await", "async", "this", "undefined", "Object", "Array", "Map", "Set", "fetch", "console", "instanceof", "typeof"];
+const CONTEXT_NAME = "ctx?.";
+
+const RESERVED_NAMES = ["await", "async", "this", "undefined", "window", "Object", "Array", "Map", "Set", "fetch", "console", "instanceof", "typeof"];
 const CALLEXPRESSION__RESERVED__CALLEES = ["fetch", "console"];
 const BINARYEXPRESSION__RESERVED_NAMES = ["instanceof"];
 const IGNORED_TYPES = new Set(["FunctionExpression", "ArrowFunctionExpression"]);
@@ -51,7 +57,7 @@ const TYPE_HANDLES = new Map([
 		"Identifier",
 		(ast) => {
 			const { name } = ast;
-			if (!RESERVED_NAMES.includes(name)) ast.name = `${CONTEXT_NAME}.${name}`;
+			if (!RESERVED_NAMES.includes(name)) ast.name = `${CONTEXT_NAME}${name}`;
 		},
 	],
 ]);
@@ -78,22 +84,22 @@ const traverse = function (ast) {
  * @returns {Function}
  */
 const generate = (aStatement) => {
-	const source = `async function fn(){return (${aStatement})}`;
+	const source = `async function fn({ctx}){return (${aStatement})}`;
 	//console.log("source", source);
-	const ast = esprima.parseScript(source, { tolerant: true });
+	//const ast = esprima.parseModule(source, { tolerant: true });
+	const ast = espree.parse(source, { tolerant: true, ecmaVersion: 16 });
 
 	traverse(ast);
 	const result = ast;
-	const code = escodegen.generate(result);
-	//console.log("code", code);
+	const code = `	
+	${escodegen.generate(result, {format: {compact: true}})};
+	
+	return fn({ctx:context});
+`;
+	if(DEBUG)
+		console.log("code", code);
 
-	return new Function(
-		"context",
-		`
-${code};
-return fn.call({ctx:context});
-		`,
-	);
+	return new Function("context", code);
 };
 
 /**
@@ -116,10 +122,10 @@ const getOrCreateFunction = (aStatement) => {
  * @param {object} aContext
  * @returns {Promise}
  */
-function esprimaExecute (aStatement, aContext) {
+function esprimaExecute(aStatement, aContext) {
 	const expression = getOrCreateFunction(aStatement);
 	return expression(aContext);
-};
+}
 registrate(EXECUTERNAME, esprimaExecute);
 
 export default esprimaExecute;

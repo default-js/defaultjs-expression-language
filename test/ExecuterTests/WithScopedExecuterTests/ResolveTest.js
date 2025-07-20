@@ -1,5 +1,5 @@
-import {ExpressionResolver} from "../../index.js";
-import {EXECUTERNAME} from "../../src/executer/WithScopedExecuter.js"
+import {ExpressionResolver} from "../../../index.js";
+import {EXECUTERNAME} from "../../../src/executer/WithScopedExecuter.js"
 
 describe("Test resolve", () => {
 	const executerReset = ExpressionResolver.defaultExecuter;

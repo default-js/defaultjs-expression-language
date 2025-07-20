@@ -10,19 +10,20 @@ let initialCall = true;
  * @returns {Function}
  */
 const generate = (aStatement) => {
-	return new Function(
-		"context",
-		`
-return (async (context) => {
-	try{ 
+const code = `
+	return (async (context) => {
 		with(context){
-			 return ${aStatement}
+			try{ 
+				return ${aStatement}
+			}catch(e){
+				throw e;
+			}
 		}
-	}catch(e){
-		throw e;
-	}
-})(context || {});`,
-	);
+	})(context || {});
+`;
+	//console.log("code", code);
+
+	return new Function("context", code);
 };
 
 /**

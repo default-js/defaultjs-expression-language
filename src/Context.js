@@ -8,7 +8,8 @@ const seekAtChain = (resolver, property) => {
 		
 		resolver = resolver.parent;
 	}	
-	return { data: null, resolver: null, defined: false };
+
+	return { data: undefined, resolver: null, defined: false };
 }
 
 /**
@@ -49,7 +50,7 @@ class CachedProxyHandle {
 			def = { data: this.data, resolver: this.resolver, defined: true };
 		else if(seek)
 			def = seekAtChain(this.resolver.parent, property);
-		else
+		else 		
 			return null;
 		if(def.defined)
 			this.cache.set(property, def);
