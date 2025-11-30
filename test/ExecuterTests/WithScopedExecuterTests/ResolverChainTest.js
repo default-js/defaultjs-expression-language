@@ -58,8 +58,7 @@ describe("Resolver chain", () => {
 		const third = new ExpressionResolver({ context: { third: "third" }, name: "third", parent: second });
 
 		const result = await third.resolve("${second}", "fail");
-		expect(first.context).toBe(null);
-		expect(third.effectiveChain).toBe("/second/third");
+		expect(third.effectiveChain).toBe("/first/second/third");
 		expect(result).toBe("second");
 	});
 
@@ -69,8 +68,7 @@ describe("Resolver chain", () => {
 		const third = new ExpressionResolver({ context: { third: "third" }, name: "third", parent: second });
 
 		const result = await third.resolve("${first}", "fail");
-		expect(second.context).toBe(null);
-		expect(third.effectiveChain).toBe("/first/third");
+		expect(third.effectiveChain).toBe("/first/second/third");
 		expect(result).toBe("first");
 	});
 
@@ -80,8 +78,7 @@ describe("Resolver chain", () => {
 		const third = new ExpressionResolver({ context: null, name: "third", parent: second });
 
 		const result = await third.resolve("${first}", "fail");
-		expect(third.context).toBe(null);
-		expect(third.effectiveChain).toBe("/first/second");
+		expect(third.effectiveChain).toBe("/first/second/third");
 		expect(result).toBe("first");
 	});
 

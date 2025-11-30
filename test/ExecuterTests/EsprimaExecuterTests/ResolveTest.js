@@ -11,7 +11,7 @@ describe("resolve test:", () => {
 		ExpressionResolver.defaultExecuter = executerReset;
 	});
 
-	/*
+	
 	it('"test"', async () => {
 		const result = await ExpressionResolver.resolve("test", { test: "success" });
 		expect(result).toBe("success");
@@ -21,14 +21,14 @@ describe("resolve test:", () => {
 		const result = await ExpressionResolver.resolve("${test}", { test: "success" });
 		expect(result).toBe("success");
 	});
-	*/
+	
 
 	it('"${test?.value}"', async () => {
 		const result = await ExpressionResolver.resolve("${test?.value}", { test: "success" });
 		expect(typeof result === "undefined").toBe(true);
 	});
 
-	/*	
+	
 	it("resolve \"${typeof test !== \\\"undefined\\\" ? test : undefined}\" to default", async () => {
 		const expression = "${typeof test !== \"undefined\" ? test : undefined}";
 		const result = await ExpressionResolver.resolve(expression, {}, "fail");
@@ -156,5 +156,5 @@ describe("resolve test:", () => {
 		const result = await ExpressionResolver.resolve(expression, {test: ["1", "2", "3"]});
 		expect(result instanceof Array).toBe(true);
 	});
-	*/
+	
 });

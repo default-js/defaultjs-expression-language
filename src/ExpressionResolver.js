@@ -1,11 +1,10 @@
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
-import ObjectProperty from "@default-js/defaultjs-common-utils/src/ObjectProperty.js";
 import ObjectUtils from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 import DefaultValue from "./DefaultValue.js";
-import Context from "./Context.js";
 import getExecuterType from "./ExecuterRegistry.js";
+import ContextProxy from "./ResolverContextHandle.js";
 
-const DEFAULT_EXECUTER_NAME = "with-scoped";
+const DEFAULT_EXECUTER_NAME = "with-scoped-executer";
 let DEFAULT_EXECUTER = (() => {
 	let executer = null;
 	return (aStatement, aContext) => {
@@ -69,7 +68,7 @@ const execute = async function (anExecuter, aStatement, aContext) {
 const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpression, aFilter, aDefault) {
 	if (aFilter && aResolver.name != aFilter) return aResolver.parent ? resolve(aResolver.parent, aExpression, aFilter, aDefault, aExecuter) : null;
 
-	const result = await execute(aExecuter, aExpression, aResolver.proxy.data);
+	const result = await execute(aExecuter, aExpression, aResolver.context);
 	if (result !== null && typeof result !== "undefined") return result;
 	else if (aDefault instanceof DefaultValue && aDefault.hasValue) return aDefault.value;
 };
@@ -109,7 +108,16 @@ export default class ExpressionResolver {
 		return DEFAULT_EXECUTER;
 	}
 
+	/** @type {string|null} */
+	#name = null;
+	/** @type {ExpressionResolver|null} */
+	#parent = null;
+	/** @type {function|null} */
 	#executer = null;
+	/** @type {Proxy|null} */
+	#context = null;
+	/** @type {ResolverContextHandle|null} */
+	#contextHandle = null;
 
 	/**
 	 * Creates an instance of ExpressionResolver.
@@ -122,11 +130,27 @@ export default class ExpressionResolver {
 	 * @param {?string} [param0.name=null]
 	 */
 	constructor({ context = GLOBAL, parent = null, name = null, executer } = {}) {
-		this.parent = parent instanceof ExpressionResolver ? parent : null;
-		this.name = name;
-		this.context = context;
-		this.proxy = new Context(this.context, this);
+		this.#parent = parent instanceof ExpressionResolver ? parent : null;
+		this.#name = name;
+		this.#contextHandle = new ContextProxy(context, this.#parent ? this.#parent.contextHandle : null);
+		this.#context = this.#contextHandle.proxy;
 		this.#executer = typeof executer === "string" ? getExecuterType(executer) : undefined;
+	}
+
+	get name() {
+		return this.#name;
+	}
+
+	get parent() {
+		return this.#parent;
+	}
+
+	get context() {
+		return this.#context;
+	}
+
+	get contextHandle() {
+		return this.#contextHandle;
 	}
 
 	/**
@@ -146,7 +170,6 @@ export default class ExpressionResolver {
 	 * @returns {string}
 	 */
 	get effectiveChain() {
-		if (!this.context) return this.parent ? this.parent.effectiveChain : "";
 		return this.parent ? this.parent.effectiveChain + "/" + this.name : "/" + this.name;
 	}
 
@@ -176,12 +199,11 @@ export default class ExpressionResolver {
 	 * @returns {*}
 	 */
 	getData(key, filter) {
-		if (!key) return;
+		if (!key) return this.context;
 		else if (filter && filter != this.name) {
 			if (this.parent) this.parent.getData(key, filter);
 		} else {
-			const property = ObjectProperty.load(this.context, key, false);
-			return property ? property.value : null;
+			return this.context[key];
 		}
 	}
 
@@ -197,13 +219,7 @@ export default class ExpressionResolver {
 		else if (filter && filter != this.name) {
 			if (this.parent) this.parent.updateData(key, value, filter);
 		} else {
-			if (this.context == null || typeof this.context === "undefined") {
-				this.context = {};
-				this.proxy.updateData(this.context);
-			}
-			const property = ObjectProperty.load(this.context, key);
-			property.value = value;
-			this.proxy.resetCache();
+			this.context[key] = value;
 		}
 	}
 
@@ -212,13 +228,12 @@ export default class ExpressionResolver {
 	 *
 	 * @param {object} context
 	 * @param {?string} filter
-	 */
+	 */	
 	mergeContext(context, filter) {
 		if (filter && filter != this.name) {
 			if (this.parent) this.parent.mergeContext(context, filter);
-		} else {
-			this.context = this.context ? ObjectUtils.merge(this.context, context) : context;
-		}
+		} else 
+			this.#contextHandle.mergeData(context);
 	}
 
 	/**
@@ -232,10 +247,9 @@ export default class ExpressionResolver {
 	async resolve(aExpression, aDefault) {
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		try {
+			aExpression = aExpression.trim();
 			if (aExpression.startsWith("\\${")) return aExpression.substring(1);
-			else if (aExpression.startsWith("${")) return await resolve(this.#executer, this, normalize(aExpression.substring(2, aExpression.length - 1)), null, defaultValue);
-			//const match = EXPRESSION.exec(aExpression);
-			//if (match) return await resolveMatch(this, match, defaultValue);
+			else if (aExpression.startsWith("${") && aExpression.endsWith("}")) return await resolve(this.#executer, this, normalize(aExpression.substring(2, aExpression.length - 1)), null, defaultValue);			
 			else return await resolve(this.#executer, this, normalize(aExpression), null, defaultValue);
 		} catch (e) {
 			console.error('error at executing statment"', aExpression, '":', e);

@@ -3,7 +3,7 @@ import * as espree from "espree";
 import escodegen from "escodegen";
 import { registrate } from "../ExecuterRegistry.js";
 
-export const EXECUTERNAME = "esprima";
+export const EXECUTERNAME = "esprima-executer";
 
 let DEBUG = false;
 export const setDebug = (value = true) => {

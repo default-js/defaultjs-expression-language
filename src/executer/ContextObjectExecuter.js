@@ -1,6 +1,6 @@
 import { registrate } from "../ExecuterRegistry.js";
 
-export const EXECUTERNAME = "direct";
+export const EXECUTERNAME = "context-object-executer";
 const EXPRESSION_CACHE = new Map();
 /**
  *
@@ -28,11 +28,14 @@ return (async (ctx) => {
  * @returns {Function}
  */
 const getOrCreateFunction = (aStatement) => {
-	if (EXPRESSION_CACHE.has(aStatement)) {
-		return EXPRESSION_CACHE.get(aStatement);
+
+	const cacheKey = aStatement;
+
+	if (EXPRESSION_CACHE.has(cacheKey)) {
+		return EXPRESSION_CACHE.get(cacheKey);
 	}
 	const expression = generate(aStatement);
-	EXPRESSION_CACHE.set(aStatement, expression);
+	EXPRESSION_CACHE.set(cacheKey, expression);
 	return expression;
 };
 

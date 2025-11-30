@@ -1,6 +1,6 @@
 import {registrate} from "../ExecuterRegistry.js";
 
-export const EXECUTERNAME = "with-scoped";
+export const EXECUTERNAME = "with-scoped-executer";
 const EXPRESSION_CACHE = new Map();
 let initialCall = true;
 

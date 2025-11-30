@@ -6,8 +6,7 @@ GLOBAL.defaultjs = GLOBAL.defaultjs || {};
 GLOBAL.defaultjs.el = GLOBAL.defaultjs.el || {
 	VERSION: "${version}",
 	ExpressionResolver,
-	Context,
 	ExecuterRegistry
 };
 
-export { ExpressionResolver, Context, ExecuterRegistry };
+export { ExpressionResolver, ExecuterRegistry };

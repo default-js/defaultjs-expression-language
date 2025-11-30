@@ -1,5 +1,5 @@
 import {ExpressionResolver} from "../../../index.js";
-import {EXECUTERNAME } from "../../../src/executer/ContextObjectExecuter.js";
+import {EXECUTERNAME } from "../../../src/executer/ContextDeconstructorExecuter.js";
 
 describe(`${EXECUTERNAME} resolve test: `, () => {
 
@@ -7,13 +7,13 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 	beforeAll(() => {
 		ExpressionResolver.defaultExecuter = EXECUTERNAME;
 	});	
-
+ 
 	afterAll(() => {
 		ExpressionResolver.defaultExecuter = executerReset;
 	});
 	
 	it("\"${test}\"", async () => {
-		const result = await ExpressionResolver.resolve("${ctx.test}", {"test":"success"});
+		const result = await ExpressionResolver.resolve("${test}", {"test":"success"});
 		expect(result).toBe("success");
 	});
 
