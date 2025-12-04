@@ -1,7 +1,16 @@
 import { registrate } from "../ExecuterRegistry.js";
+import CodeCache from "../CodeCache.js";
 
 export const EXECUTERNAME = "context-object-executer";
-const EXPRESSION_CACHE = new Map();
+const EXPRESSION_CACHE = new CodeCache({ aSize: 5000 });
+
+/**
+ * @param {import('../CodeCache.js').CodeCacheOptions} options
+ */
+export const setupExecuter = (options) => {
+	EXPRESSION_CACHE.setup(options);
+};
+
 /**
  *
  * @param {string} aStatement
@@ -40,16 +49,14 @@ const getOrCreateFunction = (aStatement) => {
 };
 
 /**
- * Description placeholder
- *
  * @param {string} aStatement
  * @param {object} aContext
  * @returns {Promise}
  */
-function directExecute(aStatement, aContext) {
+function executer(aStatement, aContext) {
 	const expression = getOrCreateFunction(aStatement);
 	return expression(aContext);
 };
-registrate(EXECUTERNAME, directExecute);
+registrate(EXECUTERNAME, executer);
 
-export default directExecute;
+export default executer;

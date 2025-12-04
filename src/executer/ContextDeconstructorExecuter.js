@@ -1,8 +1,17 @@
 import { registrate } from "../ExecuterRegistry.js";
-import { stringToHashcode } from "../Utils.js";
+import CodeCache from "../CodeCache.js";
 
 export const EXECUTERNAME = "context-deconstruction-executer";
-const EXPRESSION_CACHE = new Map();
+
+const EXPRESSION_CACHE = new CodeCache({ size: 5000 });
+
+/**
+ * @param {import('../CodeCache.js').CodeCacheOptions} options
+ */
+export const setupExecuter = (options) => {
+	EXPRESSION_CACHE.setup(options);
+};
+
 /**
  *
  * @param {string} aStatement
@@ -29,7 +38,7 @@ return (async ({${contextProperties}}) => {
  * @returns {Function}
  */
 const getOrCreateFunction = (aStatement, contextProperties) => {
-	const cacheKey = stringToHashcode(contextProperties + "::" + aStatement);
+	const cacheKey = `${contextProperties}::${aStatement}`;
 	if (EXPRESSION_CACHE.has(cacheKey)) {
 		return EXPRESSION_CACHE.get(cacheKey);
 	}
@@ -39,17 +48,15 @@ const getOrCreateFunction = (aStatement, contextProperties) => {
 };
 
 /**
- * Description placeholder
- *
  * @param {string} aStatement
  * @param {object} aContext
  * @returns {Promise}
  */
-function execute(aStatement, aContext) {
+function executer(aStatement, aContext) {
 	const contextProperties = Object.getOwnPropertyNames(aContext || {}).join(", ")	;
 	const expression = getOrCreateFunction(aStatement, contextProperties);
 	return expression(aContext);
 };
-registrate(EXECUTERNAME, execute);
+registrate(EXECUTERNAME, executer);
 
-export default execute;
+export default executer;

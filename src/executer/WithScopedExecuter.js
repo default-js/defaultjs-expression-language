@@ -1,7 +1,16 @@
 import {registrate} from "../ExecuterRegistry.js";
+import CodeCache from "../CodeCache.js";
 
 export const EXECUTERNAME = "with-scoped-executer";
-const EXPRESSION_CACHE = new Map();
+const EXPRESSION_CACHE = new CodeCache({ aSize: 5000 });
+
+/**
+ * @param {import('../CodeCache.js').CodeCacheOptions} options
+ */
+export const setupExecuter = (options) => {
+	EXPRESSION_CACHE.setup(options);
+};
+
 let initialCall = true;
 
 /**
@@ -41,13 +50,11 @@ const getOrCreateFunction = (aStatement) => {
 };
 
 /**
- * Description placeholder
- *
  * @param {string} aStatement
  * @param {object} aContext
  * @returns {Promise}
  */
-function withScopedExecute (aStatement, aContext) {
+function executer(aStatement, aContext) {
 	if(initialCall){
 		initialCall = false;
 		console.warn(new Error(`With Scoped expression execution is marked as deprecated.`));
@@ -56,6 +63,6 @@ function withScopedExecute (aStatement, aContext) {
 	const expression = getOrCreateFunction(aStatement);
 	return expression(aContext);
 };
-registrate(EXECUTERNAME, withScopedExecute);
+registrate(EXECUTERNAME, executer);
 
-export default withScopedExecute;
+export default executer;

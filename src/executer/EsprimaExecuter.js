@@ -2,6 +2,7 @@
 import * as espree from "espree";
 import escodegen from "escodegen";
 import { registrate } from "../ExecuterRegistry.js";
+import CodeCache from "../CodeCache.js";
 
 export const EXECUTERNAME = "esprima-executer";
 
@@ -9,6 +10,15 @@ let DEBUG = false;
 export const setDebug = (value = true) => {
 	DEBUG = value;
 }
+
+const EXPRESSION_CACHE = new CodeCache({ aSize: 5000 });
+
+/**
+ * @param {import('../CodeCache.js').CodeCacheOptions} options
+ */
+export const setupExecuter = (options) => {
+	EXPRESSION_CACHE.setup(options);
+};
 
 const CONTEXT_NAME = "ctx?.";
 
@@ -62,7 +72,6 @@ const TYPE_HANDLES = new Map([
 	],
 ]);
 
-const EXPRESSION_CACHE = new Map();
 
 const traverse = function (ast) {
 	if (ast == null) return;
@@ -117,15 +126,14 @@ const getOrCreateFunction = (aStatement) => {
 };
 
 /**
- *
  * @param {string} aStatement
  * @param {object} aContext
  * @returns {Promise}
  */
-function esprimaExecute(aStatement, aContext) {
+function executer(aStatement, aContext) {
 	const expression = getOrCreateFunction(aStatement);
 	return expression(aContext);
 }
-registrate(EXECUTERNAME, esprimaExecute);
+registrate(EXECUTERNAME, executer);
 
-export default esprimaExecute;
+export default executer;
