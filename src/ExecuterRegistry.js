@@ -1,9 +1,11 @@
+import Executer from "./Executer.js";
+
 const EXECUTERS = new Map();
 
 /**
  *
  * @param {string} aName
- * @param {Function} anExecuter
+ * @param {Executer} anExecuter
  */
 export const registrate = (aName, anExecuter) => {
 	EXECUTERS.set(aName, anExecuter);
@@ -12,7 +14,7 @@ export const registrate = (aName, anExecuter) => {
 /**
  *
  * @param {string} aName
- * @returns {Function}
+ * @returns {Executer}
  */
 export const getExecuter = (aName) => {
 	const executer = EXECUTERS.get(aName);

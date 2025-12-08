@@ -2,16 +2,12 @@ import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 import ObjectUtils from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 import DefaultValue from "./DefaultValue.js";
 import getExecuterType from "./ExecuterRegistry.js";
+import DefaultExecuter from "./executer/WithScopedExecuter.js";
 import ContextProxy from "./ResolverContextHandle.js";
+import Executer from "./Executer.js";
 
-const DEFAULT_EXECUTER_NAME = "with-scoped-executer";
-let DEFAULT_EXECUTER = (() => {
-	let executer = null;
-	return (aStatement, aContext) => {
-		if (executer == null) executer = getExecuterType(DEFAULT_EXECUTER_NAME);
-		return executer(aStatement, aContext);
-	};
-})();
+/** @type {Executer} */
+let DEFAULT_EXECUTER = DefaultExecuter;
 
 const EXECUTION_WARN_TIMEOUT = 1000;
 const EXPRESSION = /(\\?)(\$\{(([a-zA-Z0-9\-_\s]+)::)?([^\{\}]+)\})/;
@@ -45,7 +41,7 @@ const execute = async function (anExecuter, aStatement, aContext) {
 				(async () => {
 					let result = undefined;
 					try {
-						result = await anExecuter(aStatement, aContext);
+						result = await anExecuter.execute(aStatement, aContext);
 					} catch (e) {
 						console.warn(`Execution error on statement!
 							statement: 
@@ -71,6 +67,7 @@ const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpres
 	const result = await execute(aExecuter, aExpression, aResolver.context);
 	if (result !== null && typeof result !== "undefined") return result;
 	else if (aDefault instanceof DefaultValue && aDefault.hasValue) return aDefault.value;
+	return result;
 };
 
 const resolveMatch = async (aExecuter, resolver, match, defaultValue) => {
@@ -99,7 +96,7 @@ export default class ExpressionResolver {
 	 * @param {string} anExecuterName
 	 */
 	static set defaultExecuter(anExecuter) {
-		if (typeof anExecuter === "function") DEFAULT_EXECUTER = anExecuter;
+		if ( anExecuter instanceof Executer) DEFAULT_EXECUTER = anExecuter;
 		else DEFAULT_EXECUTER = getExecuterType(anExecuter);
 		console.info(`Changed default executer for ExpressionResolver!`);
 	}
@@ -129,7 +126,7 @@ export default class ExpressionResolver {
 	 * @param {ExpressionResolver} [param0.parent=null]
 	 * @param {?string} [param0.name=null]
 	 */
-	constructor({ context = GLOBAL, parent = null, name = null, executer } = {}) {
+	constructor({ context = DEFAULT_EXECUTER.defaultContext, parent = null, name = null, executer } = {}) {
 		this.#parent = parent instanceof ExpressionResolver ? parent : null;
 		this.#name = name;
 		this.#contextHandle = new ContextProxy(context, this.#parent ? this.#parent.contextHandle : null);
@@ -198,7 +195,7 @@ export default class ExpressionResolver {
 	 * @param {?string} filter
 	 * @returns {*}
 	 */
-	getData(key, filter) {
+	getData(key, filter) {		
 		if (!key) return this.context;
 		else if (filter && filter != this.name) {
 			if (this.parent) this.parent.getData(key, filter);

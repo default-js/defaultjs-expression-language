@@ -14,10 +14,6 @@ describe(`${EXECUTERNAME} context checks: `, () => {
 	
 	it("No Stacked context", async () => {
 		const resolver = new ExpressionResolver({ context: {string:"string", number:0, boolean:false, test:"success"}});
-		
-		const data = resolver.getData();
-
-		console.log(Object.getOwnPropertyNames(data));
 		expect(await resolver.resolve("${string}")).toBe("string");
 	});
 
@@ -31,8 +27,6 @@ describe(`${EXECUTERNAME} context checks: `, () => {
 		});
 		
 		const data = resolver.getData();
-
-		console.log(Object.getOwnPropertyNames(data));
 		expect(await resolver.resolve("${string}")).toBe("string");
 	});
 });

@@ -1,4 +1,5 @@
 import { registrate } from "../ExecuterRegistry.js";
+import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 
 export const EXECUTERNAME = "context-object-executer";
@@ -48,15 +49,14 @@ const getOrCreateFunction = (aStatement) => {
 	return expression;
 };
 
-/**
- * @param {string} aStatement
- * @param {object} aContext
- * @returns {Promise}
- */
-function executer(aStatement, aContext) {
-	const expression = getOrCreateFunction(aStatement);
+const EXECUTER = new Executer({
+	defaultContext: {},
+	execution: (aStatement, aContext) => {
+		const expression = getOrCreateFunction(aStatement);
 	return expression(aContext);
-};
-registrate(EXECUTERNAME, executer);
+	},
+});
 
-export default executer;
+registrate(EXECUTERNAME, EXECUTER);
+
+export default EXECUTER;

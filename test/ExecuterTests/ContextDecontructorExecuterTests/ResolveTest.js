@@ -56,4 +56,10 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 		const result = await ExpressionResolver.resolve("${new Date()}", {});
 		expect(result instanceof Date).toBe(true);
 	});	
+
+	it("varname not defined", async () => {
+		const result = await ExpressionResolver.resolve("${test}", {});
+		expect(typeof result === "undefined").toBe(true);
+	});	
+
 });

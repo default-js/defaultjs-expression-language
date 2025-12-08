@@ -3,13 +3,15 @@ import * as espree from "espree";
 import escodegen from "escodegen";
 import { registrate } from "../ExecuterRegistry.js";
 import CodeCache from "../CodeCache.js";
+import Executer from "../Executer.js";
+import { GLOBAL } from "@default-js/defaultjs-common-utils";
 
 export const EXECUTERNAME = "esprima-executer";
 
 let DEBUG = false;
 export const setDebug = (value = true) => {
 	DEBUG = value;
-}
+};
 
 const EXPRESSION_CACHE = new CodeCache({ aSize: 5000 });
 
@@ -72,7 +74,6 @@ const TYPE_HANDLES = new Map([
 	],
 ]);
 
-
 const traverse = function (ast) {
 	if (ast == null) return;
 	else if (ast instanceof Array) return ast.forEach((item) => traverse(item));
@@ -101,12 +102,11 @@ const generate = (aStatement) => {
 	traverse(ast);
 	const result = ast;
 	const code = `	
-	${escodegen.generate(result, {format: {compact: true}})};
+	${escodegen.generate(result, { format: { compact: true } })};
 	
 	return fn({ctx:context});
 `;
-	if(DEBUG)
-		console.log("code", code);
+	if (DEBUG) console.log("code", code);
 
 	return new Function("context", code);
 };
@@ -125,15 +125,14 @@ const getOrCreateFunction = (aStatement) => {
 	return expression;
 };
 
-/**
- * @param {string} aStatement
- * @param {object} aContext
- * @returns {Promise}
- */
-function executer(aStatement, aContext) {
-	const expression = getOrCreateFunction(aStatement);
-	return expression(aContext);
-}
-registrate(EXECUTERNAME, executer);
+const EXECUTER = new Executer({
+	defaultContext: GLOBAL,
+	execution: (aStatement, aContext) => {
+		const expression = getOrCreateFunction(aStatement);
+		return expression(aContext);
+	},
+});
 
-export default executer;
+registrate(EXECUTERNAME, EXECUTER);
+
+export default EXECUTER;

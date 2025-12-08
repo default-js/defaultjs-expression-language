@@ -1,4 +1,5 @@
 import { registrate } from "../ExecuterRegistry.js";
+import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 
 export const EXECUTERNAME = "context-deconstruction-executer";
@@ -47,16 +48,15 @@ const getOrCreateFunction = (aStatement, contextProperties) => {
 	return expression;
 };
 
-/**
- * @param {string} aStatement
- * @param {object} aContext
- * @returns {Promise}
- */
-function executer(aStatement, aContext) {
-	const contextProperties = Object.getOwnPropertyNames(aContext || {}).join(", ")	;
-	const expression = getOrCreateFunction(aStatement, contextProperties);
-	return expression(aContext);
-};
-registrate(EXECUTERNAME, executer);
+const EXECUTER = new Executer({
+	defaultContext: {},
+	execution: (aStatement, aContext) => {
+		const contextProperties = Object.getOwnPropertyNames(aContext || {}).join(", ");
+		const expression = getOrCreateFunction(aStatement, contextProperties);
+		return expression(aContext);
+	},
+});
 
-export default executer;
+registrate(EXECUTERNAME, EXECUTER);
+
+export default EXECUTER;

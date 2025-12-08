@@ -1,4 +1,5 @@
 import {registrate} from "../ExecuterRegistry.js";
+import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 
 export const EXECUTERNAME = "with-scoped-executer";
@@ -49,20 +50,17 @@ const getOrCreateFunction = (aStatement) => {
 	return expression;
 };
 
-/**
- * @param {string} aStatement
- * @param {object} aContext
- * @returns {Promise}
- */
-function executer(aStatement, aContext) {
-	if(initialCall){
-		initialCall = false;
-		console.warn(new Error(`With Scoped expression execution is marked as deprecated.`));
-	}
 
-	const expression = getOrCreateFunction(aStatement);
-	return expression(aContext);
-};
-registrate(EXECUTERNAME, executer);
 
-export default executer;
+const EXECUTER = new Executer({defaultContext: {}, execution: (aStatement, aContext) => {
+		if(initialCall){
+			initialCall = false;
+			console.warn(new Error(`With Scoped expression execution is marked as deprecated.`));
+		}
+
+		const expression = getOrCreateFunction(aStatement);
+		return expression(aContext);
+	}});
+registrate(EXECUTERNAME, EXECUTER);
+
+export default EXECUTER;
