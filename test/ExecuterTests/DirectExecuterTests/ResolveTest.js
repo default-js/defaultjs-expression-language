@@ -56,4 +56,11 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 		const result = await ExpressionResolver.resolve("${new Date()}", {});
 		expect(result instanceof Date).toBe(true);
 	});	
+
+	it("illegal object member", async () => {
+		const data = { test:"success"};
+		data["test-test"] =  true;
+		const result = await ExpressionResolver.resolve("${ctx.test}", data);
+		expect(result).toBe("success");
+	});	
 });

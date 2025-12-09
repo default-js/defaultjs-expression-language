@@ -143,4 +143,11 @@ describe("Test resolve", () => {
 		const result = await ExpressionResolver.resolve(expression, {test: ["1", "2", "3"]});
 		expect(result instanceof Array).toBe(true);
 	});
+
+	it("illegal object member", async () => {
+		const data = { test:"success"};
+		data["test-test"] =  true;
+		const result = await ExpressionResolver.resolve("${test}", data);
+		expect(result).toBe("success");
+	});	
 });

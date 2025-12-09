@@ -2,6 +2,8 @@ import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 import ExpressionResolver from "./ExpressionResolver";
 
 
+const VARNAME_CHECK = /^[$_\p{ID_Start}][$\p{ID_Continue}]*$/u;
+
 const createGlobalCacheWrapper = (handle) => {
 
 	return {
@@ -128,7 +130,12 @@ export default class ResolverContextHandle {
 			return createGlobalCacheWrapper(this);	
 
 		const cache = new Map();
-		for (let property of Object.getOwnPropertyNames(data)) cache.set(property, this);
+		for (let property in data) {
+			if(VARNAME_CHECK.test(property))	
+				cache.set(property, this);
+			else
+				console.warn(`Variable name is illegal ${property}, variable irgnored!`);
+		}
 
 		return cache;
 	}
@@ -156,7 +163,7 @@ export default class ResolverContextHandle {
 	}
 	#setProperty(property, value) {
 		//@TODO would support this action on an proxied resolver context??? write tests!!!
-		console.log("set property data:", property, "=", value);
+		//console.log("set property data:", property, "=", value);
 		this.#data[property] = value;
 		this.#cache.set(property, this);
 		return true;

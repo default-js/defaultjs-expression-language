@@ -62,4 +62,25 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 		expect(typeof result === "undefined").toBe(true);
 	});	
 
+	it("illegal object member", async () => {
+		const data = { test:"success"};
+		data["test-test"] =  true;
+		const result = await ExpressionResolver.resolve("${test}", data);
+		expect(result).toBe("success");
+	});	
+
+
+	it("work with complex elements at first level", async () => {
+		const div = document.createElement("div");
+		const result = await ExpressionResolver.resolve("${children.length}", div);
+		expect(result===0).toBe(true);
+	});
+
+	it("work with complex elements at deeper level", async () => {
+		const div = document.createElement("div");
+		const result = await ExpressionResolver.resolve("${div}", {div});
+		expect(result == div).toBe(true);
+		const resultchilderen = await ExpressionResolver.resolve("${div.children.length}", {div});
+		expect(resultchilderen===0).toBe(true);
+	});
 });

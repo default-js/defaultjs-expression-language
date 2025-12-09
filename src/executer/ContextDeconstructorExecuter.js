@@ -28,7 +28,7 @@ return (async ({${contextProperties}}) => {
     }
 })(context || {});`;
 
-	//console.log("code", code);
+	console.log("code", code);
 
 	return new Function("context", code);
 };
@@ -51,7 +51,11 @@ const getOrCreateFunction = (aStatement, contextProperties) => {
 const EXECUTER = new Executer({
 	defaultContext: {},
 	execution: (aStatement, aContext) => {
-		const contextProperties = Object.getOwnPropertyNames(aContext || {}).join(", ");
+		const propertyNames = Object.getOwnPropertyNames(aContext || {});
+		if(propertyNames.length > 50)
+			console.warn(`High count of properties at first level, can be decrease the performence! count: ${propertyNames.length}`);
+
+		const contextProperties = propertyNames.join(",");
 		const expression = getOrCreateFunction(aStatement, contextProperties);
 		return expression(aContext);
 	},
