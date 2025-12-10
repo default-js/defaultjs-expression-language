@@ -2,7 +2,16 @@ import { registrate } from "../ExecuterRegistry.js";
 import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 
+let DEBUG = false;
 export const EXECUTERNAME = "context-deconstruction-executer";
+
+/**
+ * 
+ * @param {boolean} value 
+ */
+export const setDebug = (value) => {
+	DEBUG = value;
+}
 
 const EXPRESSION_CACHE = new CodeCache({ size: 5000 });
 
@@ -28,7 +37,8 @@ return (async ({${contextProperties}}) => {
     }
 })(context || {});`;
 
-	console.log("code", code);
+	if (DEBUG)
+		console.log("genererated code: \n", code);
 
 	return new Function("context", code);
 };

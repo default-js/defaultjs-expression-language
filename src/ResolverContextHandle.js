@@ -1,8 +1,15 @@
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 import ExpressionResolver from "./ExpressionResolver";
+import { isNullOrUndefined } from "@default-js/defaultjs-common-utils/src/ObjectUtils";
 
 
 const VARNAME_CHECK = /^[$_\p{ID_Start}][$\p{ID_Continue}]*$/u;
+const RESERVED_WORDS = new Set([
+	"break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "export",
+	"extends", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "return", "super", "switch",
+	"this", "throw", "try", "typeof", "var", "void", "while", "with", "yield", "enum", "implements", "interface",
+	"let", "package", "private", "protected", "public", "static", "await", "null", "true", "false", "constructor", "undefined"
+]);
 
 const createGlobalCacheWrapper = (handle) => {
 
@@ -130,11 +137,19 @@ export default class ResolverContextHandle {
 			return createGlobalCacheWrapper(this);	
 
 		const cache = new Map();
-		for (let property in data) {
-			if(VARNAME_CHECK.test(property))	
-				cache.set(property, this);
-			else
-				console.warn(`Variable name is illegal ${property}, variable irgnored!`);
+		let type = data;
+		while(!isNullOrUndefined(type)) {
+			for (let name of Reflect.ownKeys(type)) {
+				if(typeof name !== 'string')
+					;//ignore non string property names
+				else if(RESERVED_WORDS.has(name))
+					;//ignore reserved words
+				else if(!VARNAME_CHECK.test(name))	
+					console.warn(`Variable name is illegal ${name}, variable irgnored!`);				
+				else
+					cache.set(name, this);					
+			}
+			type = Reflect.getPrototypeOf(type);
 		}
 
 		return cache;

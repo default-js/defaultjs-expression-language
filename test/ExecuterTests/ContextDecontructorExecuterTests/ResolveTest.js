@@ -83,4 +83,20 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 		const resultchilderen = await ExpressionResolver.resolve("${div.children.length}", {div});
 		expect(resultchilderen===0).toBe(true);
 	});
+
+
+	it("work with complex elements at deeper level", async () => {
+		class TestClass {
+			constructor(){			
+			}
+			get test() {
+				return "success";
+			}
+		}
+
+		let result = await ExpressionResolver.resolve("${test}",new TestClass());
+		expect(result).toBe("success");
+		result = await ExpressionResolver.resolve("${data.test}", {data: new TestClass()});
+		expect(result).toBe("success");
+	});
 });
