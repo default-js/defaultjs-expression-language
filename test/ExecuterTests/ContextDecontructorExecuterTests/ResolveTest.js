@@ -99,4 +99,5 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 		result = await ExpressionResolver.resolve("${data.test}", {data: new TestClass()});
 		expect(result).toBe("success");
 	});
+
 });

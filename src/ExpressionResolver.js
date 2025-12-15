@@ -126,12 +126,12 @@ export default class ExpressionResolver {
 	 * @param {ExpressionResolver} [param0.parent=null]
 	 * @param {?string} [param0.name=null]
 	 */
-	constructor({ context = DEFAULT_EXECUTER.defaultContext, parent = null, name = null, executer } = {}) {
+	constructor({ context = DEFAULT_EXECUTER.defaultContext, parent = null, name = null, executer } = {}) {		
+		this.#executer = typeof executer === "string" ? getExecuterType(executer) : ExpressionResolver.defaultExecuter;
 		this.#parent = parent instanceof ExpressionResolver ? parent : null;
 		this.#name = name;
 		this.#contextHandle = new ContextProxy(context, this.#parent ? this.#parent.contextHandle : null);
 		this.#context = this.#contextHandle.proxy;
-		this.#executer = typeof executer === "string" ? getExecuterType(executer) : undefined;
 	}
 
 	get name() {
@@ -217,6 +217,15 @@ export default class ExpressionResolver {
 			if (this.parent) this.parent.updateData(key, value, filter);
 		} else {
 			this.context[key] = value;
+		}
+	}
+
+	deleteData(key, filter) {
+		if (!key) return;
+		else if (filter && filter != this.name) {
+			if (this.parent) this.parent.deleteDataData(key, filter);
+		} else {
+			delete this.context[key];
 		}
 	}
 

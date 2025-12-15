@@ -24,7 +24,7 @@ export const setupExecuter = (options) => {
 
 const CONTEXT_NAME = "ctx?.";
 
-const RESERVED_NAMES = ["await", "async", "this", "undefined", "window", "Object", "Array", "Map", "Set", "fetch", "console", "instanceof", "typeof"];
+const RESERVED_NAMES = ["await", "async", "this", "undefined", "window", "gobal", "self", "Object", "Array", "Map", "Set", "fetch", "console", "instanceof", "typeof"];
 const CALLEXPRESSION__RESERVED__CALLEES = ["fetch", "console"];
 const BINARYEXPRESSION__RESERVED_NAMES = ["instanceof"];
 const IGNORED_TYPES = new Set(["FunctionExpression", "ArrowFunctionExpression"]);

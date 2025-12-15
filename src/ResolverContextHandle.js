@@ -18,12 +18,13 @@ const createGlobalCacheWrapper = (handle) => {
 			return true;
 		},
 		get: (property) => {
-			return handle
+			return GLOBAL[property];
 		},
-		set: (property, value) => {			
+		set: (property, value) => {
+			return false;
 		},
 		delete: (property) => {
-			delete GLOBAL[property];
+			return false;
 		},
 		keys: () => {
 			return Object.getOwnPropertyNames(GLOBAL);
@@ -63,21 +64,26 @@ export default class ResolverContextHandle {
 		this.#proxy = new Proxy(this.#data, {
 			has: (data, property) => {
 				//console.log("has property:", property);
-				return this.#hasProperty(property);
+				return this.#getPropertyDef(property) != null;
 			},
 			get: (data, property) => {
 				//console.log("get property:", property);
 				const proxy = this.#getPropertyDef(property);
-				return proxy ? proxy.#getProperty(property) : undefined;
+				return proxy ? proxy.#data[property] : undefined;
 			},
 			set: (data, property, value) => {
 				//console.log("set property:", property, "=", value);
-				const proxy = this.#getPropertyDef(property);
-				if (proxy) return proxy.#setProperty(property, value);
-				else return this.#setProperty(property, value);
+				this.#data[property] = value;
+				this.#cache.set(property, this);
+				return true;				
 			},
 			deleteProperty: (data, property) => {
-				return this.#deleteProperty(property);
+				const propertyDef = this.#cache.get(property);
+				if (propertyDef) {
+					delete this.#data[property];
+					this.#cache.delete(property);
+				}
+				return true;
 			},
 			ownKeys: (data) => {
 				//console.log("ownKeys");
@@ -167,27 +173,5 @@ export default class ResolverContextHandle {
 			parent = parent.#parent;
 		}
 		return null;
-	}
-
-	#hasProperty(property) {
-		return this.#getPropertyDef(property) != null;
-	}
-	#getProperty(property) {
-		//@TODO write tests!!!
-		return this.#data[property];
-	}
-	#setProperty(property, value) {
-		//@TODO would support this action on an proxied resolver context??? write tests!!!
-		//console.log("set property data:", property, "=", value);
-		this.#data[property] = value;
-		this.#cache.set(property, this);
-		return true;
-	}
-	#deleteProperty(property) {
-		const propertyDef = this.#cache.get(property);
-		if (propertyDef) {
-			delete propertyDef.data[property];
-			this.#cache.delete(property);
-		}
 	}
 }
