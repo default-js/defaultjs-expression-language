@@ -46,7 +46,7 @@
 	},
 	"homepage": "https://github.com/default-js/defaultjs-expression-language#readme",
 	"dependencies": {
-		"@default-js/defaultjs-common-utils": "latest",
+		"@default-js/defaultjs-common-utils": "^1",
 		"escodegen": "^2.1.0",
 		"espree": "^10.4.0",
 		"esprima": "^4.0.1"
