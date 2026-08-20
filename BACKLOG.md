@@ -1,0 +1,45 @@
+# Backlog
+
+Open items and findings for `@default-js/defaultjs-expression-language`.
+
+Three kinds of entry live here: defects noticed while working on something else, open questions that need a decision, and work that was agreed but not implemented yet.
+
+One paragraph each — where it is, what is wrong or undecided, what it costs. Enough to act on months later without asking anyone. Entries are written the moment they come up, not at the end of a session, because a session can end at any point. They are deleted once done; git history is the archive.
+
+Anything that affects consumers of the package additionally belongs in the [issue tracker](https://github.com/default-js/defaultjs-expression-language/issues); that call is Frank's.
+
+Entries here are independent of each other. The one undertaking with a forced order — the toolchain modernization — is tracked in `plans/toolchain-modernization.md` instead, and that file is deleted once it is finished.
+
+---
+
+- [ ] **The `CodeCache` size option is silently ignored in three of four executers.**
+  `src/executer/WithScopedExecuter.js:6`, `src/executer/ContextObjectExecuter.js:6` and
+  `src/executer/EsprimaExecuter.js:16` construct `new CodeCache({ aSize: 5000 })`, but the
+  option is named `size` (`src/CodeCache.js:32`). The intended 5000 never applies; those
+  caches run at the default of 1000 and trim five times as often as designed.
+  `src/executer/ContextDeconstructorExecuter.js:16` gets it right — which is what confirms
+  the intended name. Found 2026-08-20.
+
+- [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
+  `defaultjs-common-utils` already went this way, so the two packages diverge today. The
+  catch: reaching a non-default executer — and with it `setupExecuter(options)` — is done by
+  importing its module directly, e.g.
+  `@default-js/defaultjs-expression-language/src/executer/EsprimaExecuter.js`. That is the
+  intended usage (see `DECISIONS.md`, 2026-08-20) and works only because there is no
+  `exports` field. An `exports` field must therefore whitelist `./src/executer/*`, or every
+  consumer following the intended pattern breaks. Open alongside it: tuning the *default*
+  executer needs the same deep import even though the consumer never imported that module —
+  decide whether that stays as is or gets a documented entry point. Not to be mixed into the
+  toolchain work; the outcome belongs in `DECISIONS.md`. Found 2026-08-20.
+
+- [ ] **Decide whether to move `espree` 10 → 11.**
+  Version 11 raises the **runtime** Node floor for consumers of this package to
+  `^20.19 || ^22.13 || >=24`. That is a compatibility decision about the published package,
+  not a toolchain bump, so it stays out of the modernization stages. `espree` is only pulled
+  in by `EsprimaExecuter`, which is not registered by default — weigh the reach of the change
+  against that. The outcome belongs in `DECISIONS.md`. Found 2026-08-20.
+
+- [ ] **`webpack.config.js` refers to `./webcontent`, the directory is `WebContent`.**
+  `devServer.static` and `devServer.watchFiles` both use the lowercase spelling
+  (`webpack.config.js:57`, `:59`). Windows resolves it, a case-sensitive filesystem will
+  not — `npm run dev` would serve nothing on Linux or macOS. Found 2026-08-20.

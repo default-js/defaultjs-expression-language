@@ -1,0 +1,16 @@
+{
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node -e \"const fs=require('fs'),p=(process.env.CLAUDE_PROJECT_DIR||process.cwd())+'/BACKLOG.md';let t='';try{t=fs.readFileSync(p,'utf8')}catch(e){process.exit(0)}process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:'Current BACKLOG.md (open items for this project):\\n\\n'+t}}))\"",
+						"timeout": 10,
+						"statusMessage": "Loading BACKLOG.md"
+					}
+				]
+			}
+		]
+	}
+}
