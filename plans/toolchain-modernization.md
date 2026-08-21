@@ -2,7 +2,7 @@
 
 **Project:** `@default-js/defaultjs-expression-language` v3.0.0
 **Analysis as of:** 2026-08-14
-**Status:** stages 0 and A green (2026-08-21). Stages B–F of part 1 open, part 2 not started.
+**Status:** stages 0, A and B green (2026-08-21). Stages C–F of part 1 open, part 2 not started.
 
 A plan, not a collection: the stages depend on each other, and that sequence is what the analysis below buys. Independent items belong in `BACKLOG.md`, settled questions in `DECISIONS.md`.
 
@@ -156,12 +156,36 @@ taken from the ref are therefore up to ~900 bytes lower than the same file on di
 
 #### Stage B — clean up
 
-**Status:** not started.
+**Status:** **green, 2026-08-21.** All four packages removed after confirming by grep that
+nothing outside `package.json` and this plan mentions them:
+`clean-webpack-plugin`, `terser-webpack-plugin`, `http-server` from `devDependencies`,
+`esprima` from `dependencies`.
 
-- Remove `clean-webpack-plugin`, `terser-webpack-plugin`, `http-server` from `devDependencies`.
-- Remove `esprima` from `dependencies`.
-- Add `output.clean: true` to `webpack.config.js`.
-→ Build and tests.
+**Deviation — `output.clean: true` is wrong here and was not used as written.** Both modes
+emit into the same `dist/`, dev first and prod second, so an unconditional clean lets the
+prod run delete the dev bundles. Measured before changing anything: after `build:dev`
+`dist/` held the three dev bundles, after the following `build:prod` only the six minified
+artifacts were left. Since `dist/**` is part of the `files` array, that ships a package
+without its unminified bundles.
+
+What went in instead keeps the intent — webpack cleans, no third-party plugin — while each
+mode only removes its own stale artifacts:
+
+```js
+clean: { keep: (asset) => (devMode ? asset.includes(".min.") : !asset.includes(".min.")) },
+```
+
+Verified with two planted files: `dist/stale-old.js` and `dist/stale-old.min.js`.
+`build:dev` removed the first and kept the second, `build:prod` removed the second and kept
+all dev bundles; all nine real artifacts survive the pair.
+
+- `npm test` — **122 of 122 passing**.
+- `npm run build:dev` / `build:prod` — both exit 0. The artifacts are **byte-identical in
+  size to stage A**, as expected: `esprima` was never bundled.
+- `npm audit` — 42 → **41** (1 low, 15 moderate, 22 high, 3 critical), **0** with `--omit=dev`.
+
+`esprima` stays in `node_modules` regardless — `escodegen@2.1.0` depends on it. Only the
+declared direct dependency is gone; `CHANGELOG.md` says so.
 
 #### Stage C — rework versioning
 

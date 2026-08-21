@@ -21,6 +21,11 @@ module.exports = (env, argv) => {
 		output: {
 			filename: devMode ? `[name]-${project.buildname}.js` : `[name]-${project.buildname}.min.js`,
 			path: path.resolve(__dirname, target),
+			// Both modes emit into the same directory, dev first, prod second. Cleaning
+			// unconditionally would let the prod run delete the dev bundles, which are
+			// published through the files array. Each mode therefore only removes its own
+			// stale artifacts and keeps the ones belonging to the other.
+			clean: { keep: (asset) => (devMode ? asset.includes(".min.") : !asset.includes(".min.")) },
 		},
 		plugins: (() => {
 

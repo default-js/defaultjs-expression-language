@@ -13,6 +13,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ## [Unreleased]
 
+### Removed
+
+- **`esprima` is no longer a declared runtime dependency.** It was never imported — the two
+  references in `src/executer/EsprimaExecuter.js` are commented out, the executer parses with
+  `espree`. Nothing changes in an install: `escodegen` depends on `esprima` and still pulls
+  it in.
+
 ### Fixed
 
 - **The dependency on `@default-js/defaultjs-common-utils` was declared as `latest`.**
