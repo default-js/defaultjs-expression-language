@@ -76,8 +76,9 @@ The repository root holds permanent records only; anything temporary lives in `p
 
 | | |
 |---|---|
-| `npm test` | Karma headless (Chrome via Puppeteer) — the test gate |
-| `npm run test:live` | Karma in watch mode |
+| `npm test` | Vitest in headless Chromium via Playwright — the test gate |
+| `npm run test:live` | Vitest in watch mode |
+| `npm run test:coverage` | the same, with a v8 coverage report into `coverage/` |
 | `npm run build:dev` / `build:prod` | webpack bundles into `dist/` |
 | `npm run build` | `test` plus both builds |
 | `npm run dev` | dev server against `WebContent/` |
@@ -123,6 +124,12 @@ A consumer who wants a non-default executer imports it explicitly; that same imp
 
 ## Tests
 
-Jasmine running under Karma. The suite uses only `describe` / `it` / `beforeAll` with `async` functions and the matchers `toBe`, `toBeDefined`, `toBeUndefined`. That restriction is what keeps the planned move away from Karma cheap, so don't widen it without a reason.
+Vitest in browser mode, headless Chromium through Playwright — a real browser, because the package targets one and the tests reach for `document`, `window` and `document.location`. Configuration in `vitest.config.mjs`. The reasoning behind the runner choice is in `DECISIONS.md`.
 
-New test files are **not discovered automatically**: they have to be listed in the `index.js` of their folder, and that chain runs up to `test/index.js`. Shared setup sits in `test/setup.js`, helpers in `test/TestUtils.js`.
+New test files **are** discovered automatically: anything matching `test/**/*Test.js` runs. Shared setup sits in `test/setup.js`, wired in through `setupFiles`; helpers in `test/TestUtils.js`.
+
+Every test file imports what it uses — `import { describe, it, expect, beforeAll, afterAll } from "vitest"`. **`globals: true` is deliberately off** and must stay off: the suite uses the bare identifier `test` as its example of an undefined variable, and one `afterAll` calls `delete global.test`. With globals on, that is Vitest's own `test` function on `window`.
+
+The suite uses `describe` / `it` / `beforeAll` / `afterAll` with `async` functions and the matchers `toBe`, `toBeDefined`, `toBeUndefined`. Keeping that surface narrow is worth something on its own — don't widen it without a reason. Per-suite timeouts go in the options object, `describe(name, { timeout }, fn)`.
+
+`test/PerformanceTests/` holds three cases that nothing runs; they were already excluded under Karma. See `BACKLOG.md`.

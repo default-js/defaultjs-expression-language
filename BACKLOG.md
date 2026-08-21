@@ -109,3 +109,18 @@ Entries here are independent of each other. The one undertaking with a forced or
   `rolldown` at 1.x. Do not open this before part 2 of the toolchain plan is green — it
   needs its own plan under `plans/`, and the outcome belongs in `DECISIONS.md`.
   Raised 2026-08-21 when the runner was decided.
+
+- [ ] **`test/PerformanceTests/` is dead code.**
+  `Case1.js`, `Case2.js` and `Case3.js` were reached only through
+  `test/PerformanceTests/index.js`, and the import of that file in `test/index.js` was
+  commented out — so they have not run for as long as the git history shows. Both index
+  files are gone with the Karma removal (2026-08-21), which leaves the three cases with no
+  entry point at all. They do not match `test/**/*Test.js`, so Vitest ignores them too.
+  Either give them a runner — Vitest has `bench` for exactly this shape of test — or delete
+  them. Leaving them is the one option that costs something: they read as tests and are not.
+
+- [ ] **`argv.target` in `webpack.config.js` no longer has a caller.**
+  `const target = argv.target ? argv.target : "dist"` (`webpack.config.js:10`) existed so
+  `karma.conf.js` could redirect the build into `target/`. With Karma gone nothing passes
+  the argument any more, and `target/` is stale build output. Harmless, but it is one branch
+  and one `.gitignore` entry pretending to serve a purpose. Found 2026-08-21 during part 2.

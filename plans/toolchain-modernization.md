@@ -2,8 +2,9 @@
 
 **Project:** `@default-js/defaultjs-expression-language` v3.0.0
 **Analysis as of:** 2026-08-14
-**Status:** stages 0 to D green (2026-08-21), stage E dropped. Stage F is open in its
-`webpack.config.js` half only; part 2 not started.
+**Status:** part 2 is **done** (2026-08-21) — Karma is gone, Vitest is the gate, coverage
+works, `npm audit` is at **0**. Of part 1, stages 0 to D are green, stage E was dropped, and
+stage F is still open in its `webpack.config.js` half. Closing out part 1 is what remains.
 
 A plan, not a collection: the stages depend on each other, and that sequence is what the analysis below buys. Independent items belong in `BACKLOG.md`, settled questions in `DECISIONS.md`.
 
@@ -591,7 +592,7 @@ ecosystem, and pays for it with Vite in the tree.
 
 ### Stages
 
-**Status: steps 1 to 5 done, 2026-08-21. Step 6 is open and blocking — see below.**
+**Status: done, 2026-08-21.**
 
 1. **Set up side by side** — done. `vitest` 4.1.11, `@vitest/browser`,
    `@vitest/browser-playwright`, `@vitest/coverage-v8` and `playwright` 1.62.1 as
@@ -611,10 +612,24 @@ ecosystem, and pays for it with Vite in the tree.
    repository: statements 78.21 % (316/404), branches 64.70 % (132/204), functions 75.26 %
    (70/93), lines 82.87 % (300/362). `@vitest/coverage-v8`, html and lcov into `coverage/`.
    Goal 3 of the v3 cycle is unblocked.
-6. **Remove Karma** — open. `karma`, the seven `karma-*` packages, `jasmine-core`,
-   `puppeteer`, `karma.conf.js`, `test/index.js` with its folder `index.js` chain, and
-   `test/sites/`. `test` points at `vitest run`, `test:live` at `vitest`.
-7. **Final `npm audit`** — open, follows step 6.
+6. **Remove Karma** — done. `karma` and the nine `karma-*` packages plus `puppeteer`
+   uninstalled, which took **170 packages** out of `node_modules` (`jasmine-core` went with
+   them; it was never a direct dependency, because stage E was dropped). Deleted:
+   `karma.conf.js`, `test/index.js`, the seven folder `index.js` files and
+   `test/sites/browser-setup.html`. `test` now runs `vitest run`, `test:live` runs `vitest`,
+   `test:coverage` runs `vitest run --coverage`.
+7. **Final `npm audit`** — done: **0 vulnerabilities**, from 44 at the start of this plan.
+   Removing Karma brought it to 15, and all 15 sat in one place —
+   `generate-license-file` → `@npmcli/arborist` → the npm internals (`pacote`, `sigstore`,
+   `tar`, `socks`). `npm audit fix` cleared them without a breaking change: 85 packages
+   added, 41 removed, 25 changed, all transitive. Tests and both builds re-verified green
+   afterwards.
+
+**State after part 2:** `npm test` is 122 of 122 in 9.2 s. `npm run build` exits 0. The
+artifacts change in exactly four files against the last commit — the two browser dev bundles
+and their `.min.js.map` — which is the removed `Context` import, not the runner swap; the
+`.min.js` files are byte-identical because the import was unused and terser dropped it either
+way. `AGENTS.md` has a rewritten Tests section and Commands table.
 
 ### Two corrections to the analysis, found while doing the work
 
