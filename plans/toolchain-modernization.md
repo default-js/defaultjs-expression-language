@@ -2,7 +2,7 @@
 
 **Project:** `@default-js/defaultjs-expression-language` v3.0.0
 **Analysis as of:** 2026-08-14
-**Status:** not started — no stage executed yet.
+**Status:** stage 0 green (2026-08-21). Stages A–F of part 1 open, part 2 not started.
 
 A plan, not a collection: the stages depend on each other, and that sequence is what the analysis below buys. Independent items belong in `BACKLOG.md`, settled questions in `DECISIONS.md`.
 
@@ -95,11 +95,38 @@ The runtime dependencies are clean. Everything that needs doing sits in the tool
 
 #### Stage 0 — Baseline
 
-**Status:** not started.
+**Status:** **green, 2026-08-21** on `683bae8` (branch `v3`), Node v24.19.0 / npm 12.0.2.
 
-- Create a branch.
-- Run `npm run build` and `npm test` against the current state.
-- Archive `dist/` as a reference (the basis of comparison for every stage that follows).
+- `npm test` — **122 of 122 passing**, Chrome Headless 105.0.5173.0 (the Chromium bundled
+  with `puppeteer@16`). Runs on Node 24 despite the age of the launcher, so stage E is not
+  forced forward.
+- `npm run build` — exit 0, three warnings, all of them the asset size limit for
+  `browser-all-executers-…min.js` (359 KiB > 244 KiB). Known and intended, see `DECISIONS.md`.
+- `npm audit` — **44** (2 low, 16 moderate, 23 high, 3 critical) in `devDependencies`,
+  **0** with `--omit=dev`. Identical to the analysis of 2026-08-14.
+- Baseline archive: the freshly built `dist/` sits in the git ref **`refs/baseline/stage0`**
+  (`e088ef2`, created with `git stash create` — no commit on `v3`, nothing in
+  `git status`). Compare a later stage with
+  `git diff refs/baseline/stage0 -- dist`, read a single file with
+  `git show refs/baseline/stage0:dist/<name>`. Delete it when the plan is retired:
+  `git update-ref -d refs/baseline/stage0`.
+
+Sizes of the archived artifacts, in bytes:
+
+| Artifact | dev | min | map |
+|---|---|---|---|
+| `browser-…` | 159 122 | 13 824 | 75 664 |
+| `browser-all-executers-…` | 2 331 003 | 368 103 | 1 329 936 |
+| `module-…` | 156 827 | 13 502 | 75 046 |
+
+The committed `dist/` of `683bae8` predates the v3 sources and is therefore **not** the
+baseline — a fresh build differs from it substantially (`browser-…min.js` 11 804 → 13 824
+bytes). That is the executer work, not a toolchain effect.
+
+Noticed while archiving, tracked in `BACKLOG.md`: the dev bundles carry 771 CRLF pairs from
+the bundled `defaultjs-common-utils` sources, which `.gitattributes` normalizes away on
+commit. Comparisons through `git diff` are unaffected — both sides are normalized — but a
+byte comparison against a checked-out `dist/` is not.
 
 #### Stage A — low-risk bumps
 

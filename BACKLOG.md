@@ -62,3 +62,16 @@ Entries here are independent of each other. The one undertaking with a forced or
   This is goal 4 territory — the readme is what an AI system reads to learn the package, and
   right now it teaches a broken call. Alongside the fix: the readme documents none of v3
   (`ExecuterRegistry`, executers, `setupExecuter`, resolver chains, scopes). Found 2026-08-21.
+
+- [ ] **`.gitattributes` normalizes line endings inside the generated bundles.**
+  `* text=auto eol=lf` (`.gitattributes:3`) applies to `dist/**` as well. The development
+  bundles contain 771 CRLF pairs — measured in
+  `dist/browser-defaultjs-expression-language.js` — that come from the bundled
+  `@default-js/defaultjs-common-utils` sources, whose own files ship with CRLF
+  (`ObjectUtils.js` alone contributes 619). Committing a fresh build therefore stores
+  different bytes than webpack produced, and the published `dist/` differs from the local
+  build for every consumer. The occurrences seen so far sit in comments, so nothing breaks
+  today; a CRLF inside a template literal of a future dependency version would.
+  `dist/** -text` next to the existing `linguist-generated=true` settles it — the directory
+  is already declared generated. Costs nothing beyond one line, but it changes tracked
+  bytes, so it should not be mixed into a toolchain stage. Found 2026-08-21 during stage 0.
