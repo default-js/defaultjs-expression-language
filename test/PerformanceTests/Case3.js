@@ -22,27 +22,27 @@ const buildChain = async function() {
 		const context = await buildContext(20);
 		resolver = new ExpressionResolver({ context, name: "next" + i, parent: resolver });
 	}
-	
+
 	return resolver;
 }
 
 describe("Resolver chain", () => {
 	let resolver = null;
-	beforeAll(async () => {	
-		console.info("preparing!");	
+	beforeAll(async () => {
+		console.info("preparing!");
 		resolver = await buildChain();
 		console.info("preparing ready!");
 		return;
 	});
 
-	it("resolve deep chain - many calls test (case 2)", async () => {		
+	it("resolve deep chain - many calls test (case 2)", async () => {
 		const start = Date.now();
 		for (let i = 0; i < TEST__DEEPCHAINCOUNT; i++) {
 			const varid = nextInt(MAX_VARNAMES);
 			await resolver.resolve("${var" + varid + "}", true);
 		}
 		const runtime = Date.now() - start;
-		
+
 		console.info("resolve deep chain - many calls test (case 2):", runtime, "ms by deep:", TEST__DEEPCHAINCOUNT);
 
 	});

@@ -52,3 +52,13 @@ Entries here are independent of each other. The one undertaking with a forced or
   longer reach the documentation app now that its version selector runs off tags, so this
   is only about noise: close them and pause Dependabot until after the 3.0.0 release, or
   leave them. Found 2026-08-21.
+
+- [ ] **Every code example in `README.md` uses a default import that does not exist.**
+  All examples read `import ExpressionResolver from "@default-js/defaultjs-expression-language"`,
+  but `index.js:5` exports only named bindings — `export { ExpressionResolver, ExecuterRegistry }`.
+  The default import resolves to `undefined`, so every example in the readme fails at the first
+  call. Present since 1.0.0, so not a v3 regression. Two of the examples are additionally
+  unbalanced (`README.md:70-78`: the object literal and the argument list are never closed).
+  This is goal 4 territory — the readme is what an AI system reads to learn the package, and
+  right now it teaches a broken call. Alongside the fix: the readme documents none of v3
+  (`ExecuterRegistry`, executers, `setupExecuter`, resolver chains, scopes). Found 2026-08-21.

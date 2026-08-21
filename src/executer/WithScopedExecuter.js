@@ -15,15 +15,15 @@ export const setupExecuter = (options) => {
 let initialCall = true;
 
 /**
- * 
- * @param {string} aStatement 
+ *
+ * @param {string} aStatement
  * @returns {Function}
  */
 const generate = (aStatement) => {
 const code = `
 	return (async (context) => {
 		with(context){
-			try{ 
+			try{
 				return ${aStatement}
 			}catch(e){
 				throw e;
@@ -37,8 +37,8 @@ const code = `
 };
 
 /**
- * 
- * @param {string} aStatement 
+ *
+ * @param {string} aStatement
  * @returns {Function}
  */
 const getOrCreateFunction = (aStatement) => {

@@ -1,0 +1,33 @@
+# EditorConfig — https://editorconfig.org
+#
+# The machine-readable half of the conventions in AGENTS.md. Editors and
+# format-aware tools read this file; it advises, it does not enforce. There is
+# no linter and no formatter in this project, so nothing rejects a violation —
+# keeping the tree and this file in agreement is a matter of discipline.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = tab
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Markdown nests list items and fenced blocks by column, which tabs cannot
+# express portably — spaces are part of the syntax here, not a style choice.
+# Trailing whitespace stays trimmed: the two-space hard line break is not used
+# in this repository, and a trailing space that carries meaning is invisible.
+# Use a backslash at end of line if a hard break is ever needed.
+[*.md]
+indent_style = space
+indent_size = 2
+
+# Generated artifacts. Never hand-edited, so never normalized either — the
+# tools that write them decide their shape.
+[{dist/**,coverage/**,target/**,package-lock.json,LICENSE-OF-THIRD-PARTY}]
+charset = unset
+end_of_line = unset
+indent_style = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

@@ -44,7 +44,7 @@ const execute = async function (anExecuter, aStatement, aContext) {
 						result = await anExecuter.execute(aStatement, aContext);
 					} catch (e) {
 						console.warn(`Execution error on statement!
-							statement: 
+							statement:
 							${aStatement}
 							error:
 							${e}
@@ -126,7 +126,7 @@ export default class ExpressionResolver {
 	 * @param {ExpressionResolver} [param0.parent=null]
 	 * @param {?string} [param0.name=null]
 	 */
-	constructor({ context = DEFAULT_EXECUTER.defaultContext, parent = null, name = null, executer } = {}) {		
+	constructor({ context = DEFAULT_EXECUTER.defaultContext, parent = null, name = null, executer } = {}) {
 		this.#executer = typeof executer === "string" ? getExecuterType(executer) : ExpressionResolver.defaultExecuter;
 		this.#parent = parent instanceof ExpressionResolver ? parent : null;
 		this.#name = name;
@@ -195,7 +195,7 @@ export default class ExpressionResolver {
 	 * @param {?string} filter
 	 * @returns {*}
 	 */
-	getData(key, filter) {		
+	getData(key, filter) {
 		if (!key) return this.context;
 		else if (filter && filter != this.name) {
 			if (this.parent) this.parent.getData(key, filter);
@@ -234,11 +234,11 @@ export default class ExpressionResolver {
 	 *
 	 * @param {object} context
 	 * @param {?string} filter
-	 */	
+	 */
 	mergeContext(context, filter) {
 		if (filter && filter != this.name) {
 			if (this.parent) this.parent.mergeContext(context, filter);
-		} else 
+		} else
 			this.#contextHandle.mergeData(context);
 	}
 
@@ -255,7 +255,7 @@ export default class ExpressionResolver {
 		try {
 			aExpression = aExpression.trim();
 			if (aExpression.startsWith("\\${")) return aExpression.substring(1);
-			else if (aExpression.startsWith("${") && aExpression.endsWith("}")) return await resolve(this.#executer, this, normalize(aExpression.substring(2, aExpression.length - 1)), null, defaultValue);			
+			else if (aExpression.startsWith("${") && aExpression.endsWith("}")) return await resolve(this.#executer, this, normalize(aExpression.substring(2, aExpression.length - 1)), null, defaultValue);
 			else return await resolve(this.#executer, this, normalize(aExpression), null, defaultValue);
 		} catch (e) {
 			console.error('error at executing statment"', aExpression, '":', e);
@@ -336,7 +336,7 @@ export default class ExpressionResolver {
 	 * build a secure context object
 	 *
 	 * @static
-	 
+
 	 * @param {object} arg
 	 * @param {object} arg.context
 	 * @param {function} arg.propFilter

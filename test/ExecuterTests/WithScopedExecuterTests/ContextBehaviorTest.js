@@ -14,7 +14,7 @@ describe("Context Behavior Test", () => {
 		const global = window || global || self || this || {};
 		delete global.test;
 	});
-	
+
 
 	it("resolve \"${test}\" from global context", async () => {
 		const result = await ExpressionResolver.resolveText("${test}");
@@ -43,7 +43,7 @@ describe("Context Behavior Test", () => {
 		let result = await ExpressionResolver.resolveText("${document.location}", { test: "local context" });
 		expect(result).toBeDefined();
 		expect(result == document.location).toBe(true);
-		
+
 		result = await ExpressionResolver.resolveText("${test}", { test: "local context" });
 		expect(result == "local context").toBe(true);
 	});

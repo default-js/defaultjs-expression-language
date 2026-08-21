@@ -19,6 +19,48 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-21 — Do we commit style configuration, and does the tree get normalized?
+
+**Decision:** Yes to both. `.editorconfig` and `.gitattributes` enter the repository, and the
+tree was normalized once to match them in the same change.
+
+- `.editorconfig`: utf-8, LF, tabs, final newline, no trailing whitespace. Markdown is the
+  one exception — spaces, width 2, because list nesting and fenced blocks are column-based
+  syntax there, not style. Generated paths (`dist/**`, `coverage/**`, `target/**`,
+  `package-lock.json`, `LICENSE-OF-THIRD-PARTY`) unset every key.
+- `.gitattributes`: `* text=auto eol=lf`, plus `linguist-generated` on the three generated
+  paths.
+- Normalization touched 55 tracked files: four were pure CRLF (`browser.js`,
+  `src/ExpressionResolver.js`, `src/index.js`, `test/index.js`), 29 had no final newline,
+  ~20 carried trailing whitespace. Space indentation became tabs in `src/Executer.js`,
+  `src/Utils.js`, `test/TestUtils.js`, `webpack.config.js` and
+  `generate-license.config.json`; the JSDoc blocks at `src/CodeCache.js:29` and `:40` sat one
+  column off and were straightened.
+
+**Reasoning:** The conventions in `AGENTS.md` were prose only, and the tree had already
+drifted away from them — seven files were space-indented while the rule said tabs, so an
+agent following "the style of the surrounding file" correctly produced the wrong thing.
+Config without normalization would have left that contradiction standing; normalization
+without config would have let it come back. Line endings were not governed by the repository
+at all. `core.autocrlf=input` is set on this machine but did not prevent the drift: the four
+CRLF files are stored that way in git, so every checkout everywhere received them. A
+per-machine setting was never going to hold that line, which is what `.gitattributes` is for.
+
+**Alternatives:** A formatter (Prettier) would enforce rather than advise, but it is a
+dependency, a script, and a much larger diff, and it decides far more than indentation —
+rejected as out of proportion to the problem. Leaving markdown on tabs was rejected outright:
+it breaks list rendering. Keeping trailing whitespace in markdown to preserve the two-space
+hard line break was rejected because that break is unused here, and an invisible significant
+character is worse than the backslash form.
+
+**Consequences:** `.editorconfig` advises, it does not enforce. With no linter and no CI
+nothing rejects a violation, so tree and config stay in agreement by discipline alone. The
+spaces inside the template literals of `ContextObjectExecuter.js:23-27` and
+`ContextDeconstructorExecuter.js:33-37` are generated-code content, not indentation, and are
+deliberately left alone — a blanket tab conversion would rewrite the code this package emits.
+Any later bulk reformatting has to make the same exception. The normalization is one
+mechanical commit touching nearly every file, so `git blame` across it needs `--ignore-rev`.
+
 ## 2026-08-21 — How do we work with branches, and what identifies a released version?
 
 **Decision:** Tags identify versions, branches only identify work.

@@ -29,7 +29,7 @@ const createGlobalCacheWrapper = (handle) => {
 		keys: () => {
 			return Object.getOwnPropertyNames(GLOBAL);
 		}
-	}	
+	}
 }
 
 
@@ -75,7 +75,7 @@ export default class ResolverContextHandle {
 				//console.log("set property:", property, "=", value);
 				this.#data[property] = value;
 				this.#cache.set(property, this);
-				return true;				
+				return true;
 			},
 			deleteProperty: (data, property) => {
 				const propertyDef = this.#cache.get(property);
@@ -139,8 +139,8 @@ export default class ResolverContextHandle {
 	 */
 	#initPropertyCache() {
 		const data = this.#data;
-		if(data == GLOBAL) 
-			return createGlobalCacheWrapper(this);	
+		if(data == GLOBAL)
+			return createGlobalCacheWrapper(this);
 
 		const cache = new Map();
 		let type = data;
@@ -150,10 +150,10 @@ export default class ResolverContextHandle {
 					;//ignore non string property names
 				else if(RESERVED_WORDS.has(name))
 					;//ignore reserved words
-				else if(!VARNAME_CHECK.test(name))	
-					console.warn(`Variable name is illegal ${name}, variable irgnored!`);				
+				else if(!VARNAME_CHECK.test(name))
+					console.warn(`Variable name is illegal ${name}, variable irgnored!`);
 				else
-					cache.set(name, this);					
+					cache.set(name, this);
 			}
 			type = Reflect.getPrototypeOf(type);
 		}

@@ -25,10 +25,10 @@ export default class CodeCache {
 	/** @type {Map<string,CacheEntry} */
 	#entryMap = new Map();
 
-	
-	 /**
-	  * @param {CodeCacheOptions} options
-	  */
+
+	/**
+	 * @param {CodeCacheOptions} options
+	 */
 	constructor({ size = 1000 } = {}) {
 		if (size <= 0) this.#disabled = true;
 		else {
@@ -37,9 +37,9 @@ export default class CodeCache {
 		}
 	}
 
-	 /**
-	  * @param {CodeCacheOptions} options
-	  */
+	/**
+	 * @param {CodeCacheOptions} options
+	 */
 	setup({ size = 1000 } = {}) {
 		if (size <= 0){
 			this.#disabled = true;

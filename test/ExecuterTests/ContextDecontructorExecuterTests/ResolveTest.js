@@ -6,12 +6,12 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 	const executerReset = ExpressionResolver.defaultExecuter;
 	beforeAll(() => {
 		ExpressionResolver.defaultExecuter = EXECUTERNAME;
-	});	
- 
+	});
+
 	afterAll(() => {
 		ExpressionResolver.defaultExecuter = executerReset;
 	});
-	
+
 	it("\"${test}\"", async () => {
 		const result = await ExpressionResolver.resolve("${test}", {"test":"success"});
 		expect(result).toBe("success");
@@ -55,19 +55,19 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 	it("\"${new Date()}\"", async () => {
 		const result = await ExpressionResolver.resolve("${new Date()}", {});
 		expect(result instanceof Date).toBe(true);
-	});	
+	});
 
 	it("varname not defined", async () => {
 		const result = await ExpressionResolver.resolve("${test}", {});
 		expect(typeof result === "undefined").toBe(true);
-	});	
+	});
 
 	it("illegal object member", async () => {
 		const data = { test:"success"};
 		data["test-test"] =  true;
 		const result = await ExpressionResolver.resolve("${test}", data);
 		expect(result).toBe("success");
-	});	
+	});
 
 
 	it("work with complex elements at first level", async () => {
@@ -87,7 +87,7 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 
 	it("work with complex elements at deeper level", async () => {
 		class TestClass {
-			constructor(){			
+			constructor(){
 			}
 			get test() {
 				return "success";

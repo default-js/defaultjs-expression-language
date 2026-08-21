@@ -6,8 +6,8 @@ let DEBUG = false;
 export const EXECUTERNAME = "context-deconstruction-executer";
 
 /**
- * 
- * @param {boolean} value 
+ *
+ * @param {boolean} value
  */
 export const setDebug = (value) => {
 	DEBUG = value;

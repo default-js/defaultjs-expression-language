@@ -4,16 +4,16 @@ import { EXECUTERNAME as WithScopedExecuter} from "../../src/executer/WithScoped
 import {createResolverWithExecuterFactory} from "../TestUtils.js";
 
 describe(`general: context checks: `, () => {
-	
+
 	beforeAll(() => {
-	
+
 	});
 
 	afterAll(() => {
-		
+
 	});
 
-	const executerNamesToTest = [ContextDeconstructorExecuterName, WithScopedExecuter];	
+	const executerNamesToTest = [ContextDeconstructorExecuterName, WithScopedExecuter];
 
 	for (const executerName of executerNamesToTest) {
 		const factory = createResolverWithExecuterFactory(executerName);
@@ -50,7 +50,7 @@ describe(`general: context checks: `, () => {
 				context: {},
 				parent,
 			});
-			resolver.updateData("test", "success");		
+			resolver.updateData("test", "success");
 			expect(await resolver.resolve("${test}")).toBe("success");
 			expect(await parent.resolve("${test}")).toBe("test");
 			resolver.deleteData("test");

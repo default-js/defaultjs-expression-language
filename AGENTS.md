@@ -108,12 +108,18 @@ A consumer who wants a non-default executer imports it explicitly; that same imp
 
 ## Conventions
 
-- Indent with **tabs**.
+- Indent with **tabs** — spaces only in markdown, where nesting is column-based syntax.
+- Files are utf-8 with LF endings, a final newline, and no trailing whitespace.
 - ESM imports **always carry the `.js` extension** — the sources run untranspiled in the browser.
 - Parameter names take an `a`/`an` prefix: `aStatement`, `anExecuter`, `aContext`.
 - State lives in private `#` fields, exposed through getters.
 - JSDoc on everything public.
-- No formatter and no linter are configured — follow the style of the surrounding file.
+- `.editorconfig` and `.gitattributes` carry the rules above in machine-readable form. They
+  advise editors and agents; nothing enforces them, because no formatter and no linter is
+  configured. Beyond what they cover, follow the style of the surrounding file.
+- The spaces inside the template literals of `src/executer/ContextObjectExecuter.js` and
+  `ContextDeconstructorExecuter.js` are the indentation of the code this package *generates*.
+  They are content, not style — leave them alone when reformatting.
 
 ## Tests
 

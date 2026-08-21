@@ -6,12 +6,12 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 	const executerReset = ExpressionResolver.defaultExecuter;
 	beforeAll(() => {
 		ExpressionResolver.defaultExecuter = EXECUTERNAME;
-	});	
+	});
 
 	afterAll(() => {
 		ExpressionResolver.defaultExecuter = executerReset;
 	});
-	
+
 	it("\"${test}\"", async () => {
 		const result = await ExpressionResolver.resolve("${ctx.test}", {"test":"success"});
 		expect(result).toBe("success");
@@ -55,12 +55,12 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 	it("\"${new Date()}\"", async () => {
 		const result = await ExpressionResolver.resolve("${new Date()}", {});
 		expect(result instanceof Date).toBe(true);
-	});	
+	});
 
 	it("illegal object member", async () => {
 		const data = { test:"success"};
 		data["test-test"] =  true;
 		const result = await ExpressionResolver.resolve("${ctx.test}", data);
 		expect(result).toBe("success");
-	});	
+	});
 });

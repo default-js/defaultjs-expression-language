@@ -82,11 +82,11 @@ ExpressionResolver.resolveText("hello ${name}, nice to see you!", {"name": funct
 ```javascript
 import ExpressionResolver from "@default-js/defaultjs-expression-language";
 
-ExpressionResolver.resolve(aStatement, aContext, aDefault, aTimeout) 
-// returned a promise and the expression can be resolved to any type 
+ExpressionResolver.resolve(aStatement, aContext, aDefault, aTimeout)
+// returned a promise and the expression can be resolved to any type
 
-ExpressionResolver.resolveText(aStatement, aContext, aDefault, aTimeout) 
-// returned a promise and the expression would be resolved to an string 
+ExpressionResolver.resolveText(aStatement, aContext, aDefault, aTimeout)
+// returned a promise and the expression would be resolved to an string
 ```
 
 ### Context sensitive behavior
@@ -96,11 +96,11 @@ const global = window || global || self || this || {};
 global.test = "global test var";
 ExpressionResolver.resolve("${test}"); // global test var
 ExpressionResolver.resolve("${test}", {}); // global test var
-ExpressionResolver.resolve("${test}", {test: "local test var"}); // local test var 
+ExpressionResolver.resolve("${test}", {test: "local test var"}); // local test var
 
 ExpressionResolver.resolveText("text ${test} text"); // text global test var text
 ExpressionResolver.resolveText("text ${test} text", {}); // text global test var text
-ExpressionResolver.resolveText("text ${test} text", {test: "local test var"}); // text local test var text 
+ExpressionResolver.resolveText("text ${test} text", {test: "local test var"}); // text local test var text
 ```
 
 ### Default value behavior
@@ -109,7 +109,7 @@ ExpressionResolver.resolveText("text ${test} text", {test: "local test var"}); /
 const global = window || global || self || this || {};
 global.test = undefined;
 ExpressionResolver.resolve("${test}", global, "var is undefined"); // var is undefined
-ExpressionResolver.resolveText("text ${test} text", global, "var is undefined"); // text var is undefined text 
+ExpressionResolver.resolveText("text ${test} text", global, "var is undefined"); // text var is undefined text
 ```
 
 ### Timeout behavior
@@ -117,10 +117,10 @@ ExpressionResolver.resolveText("text ${test} text", global, "var is undefined");
 ```javascript
 const global = window || global || self || this || {};
 global.test = "global test var";
-ExpressionResolver.resolve("${test}", global, undefined, 1000); 
-// the expression resolver waits 1000ms, before starting the resolving process   
+ExpressionResolver.resolve("${test}", global, undefined, 1000);
+// the expression resolver waits 1000ms, before starting the resolving process
 
-ExpressionResolver.resolveText("text ${test} text", global, undefined, 1000); 
+ExpressionResolver.resolveText("text ${test} text", global, undefined, 1000);
 // the expression resolver waits 1000ms, before starting the resolving process
 ```
 

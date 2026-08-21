@@ -4,7 +4,7 @@
 	"version": "3.0.0",
 	"description": "This provides an expression resolver. You can build an resolver chain to solve hierarchic scopes!",
 	"main": "./index.js",
-	"scripts": {		
+	"scripts": {
 		"build:third-party-licence": "npx generate-license-file --config ./generate-license.config.json --overwrite",
 		"build:dev": "webpack --mode=development --progress",
 		"build:prod": "webpack --mode=production --progress",

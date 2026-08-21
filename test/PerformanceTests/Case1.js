@@ -3,7 +3,7 @@ import {ExpressionResolver} from "../../index.js";
 describe("Resolver chain", () => {
 
 	beforeAll(() => { });
-	
+
 	const TEST__DEEPCHAINCOUNT = 1000000;
 	it("resolve deep chain test (case 1)", async () => {
 		let resolver = new ExpressionResolver({ context: { first: "first" }, name: "first" });

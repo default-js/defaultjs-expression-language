@@ -101,9 +101,9 @@ const generate = (aStatement) => {
 
 	traverse(ast);
 	const result = ast;
-	const code = `	
+	const code = `
 	${escodegen.generate(result, { format: { compact: true } })};
-	
+
 	return fn({ctx:context});
 `;
 	if (DEBUG) console.log("code", code);

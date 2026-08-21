@@ -3,7 +3,7 @@ import {EXECUTERNAME, setDebug} from "../../../src/executer/EsprimaExecuter.js"
 
 describe(`${EXECUTERNAME} context behavior test:`, () => {
 	const executerReset = ExpressionResolver.defaultExecuter;
-	beforeAll(() => {		
+	beforeAll(() => {
 		ExpressionResolver.defaultExecuter = EXECUTERNAME;
 		const global = window || global || self || this || {};
 		global.test = "global context";
@@ -14,7 +14,7 @@ describe(`${EXECUTERNAME} context behavior test:`, () => {
 		const global = window || global || self || this || {};
 		delete global.test;
 	});
-	
+
 
 	it("\"${window.test}\" from global context", async () => {
 		const result = await ExpressionResolver.resolveText("${window.test}");
@@ -43,7 +43,7 @@ describe(`${EXECUTERNAME} context behavior test:`, () => {
 	it("\"${document.location}\" from browser window context and local context", async () => {
 		let result = await ExpressionResolver.resolveText("${document.location}", { test: "local context" });
 		expect(result).toBe("undefined");
-		
+
 		result = await ExpressionResolver.resolveText("${test}", { test: "local context" });
 		expect(result == "local context").toBe(true);
 	});
