@@ -12,14 +12,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
 
 ---
 
-- [ ] **The `CodeCache` size option is silently ignored in three of four executers.**
-  `src/executer/WithScopedExecuter.js:6`, `src/executer/ContextObjectExecuter.js:6` and
-  `src/executer/EsprimaExecuter.js:16` construct `new CodeCache({ aSize: 5000 })`, but the
-  option is named `size` (`src/CodeCache.js:32`). The intended 5000 never applies; those
-  caches run at the default of 1000 and trim five times as often as designed.
-  `src/executer/ContextDeconstructorExecuter.js:16` gets it right — which is what confirms
-  the intended name. Found 2026-08-20.
-
 - [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
   `defaultjs-common-utils` already went this way, so the two packages diverge today. The
   catch: reaching a non-default executer — and with it `setupExecuter(options)` — is done by
@@ -145,3 +137,34 @@ Entries here are independent of each other. An undertaking whose steps depend on
   misspelled option name that no tool complains about. Fixing the typo changes a published
   file, so decide first whether the versions should really be dropped — they do make the
   file churn on every dependency bump. Found 2026-08-21 while closing out the toolchain plan.
+
+- [ ] **Move `webpack.config.js` to `webpack.config.mjs`.** — wanted, not yet done
+  The file is the last CommonJS module in the repository: `require("path")`,
+  `require("./package.json")`, `require("./entries.config.json")`, `module.exports` and
+  `__dirname` (`webpack.config.js:1-3`, `:6`, `:31`). `vitest.config.mjs` is already ESM, so
+  the two build-side configs are written in two different module systems for no reason.
+  webpack-cli 7 resolves `webpack.config.mjs` on its own — it sits in the default extension
+  list — so no script in `package.json` changes. What the rewrite has to solve: the two JSON
+  requires become either import attributes (`import project from "./package.json" with { type: "json" }`,
+  fine on the Node 24 of `.nvmrc`, but still flagged experimental and warns on stderr) or a
+  `createRequire(import.meta.url)`; and `__dirname` becomes `import.meta.dirname`
+  (Node >= 20.11). Verification is a green `npm run build:dev` and `npm run build:prod` plus
+  a byte-identical `dist/` — the config's output must not change at all. Independent of the
+  `"type": "module"` question above: `.mjs` is explicit either way, and it is what keeps the
+  config working should `package.json` stay CommonJS. Two other entries here touch the same
+  file (the `./webcontent` casing, the dead `argv.target`); doing them in the same pass is
+  cheaper than three rounds of build verification. Requested 2026-08-21.
+
+- [ ] **`CodeCache` evicts by write time, not by use — `lastHit` is written and never read.**
+  `get()` stamps `data.lastHit = Date.now()` (`src/CodeCache.js:64`), but `#trim()` sorts by
+  `count` (`:97`), and `count` is only ever set when an entry is written (`:74`, `:78`). No
+  read influences eviction, so the cache is least-recently-*written*, not least-recently-used.
+  For this workload that inverts the intent: an expression is compiled once and then hit for
+  the rest of the page's life, so the hottest entries are exactly the oldest writes and are
+  evicted first, while an expression resolved once and never again survives. Either sort by
+  `lastHit` or drop the field. Around it, the same object is described three ways: the
+  `CacheEntry` typedef declares `lastHit` and `code` (`:3`, `:5`) while the code writes
+  `count` and `value`, and the `@type` on `:25` is missing its closing `>`
+  (`Map<string,CacheEntry`). `#trim()` also logs a `console.debug` line into every consumer's
+  console on each trim (`:96`) — with the size fix now in place that happens five times less
+  often, which is why it has not been noticed. Found 2026-08-21 while fixing the `aSize` typo.

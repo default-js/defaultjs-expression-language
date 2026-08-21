@@ -38,3 +38,10 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 - **The dependency on `@default-js/defaultjs-common-utils` was declared as `latest`.**
   It resolved to whatever happened to be published at install time and would have pulled
   a future major without any warning. The range is now `^1`.
+
+- **The expression cache ran at a fifth of its configured size in three of four executers.**
+  `WithScopedExecuter`, `ContextObjectExecuter` and `EsprimaExecuter` passed the cache option
+  as `aSize` instead of `size`, so the intended 5000 entries never applied and all three fell
+  back to the default of 1000 — trimming, and therefore recompiling, five times as often as
+  designed. `ContextDeconstructorExecuter` was already correct. Expression-heavy pages hold
+  more compiled expressions in memory now and recompile less.

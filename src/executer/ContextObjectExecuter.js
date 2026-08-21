@@ -3,7 +3,7 @@ import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 
 export const EXECUTERNAME = "context-object-executer";
-const EXPRESSION_CACHE = new CodeCache({ aSize: 5000 });
+const EXPRESSION_CACHE = new CodeCache({ size: 5000 });
 
 /**
  * @param {import('../CodeCache.js').CodeCacheOptions} options

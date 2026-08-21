@@ -13,7 +13,7 @@ export const setDebug = (value = true) => {
 	DEBUG = value;
 };
 
-const EXPRESSION_CACHE = new CodeCache({ aSize: 5000 });
+const EXPRESSION_CACHE = new CodeCache({ size: 5000 });
 
 /**
  * @param {import('../CodeCache.js').CodeCacheOptions} options
