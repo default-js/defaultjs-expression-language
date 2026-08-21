@@ -2,7 +2,7 @@
 
 **Project:** `@default-js/defaultjs-expression-language` v3.0.0
 **Analysis as of:** 2026-08-14
-**Status:** stages 0, A and B green (2026-08-21). Stages C–F of part 1 open, part 2 not started.
+**Status:** stages 0, A, B and C green (2026-08-21). Stages D–F of part 1 open, part 2 not started.
 
 A plan, not a collection: the stages depend on each other, and that sequence is what the analysis below buys. Independent items belong in `BACKLOG.md`, settled questions in `DECISIONS.md`.
 
@@ -189,7 +189,36 @@ declared direct dependency is gone; `CHANGELOG.md` says so.
 
 #### Stage C — rework versioning
 
-**Status:** not started.
+**Status:** **green, 2026-08-21.** Implemented as described below, with two notes.
+
+*CommonJS, not ESM.* `defaultjs-common-utils` writes its `scripts/generate-version.js` in ESM
+because it carries `"type": "module"`. This package does not, so the script here is CJS — like
+`webpack.config.js` and `karma.conf.js`. Whenever the `"type": "module"` question in
+`BACKLOG.md` is settled, all three files are renamed to `.cjs` together.
+
+*`src/version.js` is gitignored and still published.* Verified with `npm pack --dry-run`: the
+tarball contains `src/version.js` (251 B, 31 files total). The `files` array is an allowlist
+and outranks `.gitignore`, so the generated module reaches consumers.
+
+**Verification:**
+
+- Placeholder gone: a grep for the literal `${version}` over `dist/`, `src/`, `browser.js` and
+  `browser-all-executers.js` finds nothing. `VERSION` reads `3.0.0` in `dist/browser-…js`,
+  `dist/browser-…min.js` and `dist/browser-all-executers-…min.js`. The module bundle carries no
+  `VERSION` — it never did, only the two browser entries define one.
+- `src/version.js` deleted by hand, then `npm run build:dev`: the `prebuild:dev` hook
+  regenerated it before webpack ran. The generator is idempotent — a second run prints
+  `version.js is up to date` and leaves the file untouched.
+- `npm test` — **122 of 122 passing**. `build:dev` and `build:prod` exit 0.
+- `npm audit` — **41**, unchanged; `replace-in-file-webpack-plugin` carried no advisories of
+  its own.
+
+**Artifacts** (sizes with CRLF normalized away, against the stage A/B state in `ecaa9d6`): the
+minified bundles are **byte-identical** — terser inlines the constant, which yields exactly what
+the plugin used to patch in. The browser dev bundles grow by 1 546 and 1 560 bytes for the added
+module plus its inline map, their `.min.js.map` by 258 and 369 bytes for the new source entry.
+The module bundle is unchanged, it does not import `version.js`. Source maps now match their
+content by construction: nothing rewrites the files after webpack emitted them.
 
 `replace-in-file-webpack-plugin` steps outside webpack's asset pipeline and patches files in the `done` hook. The concrete problems:
 
@@ -207,7 +236,7 @@ declared direct dependency is gone; `CHANGELOG.md` says so.
 
 *Alternative, `DefinePlugin`:* a smaller change, but it does not fix the raw-source defect — so it is not recommended.
 
-**Verification:** `VERSION` is correct in `dist/*.js`, in `dist/*.min.js` **and** in `browser.js`.
+**Verification:** `VERSION` is correct in `dist/*.js`, in `dist/*.min.js` **and** in `browser.js`. — done, see the status above.
 
 #### Stage D — webpack majors
 

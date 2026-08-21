@@ -1,6 +1,5 @@
 const path = require("path");
 const project = require("./package.json");
-const ReplaceInFileWebpackPlugin = require("replace-in-file-webpack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
 
 const entries = require("./entries.config.json");
@@ -32,18 +31,6 @@ module.exports = (env, argv) => {
 
 
 			return  [
-				new ReplaceInFileWebpackPlugin([
-					{
-						dir: "dist",
-						test: [/\.js$/],
-						rules: [
-							{
-								search: /\$\{version\}/gi,
-								replace: project.version,
-							}
-						]
-					}
-				]),
 				new CopyPlugin({
 					patterns: [
 						{ from: "./src/css", to: `css`, noErrorOnMissing: true }

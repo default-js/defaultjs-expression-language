@@ -22,6 +22,12 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **`browser.js` and `browser-all-executers.js` were published with an unresolved version
+  placeholder.** Both files are part of the `files` array, so anyone importing the raw source
+  instead of a bundle got `GLOBAL.defaultjs.el.VERSION === "${version}"`. The version now comes
+  from the generated module `src/version.js`, which ships with the package, so the raw sources
+  and the bundles report the same value.
+
 - **The dependency on `@default-js/defaultjs-common-utils` was declared as `latest`.**
   It resolved to whatever happened to be published at install time and would have pulled
   a future major without any warning. The range is now `^1`.

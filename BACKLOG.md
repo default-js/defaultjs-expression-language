@@ -75,3 +75,15 @@ Entries here are independent of each other. The one undertaking with a forced or
   `dist/** -text` next to the existing `linguist-generated=true` settles it — the directory
   is already declared generated. Costs nothing beyond one line, but it changes tracked
   bytes, so it should not be mixed into a toolchain stage. Found 2026-08-21 during stage 0.
+
+- [ ] **`browser.js` and `browser-all-executers.js` import a binding that does not exist.**
+  Both start with `import { ExpressionResolver, Context, ExecuterRegistry } from "./index.js"`
+  (`browser.js:1`, `browser-all-executers.js:1`), but `index.js:5` exports only
+  `ExpressionResolver` and `ExecuterRegistry`. `Context` is never used in either file, so
+  webpack drops it without even a warning — but both files are published raw through the
+  `files` array, and native ESM refuses the module outright: `SyntaxError: The requested
+  module './index.js' does not provide an export named 'Context'`, verified against Node 24.
+  A consumer loading `browser.js` with a plain `<script type="module">` therefore gets
+  nothing. Deleting the word `Context` fixes it; the open question is whether a `Context`
+  export was meant to exist — `src/ResolverContextHandle.js` is not exported anywhere today.
+  Found 2026-08-21 during stage C.
