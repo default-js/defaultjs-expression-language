@@ -31,11 +31,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   in by `EsprimaExecuter`, which is not registered by default — weigh the reach of the change
   against that. The outcome belongs in `DECISIONS.md`. Found 2026-08-20.
 
-- [ ] **`webpack.config.js` refers to `./webcontent`, the directory is `WebContent`.**
-  `devServer.static` and `devServer.watchFiles` both use the lowercase spelling
-  (`webpack.config.js:57`, `:59`). Windows resolves it, a case-sensitive filesystem will
-  not — `npm run dev` would serve nothing on Linux or macOS. Found 2026-08-20.
-
 - [ ] **Decide what happens to Dependabot while the v3 cycle runs.**
   Four branches sit on origin — `engine.io-6.2.1`, `json5-2.2.3`, `ua-parser-js-0.7.33`,
   `webpack-5.76.0` — the newest from 2023-03-15, all opened against `master`, all for
@@ -111,15 +106,9 @@ Entries here are independent of each other. An undertaking whose steps depend on
   Either give them a runner — Vitest has `bench` for exactly this shape of test — or delete
   them. Leaving them is the one option that costs something: they read as tests and are not.
 
-- [ ] **`argv.target` in `webpack.config.js` no longer has a caller.**
-  `const target = argv.target ? argv.target : "dist"` (`webpack.config.js:10`) existed so
-  `karma.conf.js` could redirect the build into `target/`. With Karma gone nothing passes
-  the argument any more, and `target/` is stale build output. Harmless, but it is one branch
-  and one `.gitignore` entry pretending to serve a purpose. Found 2026-08-21 during part 2.
-
 - [ ] **The `module` entry produces a bundle nothing can consume.**
   `entries.config.json` builds `index.js` into `dist/module-…[.min].js`, but
-  `webpack.config.js` sets no `output.library`, so the bundle evaluates its code and exposes
+  `webpack.config.mjs` sets no `output.library`, so the bundle evaluates its code and exposes
   no exports at all. Bundler consumers do not use it either — `main` points at `./index.js`,
   the raw untranspiled source. The artifact is therefore decorative, and it is what forces
   `optimization.usedExports: false` (see `DECISIONS.md`, 2026-08-21): without a consumer for
@@ -138,23 +127,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   file, so decide first whether the versions should really be dropped — they do make the
   file churn on every dependency bump. Found 2026-08-21 while closing out the toolchain plan.
 
-- [ ] **Move `webpack.config.js` to `webpack.config.mjs`.** — wanted, not yet done
-  The file is the last CommonJS module in the repository: `require("path")`,
-  `require("./package.json")`, `require("./entries.config.json")`, `module.exports` and
-  `__dirname` (`webpack.config.js:1-3`, `:6`, `:31`). `vitest.config.mjs` is already ESM, so
-  the two build-side configs are written in two different module systems for no reason.
-  webpack-cli 7 resolves `webpack.config.mjs` on its own — it sits in the default extension
-  list — so no script in `package.json` changes. What the rewrite has to solve: the two JSON
-  requires become either import attributes (`import project from "./package.json" with { type: "json" }`,
-  fine on the Node 24 of `.nvmrc`, but still flagged experimental and warns on stderr) or a
-  `createRequire(import.meta.url)`; and `__dirname` becomes `import.meta.dirname`
-  (Node >= 20.11). Verification is a green `npm run build:dev` and `npm run build:prod` plus
-  a byte-identical `dist/` — the config's output must not change at all. Independent of the
-  `"type": "module"` question above: `.mjs` is explicit either way, and it is what keeps the
-  config working should `package.json` stay CommonJS. Two other entries here touch the same
-  file (the `./webcontent` casing, the dead `argv.target`); doing them in the same pass is
-  cheaper than three rounds of build verification. Requested 2026-08-21.
-
 - [ ] **`CodeCache` evicts by write time, not by use — `lastHit` is written and never read.**
   `get()` stamps `data.lastHit = Date.now()` (`src/CodeCache.js:64`), but `#trim()` sorts by
   `count` (`:97`), and `count` is only ever set when an entry is written (`:74`, `:78`). No
@@ -168,3 +140,19 @@ Entries here are independent of each other. An undertaking whose steps depend on
   (`Map<string,CacheEntry`). `#trim()` also logs a `console.debug` line into every consumer's
   console on each trim (`:96`) — with the size fix now in place that happens five times less
   often, which is why it has not been noticed. Found 2026-08-21 while fixing the `aSize` typo.
+
+- [ ] **`devServer.static` serves a directory that does not exist.**
+  `webpack.config.mjs` lists `["./WebContent", "./src/css"]`, but there is no `src/css` — the
+  whole `src/` tree is `.js`. The dev server reports it anyway on startup
+  (`Content not from webpack is served from './WebContent, ./src/css' directory`, verified
+  2026-08-21), it just never resolves anything from it. Harmless, but it is the second dead
+  path found in that one option; the first was the `./webcontent` casing. Left standing while
+  fixing the casing so the change stayed on the agreed scope. Found 2026-08-21.
+
+- [ ] **`target/` holds three dead build artifacts and is no longer gitignored.**
+  `commons.js`, `index.2193891163.js` and `runtime.js` — output of the Karma-era build that
+  redirected webpack into `target/` via `argv.target`. That argument is gone (2026-08-21) and
+  so is the `.gitignore` entry, which means the directory now shows up as untracked in
+  `git status`. Nothing produces it any more and nothing reads it. Delete it. Left on disk
+  because deleting a directory is Frank's call, not a side effect of a config cleanup.
+  Found 2026-08-21.

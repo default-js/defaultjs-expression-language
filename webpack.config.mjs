@@ -1,11 +1,12 @@
-const path = require("path");
-const project = require("./package.json");
+import path from "node:path";
+import { createRequire } from "node:module";
 
+const require = createRequire(import.meta.url);
+const project = require("./package.json");
 const entries = require("./entries.config.json");
 
-module.exports = (env, argv) => {
+export default (env, argv) => {
 	const devMode = argv.mode != "production";
-	const target = argv.target ? argv.target : "dist";
 
 	return {
 		entry: entries,
@@ -26,7 +27,7 @@ module.exports = (env, argv) => {
 		devtool: devMode ? "inline-source-map" : "source-map",
 		output: {
 			filename: devMode ? `[name]-${project.buildname}.js` : `[name]-${project.buildname}.min.js`,
-			path: path.resolve(__dirname, target),
+			path: path.resolve(import.meta.dirname, "dist"),
 			// Both modes emit into the same directory, dev first, prod second. Cleaning
 			// unconditionally would let the prod run delete the dev bundles, which are
 			// published through the files array. Each mode therefore only removes its own
@@ -45,8 +46,8 @@ module.exports = (env, argv) => {
 				index: true,
 				writeToDisk: false,
 			},
-			static: ["./webcontent", "./src/css"],
-			watchFiles: { paths: ["src/**/*", "./webcontent"] }
+			static: ["./WebContent", "./src/css"],
+			watchFiles: { paths: ["src/**/*", "./WebContent"] }
 		}
 	};
 };
