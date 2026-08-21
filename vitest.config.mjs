@@ -18,6 +18,9 @@ export default defineConfig({
 		// describe, it, expect, beforeAll and afterAll explicitly instead.
 		globals: false,
 		include: ["test/**/*Test.js"],
+		// benchmarks are timing dependent and slow, so they are deliberately not part of
+		// the test gate - the include above does not match them. `npm run bench` runs them.
+		benchmark: { include: ["test/**/*.bench.js"] },
 		// registers the esprima executer, which src/executer/index.js leaves out on purpose
 		setupFiles: ["test/setup.js"],
 		browser: {

@@ -82,6 +82,7 @@ The repository root holds permanent records only; anything temporary lives in `p
 | `npm run build:dev` / `build:prod` | webpack bundles into `dist/` |
 | `npm run build` | `test` plus both builds |
 | `npm run dev` | dev server against `WebContent/` — a bare page that loads the browser bundle so the library can be tried out in the browser console. It is not a demo and is not meant to display anything; a blank screen is the intended state. |
+| `npm run bench` | the benchmarks under `test/PerformanceTests/`, deliberately not part of the gate |
 | `npm run build:third-party-licence` | regenerates `LICENSE-OF-THIRD-PARTY` |
 
 ## Architecture
@@ -132,4 +133,13 @@ Every test file imports what it uses — `import { describe, it, expect, beforeA
 
 The suite uses `describe` / `it` / `beforeAll` / `afterAll` with `async` functions and the matchers `toBe`, `toBeDefined`, `toBeUndefined`. Keeping that surface narrow is worth something on its own — don't widen it without a reason. Per-suite timeouts go in the options object, `describe(name, { timeout }, fn)`.
 
-`test/PerformanceTests/` holds three cases that nothing runs; they were already excluded under Karma. See `BACKLOG.md`.
+## Benchmarks
+
+`test/PerformanceTests/` holds three `*.bench.js` files run by `npm run bench`, never by `npm test` — `include` matches only `test/**/*Test.js`, so a benchmark can never fail the gate. They measure resolution over a chain: `ColdResolve` with the code cache switched off so every call recompiles, `WarmResolve` with it on, `RandomScope` with a context on every link and a randomly chosen name.
+
+Two things about `vitest bench` cost an hour once, verified against 4.1.11 — do not rediscover them:
+
+- **No setup hook runs.** Neither vitest's `beforeAll` nor tinybench's `beforeAll` option is executed for a bench. Setup belongs in the module body, which is why `ChainBuilder.js` exists and why one chain is built and reused across depths.
+- **A failing bench reports nothing at all** — no `FAIL`, no error, just a missing result table. If a bench produced no numbers, assume it threw.
+
+Deep-chain numbers are bimodal across runs by a factor of two; see `BACKLOG.md` before drawing conclusions from a single run.

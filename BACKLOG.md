@@ -72,15 +72,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   needs its own plan under `plans/`, and the outcome belongs in `DECISIONS.md`.
   Raised 2026-08-21 when the runner was decided.
 
-- [ ] **`test/PerformanceTests/` is dead code.**
-  `Case1.js`, `Case2.js` and `Case3.js` were reached only through
-  `test/PerformanceTests/index.js`, and the import of that file in `test/index.js` was
-  commented out — so they have not run for as long as the git history shows. Both index
-  files are gone with the Karma removal (2026-08-21), which leaves the three cases with no
-  entry point at all. They do not match `test/**/*Test.js`, so Vitest ignores them too.
-  Either give them a runner — Vitest has `bench` for exactly this shape of test — or delete
-  them. Leaving them is the one option that costs something: they read as tests and are not.
-
 - [ ] **The `module` entry produces a bundle nothing can consume.**
   `entries.config.json` builds `index.js` into `dist/module-…[.min].js`, but
   `webpack.config.mjs` sets no `output.library`, so the bundle evaluates its code and exposes
@@ -131,3 +122,55 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `git status`. Nothing produces it any more and nothing reads it. Delete it. Left on disk
   because deleting a directory is Frank's call, not a side effect of a config cleanup.
   Found 2026-08-21.
+
+- [ ] **The default executer announces itself as deprecated, and nothing says what replaces it.**
+  `WithScopedExecuter` is what every consumer gets without configuring anything
+  (`src/executer/index.js`), and on the first expression it resolves it writes
+  `console.warn(new Error("With Scoped expression execution is marked as deprecated."))`
+  (`src/executer/WithScopedExecuter.js:58`) — an `Error` object, so browsers print it with a
+  stack trace. The `initialCall` guard keeps it to once per page, so this is a notice, not
+  noise. But a default strategy that declares itself deprecated is a contradiction: either one
+  of the other three becomes the default, or the warning goes. Neither `DECISIONS.md` nor
+  `AGENTS.md` records why `with` is being retired or what consumers should move to, and the
+  readme documents none of it. Consumer-visible either way, so the outcome belongs in
+  `DECISIONS.md` and in `CHANGELOG.md`. Found 2026-08-21 while running the performance cases.
+
+- [ ] **Disabling a `CodeCache` never frees it, and re-enabling it brings the old entries back.**
+  `setup({ size: 0 })` sets `#disabled = true` and then calls `this.clear()`
+  (`src/CodeCache.js:44-46`), but `clear()` opens with `if (this.#disabled) return`
+  (`src/CodeCache.js:88`) — the flag it just set. The early return fires every time, so the
+  entries and the map survive. A consumer calling `setupExecuter({ size: 0 })` to release the
+  memory releases nothing, and a later `setupExecuter({ size: 5000 })` resurrects every stale
+  compiled expression instead of starting empty. Either clear before setting the flag, or drop
+  the guard from `clear()` — a disabled cache has nothing to protect. Reachable through the
+  public `setupExecuter` of all four executers, so it is consumer-visible. Found 2026-08-21
+  while looking for a way to force a cache miss in the benchmarks.
+
+- [ ] **A name found at the top of a resolver chain costs as much as one found at the bottom.**
+  Measured 2026-08-21 with `npm run bench`. `test/PerformanceTests/RandomScope.bench.js` builds
+  a chain whose every link carries ~10 of 100 possible names, so a randomly asked name sits
+  within a handful of links — yet depth 1 000 resolves at 86 000 hz and depth 100 000 at 166 hz,
+  a factor of ~500 for a 100-fold deeper chain. The lookup itself is not the problem:
+  `#getPropertyDef` (`src/ResolverContextHandle.js:168`) does return at the first match, and a
+  direct `proxy["marker"]` on a property sitting in the top link of a 100 000 link chain runs at
+  7.9 million hz — against 494 hz for one sitting at the bottom. What does scale with the full
+  depth is any lookup that can never match: `proxy[Symbol.unscopables]` costs 455 hz at that
+  same depth, because `#cache` is keyed by string and a symbol therefore walks every link before
+  returning null. `with(context)` asks the object for `@@unscopables` as part of resolving a
+  binding, which would put one full-chain walk on every successful lookup and matches what the
+  benchmark shows. Worth confirming with a counter in the trap before acting on it. If it holds,
+  the fix is cheap: answer non-string properties in `get`/`has` without walking, or give the
+  handle an own `Symbol.unscopables`. Consumer-visible performance, so the outcome belongs in
+  `DECISIONS.md`.
+
+- [ ] **The deep-chain benchmarks are bimodal by a factor of two across runs.**
+  At depths 100 000 and 1 000 000 a run settles into one of two states and stays there: roughly
+  6.4 ms and 64 ms, or roughly 12.9 ms and 130 ms, each with an rme under 3 %. Measured
+  2026-08-21 across several runs of `test/PerformanceTests/WarmResolve.bench.js` and
+  `ColdResolve.bench.js`, which briefly made the cold path look twice as fast as the warm one —
+  it was not, the two files had simply landed in different modes. Depths 10 and 1 000 are stable
+  to within a few percent. Cause unknown; it looks like a JIT or GC state that is decided early
+  and then holds for the whole run, not drift. Until it is understood, a single run of the deep
+  benchmarks cannot be compared against a single earlier run — repeat, or compare only within
+  one run. Whoever picks this up should check whether it also happens outside the browser
+  runner.
