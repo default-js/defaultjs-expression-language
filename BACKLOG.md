@@ -43,3 +43,12 @@ Entries here are independent of each other. The one undertaking with a forced or
   `devServer.static` and `devServer.watchFiles` both use the lowercase spelling
   (`webpack.config.js:57`, `:59`). Windows resolves it, a case-sensitive filesystem will
   not — `npm run dev` would serve nothing on Linux or macOS. Found 2026-08-20.
+
+- [ ] **Decide what happens to Dependabot while the v3 cycle runs.**
+  Four branches sit on origin — `engine.io-6.2.1`, `json5-2.2.3`, `ua-parser-js-0.7.33`,
+  `webpack-5.76.0` — the newest from 2023-03-15, all opened against `master`, all for
+  devDependencies of the old toolchain. `plans/toolchain-modernization.md` sets the target
+  versions itself, so the pull requests contradict the plan rather than help it. They no
+  longer reach the documentation app now that its version selector runs off tags, so this
+  is only about noise: close them and pause Dependabot until after the 3.0.0 release, or
+  leave them. Found 2026-08-21.

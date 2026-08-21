@@ -40,13 +40,19 @@ What this repository is meant to become a template for is **the way we work and 
 
 **Report findings, and write them down** — a defect noticed along the way goes into `BACKLOG.md` in the same turn it is reported: not at handover, and not into the diff. A session can end without a handover, and anything living only in the conversation is lost when it does.
 
+**Changes reach the changelog in the same turn** — anything a consumer of the package
+notices (public api, published files, runtime dependencies, supported environment) gets its
+entry under `## [Unreleased]` in `CHANGELOG.md` together with the diff, never assembled at
+release time from memory. Same reason as the backlog rule: a session ends without warning.
+Build and test work is not consumer-visible and stays out.
+
 **No commits, no pushes** — git is available for reading, branches, diffs, and stashes, but `git commit` and `git push` are Frank's to run. Working branch `v3`, main branch `master`.
 
 ## Workflow
 
 Sessions end whenever a topic is finished, often without warning. The files under *Records* are the only state that survives; the conversation does not.
 
-0. **Orient** — `BACKLOG.md` is injected automatically at session start by the `SessionStart` hook in `.claude/settings.json`; read it from disk only if that context is missing. Read `DECISIONS.md` before proposing anything about architecture or the public API. Read `plans/toolchain-modernization.md` before touching the build, the tests, or dependencies.
+0. **Orient** — read `BACKLOG.md` from disk at the start of every session, before anything else; nothing is injected automatically. Read `DECISIONS.md` before proposing anything about architecture or the public API. Read `plans/toolchain-modernization.md` before touching the build, the tests, or dependencies.
 1. **Clarify** — check the request, ask the open questions of intent in one batch before starting.
 2. **Plan** — for anything touching more than one file or changing dependencies: goal, affected files, risk, intended verification. Wait for approval. An approved plan that is not implemented straight away becomes a `BACKLOG.md` entry carrying the agreed scope. Small, locally contained changes go straight in.
 3. **Implement** — the agreed scope, nothing beside it.
@@ -60,6 +66,7 @@ During the modernization the staging rule from the plan applies on top: secure a
 Split by shape: independent items go in the backlog, settled questions get written down with their reasoning, and an undertaking whose steps depend on each other gets its own plan.
 
 - `BACKLOG.md` — open items, findings, and work that was agreed but not yet implemented. Entries are deleted once done; git history is the archive.
+- `CHANGELOG.md` — what changed for consumers, per released version, newest first. Keep a Changelog format. Written while the change is made, released by moving `## [Unreleased]` to a version heading.
 - `DECISIONS.md` — architecture and API decisions with their reasoning. Anything that constrains later work, or that would otherwise be argued a second time, gets an entry.
 - `plans/` — one file per ordered undertaking, named after it; currently `plans/toolchain-modernization.md`. A plan is a living document: update a stage's status the moment it goes green, along with what was actually installed and any deviation from the intent. When the undertaking is finished the plan is **deleted** — durable outcomes move into `DECISIONS.md` first, git history keeps the rest. A finished plan left lying around gets read as instructions. With nothing running, `plans/` does not exist.
 
