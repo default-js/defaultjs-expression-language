@@ -1,8 +1,8 @@
 /**
  * @typedef {Object} CacheEntry
- * @property {number} lastHit
+ * @property {number} lastHit - Monotonic marker of the last read or write, the eviction order.
  * @property {string} key
- * @property {Function} code
+ * @property {Function} value
  */
 
 /**
@@ -12,6 +12,11 @@
 
 /**
  * CodeCache class to manage caching of generated code snippets.
+ *
+ * Entries are evicted least recently used first: every hit refreshes the entry, so an
+ * expression that keeps being resolved outlives one that was compiled once and dropped.
+ * The marker is a counter rather than a timestamp — a burst of first-time compilations
+ * falls into a single millisecond, which would leave the eviction order to chance.
  */
 export default class CodeCache {
 	/** @type {boolean} */
@@ -22,31 +27,33 @@ export default class CodeCache {
 	#maxSize = 0;
 	/** @type {Array<CacheEntry>} */
 	#entries = [];
-	/** @type {Map<string,CacheEntry} */
+	/** @type {Map<string,CacheEntry>} */
 	#entryMap = new Map();
+	/** @type {number} - Hands out the `lastHit` markers, never reset. */
+	#clock = 0;
 
 
 	/**
 	 * @param {CodeCacheOptions} options
 	 */
-	constructor({ size = 1000 } = {}) {
-		if (size <= 0) this.#disabled = true;
-		else {
-			this.#size = size > 0 ? size : 1000;
-			this.#maxSize = Math.floor(size * 1.1);
-		}
+	constructor(options = {}) {
+		this.setup(options);
 	}
 
 	/**
+	 * Applies a new size. A size of 0 or less disables the cache and releases its entries,
+	 * a later positive size enables it again and starts empty.
+	 *
 	 * @param {CodeCacheOptions} options
 	 */
 	setup({ size = 1000 } = {}) {
-		if (size <= 0){
-			this.#disabled = true;
+		this.#disabled = size <= 0;
+		if (this.#disabled) {
+			this.#size = 0;
+			this.#maxSize = 0;
 			this.clear();
-		}
-		else {
-			this.#size = size > 0 ? size : 1000;
+		} else {
+			this.#size = size;
 			this.#maxSize = Math.floor(size * 1.1);
 			this.#trim();
 		}
@@ -59,10 +66,10 @@ export default class CodeCache {
 
 	get(key) {
 		if(this.#disabled) return null;
-		const data = this.#entryMap.get(key);
-		if (data) {
-			data.lastHit = Date.now();
-			return data.value;
+		const entry = this.#entryMap.get(key);
+		if (entry) {
+			entry.lastHit = ++this.#clock;
+			return entry.value;
 		}
 		return null;
 	}
@@ -71,11 +78,11 @@ export default class CodeCache {
 		if(this.#disabled) return;
 		let entry = this.#entryMap.get(key);
 		if (entry) {
-			entry.count = Date.now();
+			entry.lastHit = ++this.#clock;
 			entry.value = code;
 		} else {
 			entry = {
-				count: Date.now(),
+				lastHit: ++this.#clock,
 				key,
 				value: code,
 			};
@@ -87,15 +94,13 @@ export default class CodeCache {
 	}
 
 	clear() {
-		if(this.#disabled) return;
 		this.#entries = [];
 		this.#entryMap = new Map();
 	}
 
 	#trim() {
-		console.debug(`Trimming code cache from ${this.#entries.length} entries to ${this.#size} entries.`);
-		this.#entries.sort((a, b) => b.count - a.count);
-		if (this.#entries.length >= this.#size) {
+		this.#entries.sort((a, b) => b.lastHit - a.lastHit);
+		if (this.#entries.length > this.#size) {
 			const entriesToRemove = this.#entries.splice(this.#size);
 			for (const entry of entriesToRemove) {
 				this.#entryMap.delete(entry.key);

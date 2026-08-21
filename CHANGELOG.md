@@ -22,6 +22,25 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **The expression cache evicted the entries it should have kept.** `CodeCache` refreshed a
+  marker on every read but ordered the eviction by write time, so it dropped the least
+  recently *written* entry instead of the least recently used one. For this workload that is
+  the wrong way round: an expression is compiled once and then resolved for the rest of the
+  page's life, which makes the hottest entries the oldest writes and therefore the first to
+  go, while an expression resolved once and never again survived. Eviction now follows the
+  last use. Only reachable above the configured cache size — 5000 distinct expressions per
+  executer by default.
+
+- **A cache disabled through `setupExecuter({ size: 0 })` neither released anything nor could
+  be switched back on.** `clear()` returned early on the very flag that disabling had just
+  set, so the compiled expressions stayed in memory, and re-enabling never cleared the flag,
+  which left that executer recompiling every expression for the rest of the page's life.
+  `setupExecuter({ size: 0 })` now releases the entries, and a later positive size caches
+  again, starting empty. Affects all four executers.
+
+- **`CodeCache` wrote a `console.debug` line into the consumer's console** every time it
+  trimmed. The line is gone; nothing about the trim itself changed.
+
 - **The raw published sources could not be loaded as native ES modules.** `src/**`,
   `index.js`, `browser.js` and `browser-all-executers.js` all ship raw through the `files`
   array, and none of the three entries loaded without a bundler in front of them. Two

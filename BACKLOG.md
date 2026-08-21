@@ -93,20 +93,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   file, so decide first whether the versions should really be dropped — they do make the
   file churn on every dependency bump. Found 2026-08-21 while closing out the toolchain plan.
 
-- [ ] **`CodeCache` evicts by write time, not by use — `lastHit` is written and never read.**
-  `get()` stamps `data.lastHit = Date.now()` (`src/CodeCache.js:64`), but `#trim()` sorts by
-  `count` (`:97`), and `count` is only ever set when an entry is written (`:74`, `:78`). No
-  read influences eviction, so the cache is least-recently-*written*, not least-recently-used.
-  For this workload that inverts the intent: an expression is compiled once and then hit for
-  the rest of the page's life, so the hottest entries are exactly the oldest writes and are
-  evicted first, while an expression resolved once and never again survives. Either sort by
-  `lastHit` or drop the field. Around it, the same object is described three ways: the
-  `CacheEntry` typedef declares `lastHit` and `code` (`:3`, `:5`) while the code writes
-  `count` and `value`, and the `@type` on `:25` is missing its closing `>`
-  (`Map<string,CacheEntry`). `#trim()` also logs a `console.debug` line into every consumer's
-  console on each trim (`:96`) — with the size fix now in place that happens five times less
-  often, which is why it has not been noticed. Found 2026-08-21 while fixing the `aSize` typo.
-
 - [ ] **`devServer.static` serves a directory that does not exist.**
   `webpack.config.mjs` lists `["./WebContent", "./src/css"]`, but there is no `src/css` — the
   whole `src/` tree is `.js`. The dev server reports it anyway on startup
@@ -134,17 +120,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `AGENTS.md` records why `with` is being retired or what consumers should move to, and the
   readme documents none of it. Consumer-visible either way, so the outcome belongs in
   `DECISIONS.md` and in `CHANGELOG.md`. Found 2026-08-21 while running the performance cases.
-
-- [ ] **Disabling a `CodeCache` never frees it, and re-enabling it brings the old entries back.**
-  `setup({ size: 0 })` sets `#disabled = true` and then calls `this.clear()`
-  (`src/CodeCache.js:44-46`), but `clear()` opens with `if (this.#disabled) return`
-  (`src/CodeCache.js:88`) — the flag it just set. The early return fires every time, so the
-  entries and the map survive. A consumer calling `setupExecuter({ size: 0 })` to release the
-  memory releases nothing, and a later `setupExecuter({ size: 5000 })` resurrects every stale
-  compiled expression instead of starting empty. Either clear before setting the flag, or drop
-  the guard from `clear()` — a disabled cache has nothing to protect. Reachable through the
-  public `setupExecuter` of all four executers, so it is consumer-visible. Found 2026-08-21
-  while looking for a way to force a cache miss in the benchmarks.
 
 - [ ] **A name found at the top of a resolver chain costs as much as one found at the bottom.**
   Measured 2026-08-21 with `npm run bench`. `test/PerformanceTests/RandomScope.bench.js` builds
@@ -174,3 +149,15 @@ Entries here are independent of each other. An undertaking whose steps depend on
   benchmarks cannot be compared against a single earlier run — repeat, or compare only within
   one run. Whoever picks this up should check whether it also happens outside the browser
   runner.
+
+- [ ] **No benchmark exercises the cache eviction, the one thing `CodeCache` now does differently.**
+  All four bench files stay far below the configured 5000 entries — `ColdResolve` and
+  `WarmResolve` put a single expression through the cache, `RandomScope` about a hundred — so
+  `#trim()` never runs and the switch from write-time to use-time eviction (2026-08-21) is
+  invisible to `npm run bench`. Six runs across both versions differ by less than the
+  benchmark's own run-to-run spread, which says nothing about the case the fix targets: a page
+  holding more distinct expressions than the cache size, where the old order evicted the hot
+  entries and forced a recompile. A bench that fills past `size` and then measures the hit rate
+  on a hot subset would close that, and would also give the eviction order a regression guard
+  beyond `test/general/CodeCacheTest.js`. Found 2026-08-21 while checking the fix for
+  performance impact.
