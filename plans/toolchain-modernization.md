@@ -2,7 +2,7 @@
 
 **Project:** `@default-js/defaultjs-expression-language` v3.0.0
 **Analysis as of:** 2026-08-14
-**Status:** stage 0 green (2026-08-21). Stages A–F of part 1 open, part 2 not started.
+**Status:** stages 0 and A green (2026-08-21). Stages B–F of part 1 open, part 2 not started.
 
 A plan, not a collection: the stages depend on each other, and that sequence is what the analysis below buys. Independent items belong in `BACKLOG.md`, settled questions in `DECISIONS.md`.
 
@@ -130,10 +130,29 @@ byte comparison against a checked-out `dist/` is not.
 
 #### Stage A — low-risk bumps
 
-**Status:** not started.
+**Status:** **green, 2026-08-21** on `cdb66dc`. Installed exactly as intended, no deviation:
+`webpack` 5.100.2 → **5.109.2**, `karma-sourcemap-loader` 0.3.8 → **0.4.0**,
+`generate-license-file` 4.0.0 → **4.2.1**, and the ranges of `karma` (^6.3.4 → ^6.4.4),
+`karma-chrome-launcher` (^3.1.0 → ^3.2.0), `karma-coverage` (^2.0.3 → ^2.2.1),
+`karma-firefox-launcher` (^2.1.1 → ^2.1.3) and `karma-webpack` (^5.0.0 → ^5.0.1) raised to
+what was already installed. `webpack-cli` 4 and `webpack-dev-server` 4 untouched — stage D.
 
-`webpack` 5.109.2, all `karma*` ranges, `karma-sourcemap-loader` 0.4, `generate-license-file` 4.2.1.
-→ `npm i`, build and tests.
+- `npm test` — **122 of 122 passing**, unchanged.
+- `npm run build:dev` / `build:prod` — both exit 0, same three asset-size warnings as in
+  stage 0.
+- `npm audit` — 44 → **42** (1 low, 16 moderate, 22 high, 3 critical), still **0** with
+  `--omit=dev`. The bulk stays with puppeteer and the karma chain, as expected.
+
+**Artifacts against the baseline:** every bundle grew by roughly 2 % —
+`module-…min.js` 13 502 → 13 809, `browser-…min.js` 13 824 → 14 128,
+`browser-all-executers-…min.js` 368 103 → 371 868 bytes. Cause identified: 5.109 emits an
+additional `webpack/runtime/global` block that 5.100 did not, and the inline source map of
+the dev bundles grows with it. A codegen change, not a defect.
+
+One caveat on comparing: `refs/baseline/stage0` stores the bundles LF-normalized, the
+working copy has them with CRLF (the `.gitattributes` finding in `BACKLOG.md`). Byte counts
+taken from the ref are therefore up to ~900 bytes lower than the same file on disk. Use
+`git diff` for comparisons, which normalizes both sides.
 
 #### Stage B — clean up
 
