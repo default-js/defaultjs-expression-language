@@ -25,7 +25,6 @@
 		"@vitest/browser": "^4.1.11",
 		"@vitest/browser-playwright": "^4.1.11",
 		"@vitest/coverage-v8": "^4.1.11",
-		"copy-webpack-plugin": "^14.0.0",
 		"generate-license-file": "^4.2.1",
 		"playwright": "^1.62.1",
 		"vitest": "^4.1.11",

@@ -1,6 +1,5 @@
 const path = require("path");
 const project = require("./package.json");
-const CopyPlugin = require("copy-webpack-plugin");
 
 const entries = require("./entries.config.json");
 
@@ -10,10 +9,18 @@ module.exports = (env, argv) => {
 
 	return {
 		entry: entries,
-		target: "web",
+		// no browserslist in this project, so plain "web" makes webpack emit ES5-capable
+		// runtime helpers for sources that ship untranspiled anyway
+		target: ["web", "es2022"],
 		mode: devMode ? "development" : "production",
+		// caches module compilation under node_modules/.cache/webpack between runs
+		cache: { type: "filesystem" },
 		optimization: {
 			minimize: !devMode,
+			// LOAD-BEARING, do not "clean up". The module entry has no output.library, so with
+			// tree shaking on webpack sees its exports as unused and prunes the whole library
+			// out of dist/module-...min.js - measured: 13809 -> 3685 bytes, resolveText and
+			// DefaultValue gone. See DECISIONS.md.
 			usedExports: false,
 		},
 		devtool: devMode ? "inline-source-map" : "source-map",
@@ -26,18 +33,6 @@ module.exports = (env, argv) => {
 			// stale artifacts and keeps the ones belonging to the other.
 			clean: { keep: (asset) => (devMode ? asset.includes(".min.") : !asset.includes(".min.")) },
 		},
-		plugins: (() => {
-
-
-
-			return  [
-				new CopyPlugin({
-					patterns: [
-						{ from: "./src/css", to: `css`, noErrorOnMissing: true }
-					]
-				})
-			]
-		})(),
 		devServer: {
 			open: true,
 			allowedHosts: "all",

@@ -124,3 +124,14 @@ Entries here are independent of each other. The one undertaking with a forced or
   `karma.conf.js` could redirect the build into `target/`. With Karma gone nothing passes
   the argument any more, and `target/` is stale build output. Harmless, but it is one branch
   and one `.gitignore` entry pretending to serve a purpose. Found 2026-08-21 during part 2.
+
+- [ ] **The `module` entry produces a bundle nothing can consume.**
+  `entries.config.json` builds `index.js` into `dist/module-…[.min].js`, but
+  `webpack.config.js` sets no `output.library`, so the bundle evaluates its code and exposes
+  no exports at all. Bundler consumers do not use it either — `main` points at `./index.js`,
+  the raw untranspiled source. The artifact is therefore decorative, and it is what forces
+  `optimization.usedExports: false` (see `DECISIONS.md`, 2026-08-21): without a consumer for
+  its exports, tree shaking prunes the library out of it. Either give it a library
+  configuration and let tree shaking back in, or drop the entry and publish two bundles
+  instead of three. Consumer-visible either way, so the outcome belongs in `DECISIONS.md`.
+  Found 2026-08-21 during stage F.

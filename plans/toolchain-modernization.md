@@ -3,8 +3,8 @@
 **Project:** `@default-js/defaultjs-expression-language` v3.0.0
 **Analysis as of:** 2026-08-14
 **Status:** part 2 is **done** (2026-08-21) — Karma is gone, Vitest is the gate, coverage
-works, `npm audit` is at **0**. Of part 1, stages 0 to D are green, stage E was dropped, and
-stage F is still open in its `webpack.config.js` half. Closing out part 1 is what remains.
+works, `npm audit` is at **0**. Of part 1, stages 0 to D and F are green and stage E was
+dropped. **Only "Closing out part 1" remains.**
 
 A plan, not a collection: the stages depend on each other, and that sequence is what the analysis below buys. Independent items belong in `BACKLOG.md`, settled questions in `DECISIONS.md`.
 
@@ -291,26 +291,38 @@ The same reasoning applies to the `karma.conf.js` half of stage F — see there.
 
 #### Stage F — modernize the configuration
 
-**Status:** open, **reduced to the `webpack.config.js` half** (2026-08-21).
+**Status:** **green, 2026-08-21**, `webpack.config.js` half only — the `karma.conf.js` half
+was dropped with stage E and the file no longer exists.
 
-In `webpack.config.js`:
-- `target: ["web", "es2022"]` instead of `target: "web"` — without a browserslist, webpack
-  otherwise emits conservative, ES5-capable runtime helpers even though the sources ship
-  untranspiled.
-- `cache: { type: "filesystem" }` for faster dev builds.
-- `CopyPlugin`: `src/css` does not exist; `noErrorOnMissing` swallows that. Keep it or drop it
-  outright — but decide deliberately.
-- Review `optimization.usedExports: false`. A `sideEffects` field in `package.json` (as in
-  `defaultjs-common-utils`) would be cleaner than disabling tree shaking globally.
+- **`target: ["web", "es2022"]`** — done. The project has no browserslist and no
+  `.browserslistrc`, so plain `"web"` had webpack emitting ES5-capable helpers. Measured
+  effect: the `webpack/runtime/global` block disappears, because `globalThis` is usable
+  directly. All three minified bundles shrink by 166 to 173 bytes.
+- **`cache: { type: "filesystem" }`** — done. `build:dev` goes from ~1 495 ms to ~1 320 ms in
+  steady state, about 12 %; the first run after a cold cache costs ~1 726 ms. The cache is
+  13 MB under `node_modules/.cache/webpack`, so it is covered by the existing ignore rules.
+- **`CopyPlugin`** — dropped, and with it the `copy-webpack-plugin` devDependency (4 packages).
+  It copied `./src/css`, which does not exist; `noErrorOnMissing: true` hid that. The package
+  ships no CSS. With it went the last plugin, so the `plugins` key is gone from the config
+  entirely. `devServer.static` still lists `./src/css` — harmless, and it belongs to the
+  `./webcontent` casing entry already in `BACKLOG.md`.
+- **`optimization.usedExports: false`** — reviewed, and **kept**. The plan expected the
+  opposite; the measurement overruled it. Removing the line cuts `dist/module-…min.js` from
+  13 809 to 3 685 bytes and takes `resolveText`, `defaultExecuter`, `ResolverContextHandle`
+  and `DefaultValue` with it, because the `module` entry has no `output.library` and webpack
+  therefore treats its exports as unused. The suggested `sideEffects` field is worse still:
+  as `false` it drops two of the three default executers out of `browser-…min.js`, which
+  falls from 13 403 to 8 126 bytes. Both experiments, the reasoning and what would change the
+  answer are written up in `DECISIONS.md`; the underlying defect — a bundle nothing can
+  consume — is a `BACKLOG.md` entry. The line now carries a comment marking it load-bearing.
 
-In `karma.conf.js` — **dropped for the same reason as stage E**: the file is deleted in part 2
-step 6. The dead `test/data/**` and `test/templates/**` entries, their `proxies` and the
-`karma-safari-launcher` plugin entry cost nothing while they sit there; cleaning a file that is
-about to be removed buys nothing.
-
-- **Do not repair coverage here** — part 2 takes care of it. Until then it is deliberately
-  documented as known-broken.
-
+**Verification:** `npm test` 122 of 122. `build:dev` and `build:prod` exit 0. Beyond that, a
+throwaway Playwright script loaded each built browser bundle in Chromium and checked what the
+grep could not: `VERSION` reads 3.0.0, the three default executers are registered,
+`esprima-executer` is absent from the small bundle and present in the all-executers one, and
+`resolveText("${1 + 1}")` returns `"2"`. That check exists because **no test covers `dist/`** —
+the suite runs against `src/`, so a bundling regression would pass unnoticed. Making it a real
+test is the open item from part 2.
 
 #### Closing out part 1
 

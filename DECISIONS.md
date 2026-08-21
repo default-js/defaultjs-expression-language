@@ -19,6 +19,49 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-21 — Do we enable tree shaking for the `dist/` bundles?
+
+**Decision:** No. `optimization.usedExports: false` stays in `webpack.config.js`, and a
+`sideEffects` field must **not** be added to `package.json` — at least not as `false`. Both
+were reviewed as part of stage F of the toolchain plan, which suggested the opposite; the
+measurements below overruled it.
+
+**Reasoning:** Two experiments, each a build followed by a look at what came out.
+
+*Dropping `usedExports: false`* guts the module bundle. `dist/module-…min.js` falls from
+13 809 to 3 685 bytes, and `resolveText`, `defaultExecuter`, `ResolverContextHandle` and
+`DefaultValue` are gone from it — only the executer registration survives. The cause is not
+tree shaking misbehaving: the `module` entry has no `output.library`, so webpack correctly
+concludes that nothing consumes the entry's exports and prunes everything reachable only
+through them. The browser entries are unaffected, because their code sets
+`GLOBAL.defaultjs.el` as a side effect rather than through exports.
+
+*Adding `sideEffects: false`* is worse. `dist/browser-…min.js` drops from 13 403 to 8 126
+bytes, and the bundle loses `context-object-executer`, `context-deconstruction-executer` and
+`esprima-executer` — two of the three default executers and the optional one. Every executer
+registers itself through a bare `import "./XExecuter.js"` in `src/executer/index.js`;
+declaring the package free of side effects tells every bundler, ours and the consumers', that
+those imports may be discarded.
+
+Both were confirmed the other way too: with the current settings a Playwright smoke test
+loads each built browser bundle in Chromium and finds `VERSION` 3.0.0, the three default
+executers registered, `esprima-executer` absent from the small bundle and present in the
+all-executers one, and `resolveText("${1 + 1}")` returning `"2"`.
+
+**Alternatives:** Tree shaking becomes worth revisiting the moment the `module` entry gets an
+`output.library`, or is dropped — bundler consumers reach the package through `main`, which
+points at the raw `index.js`, not at `dist/`. A `sideEffects` field could be introduced as an
+*array* whitelisting the self-registering modules (`./src/executer/*.js`, `./browser.js`,
+`./browser-all-executers.js`); `false` is the value that must never appear. Both are tracked
+in `BACKLOG.md`.
+
+**Consequences:** The bundles carry unused exports of `@default-js/defaultjs-common-utils`,
+which is what the roughly 10 KB difference in the module bundle is. That is the price of
+correctness here, and it is paid only by consumers of `dist/`, not by those importing `src/`.
+The `usedExports: false` line is load-bearing and carries a comment saying so, in the same
+way as the commented-out esprima import in `src/executer/index.js`.
+
+
 ## 2026-08-21 — Which test runner replaces Karma?
 
 **Decision:** Vitest 4 in browser mode, with Playwright/Chromium as the provider and
