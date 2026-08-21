@@ -1,6 +1,6 @@
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
-import ExpressionResolver from "./ExpressionResolver";
-import { isNullOrUndefined } from "@default-js/defaultjs-common-utils/src/ObjectUtils";
+import ExpressionResolver from "./ExpressionResolver.js";
+import { isNullOrUndefined } from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 
 
 const VARNAME_CHECK = /^[$_\p{ID_Start}][$\p{ID_Continue}]*$/u;

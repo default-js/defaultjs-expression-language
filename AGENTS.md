@@ -52,7 +52,7 @@ Build and test work is not consumer-visible and stays out.
 
 Sessions end whenever a topic is finished, often without warning. The files under *Records* are the only state that survives; the conversation does not.
 
-0. **Orient** — read `BACKLOG.md` from disk at the start of every session, before anything else; nothing is injected automatically. Read `DECISIONS.md` before proposing anything about architecture or the public API. If `plans/` exists, read the plan it contains before touching whatever it covers.
+0. **Orient** — read `BACKLOG.md` from disk at the start of every session, before anything else; nothing is injected automatically. Read `DECISIONS.md` before proposing anything about architecture or the public API. If `plans/` exists, read the plan it contains before touching whatever it covers. The question *what do we do next?* is answered from `BACKLOG.md` and this file alone: the backlog is the authoritative status, so no test run, no build and no code search is needed to work it out.
 1. **Clarify** — check the request, ask the open questions of intent in one batch before starting.
 2. **Plan** — for anything touching more than one file or changing dependencies: goal, affected files, risk, intended verification. Wait for approval. An approved plan that is not implemented straight away becomes a `BACKLOG.md` entry carrying the agreed scope. Small, locally contained changes go straight in.
 3. **Implement** — the agreed scope, nothing beside it.

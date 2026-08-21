@@ -22,12 +22,19 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
-- **`browser.js` and `browser-all-executers.js` could not be loaded as native ES modules.**
-  Both imported a binding `Context` that `index.js` does not export, which a browser rejects
-  with `SyntaxError: The requested module './index.js' does not provide an export named
-  'Context'`. Since both files are published raw through the `files` array, loading either
-  with `<script type="module">` failed outright. The import was unused and is gone; nothing
-  else about either file changed.
+- **The raw published sources could not be loaded as native ES modules.** `src/**`,
+  `index.js`, `browser.js` and `browser-all-executers.js` all ship raw through the `files`
+  array, and none of the three entries loaded without a bundler in front of them. Two
+  independent reasons: `browser.js` and `browser-all-executers.js` imported a binding
+  `Context` that `index.js` does not export, which a browser rejects with `SyntaxError: The
+  requested module './index.js' does not provide an export named 'Context'`; and four imports
+  carried no file extension — `./ExpressionResolver` and
+  `@default-js/defaultjs-common-utils/src/ObjectUtils` in `src/ResolverContextHandle.js`,
+  `@default-js/defaultjs-common-utils/src/Global` in both browser entries — which the browser
+  and Node answer with `ERR_MODULE_NOT_FOUND`, because neither guesses the extension and the
+  dependency's `exports` map takes the subpath literally. The second reason reached `index.js`
+  as well, the entry `main` points at. The unused import is gone and the four extensions are
+  in place; nothing else about any of the files changed, and the bundles are unaffected.
 
 - **`browser.js` and `browser-all-executers.js` were published with an unresolved version
   placeholder.** Both files are part of the `files` array, so anyone importing the raw source

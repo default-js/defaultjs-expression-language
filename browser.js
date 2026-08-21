@@ -1,5 +1,5 @@
 import { ExpressionResolver, ExecuterRegistry } from "./index.js";
-import GLOBAL from "@default-js/defaultjs-common-utils/src/Global";
+import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 import { VERSION } from "./src/version.js";
 
 GLOBAL.defaultjs = GLOBAL.defaultjs || {};
