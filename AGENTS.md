@@ -13,9 +13,9 @@ Part of the `defaultjs-*` family (~20 repositories under `c:\_dev_ws\vscode`). I
 v3 is an AI-assisted modernization cycle with four goals:
 
 1. **Modernize the toolchain** — current build and test chain, replace Karma. **Done (2026-08-21):** webpack 5.109 with CLI 7 and dev server 6, Vitest in a real browser instead of Karma, `npm audit` at 0. The reasoning that outlived the work is in `DECISIONS.md`, the rest in the git history.
-2. **Raise code quality** — fix existing defects, sharpen the structure. The pluggable executer strategy is the part of this work already begun.
-3. **Raise test coverage** — coverage is structurally broken today (see the plan). Repair first, extend afterwards.
-4. **Documentation** — for human consumers *and* for AI systems meant to use this package.
+2. **Raise code quality** — fix existing defects, sharpen the structure. The pluggable executer strategy is the part of this work already begun. **On hold since 2026-08-21** for everything touching the resolver: there is no specification of what the ExpressionResolver is meant to do, so a fix derived from the code risks cementing an accident — one of the defects found is a year-old regression. See `plans/expression-resolver-specification.md` for what is frozen and what is not.
+3. **Raise test coverage** — the structural blocker is gone: the Vitest migration made `npm run test:coverage` work, and it reported 84.28 % of statements on 2026-08-21. What is left is extending it; the named gaps are in `BACKLOG.md`.
+4. **Documentation** — for human consumers *and* for AI systems meant to use this package. Downstream of the specification plan; documenting an unspecified behaviour only describes the accident a second time.
 
 What this repository is meant to become a template for is **the way we work and shape the project** — the sibling repositories are otherwise none of this project's business. Carrying results over to them is Frank's own task and must not influence decisions made here.
 
@@ -35,6 +35,14 @@ What this repository is meant to become a template for is **the way we work and 
 - *Routine judgement* (naming, ordering, where a test belongs) — decide, and state the assumption in the handover.
 
 **Test gate** — nothing counts as done before `npm test` has run green. Failing tests are reported with their output rather than talked around; skipped steps are named.
+
+**Tests come first** — a change in behaviour starts with a test, and that test is run and seen
+failing before any source file is touched. Failing for the right reason: a defect is reproduced
+first, so the test proves the defect exists and later proves it gone. A test written after the
+fix passes on the broken version often enough to be worthless, and nobody finds out. Where the
+two states genuinely cannot be told apart from the outside — `setupExecuter` is the known case,
+a cache hit and a recompilation return the same value — write that limitation into the test file
+instead of implying a proof that is not there.
 
 **No unrequested extras** — no drive-by refactorings, no new dependencies, no additional tooling (formatter, linter, CI, types) without asking. The requested scope is the scope.
 
@@ -68,7 +76,7 @@ Split by shape: independent items go in the backlog, settled questions get writt
 - `BACKLOG.md` — open items, findings, and work that was agreed but not yet implemented. Entries are deleted once done; git history is the archive.
 - `CHANGELOG.md` — what changed for consumers, per released version, newest first. Keep a Changelog format. Written while the change is made, released by moving `## [Unreleased]` to a version heading.
 - `DECISIONS.md` — architecture and API decisions with their reasoning. Anything that constrains later work, or that would otherwise be argued a second time, gets an entry.
-- `plans/` — one file per ordered undertaking, named after it. The directory does not exist right now; the last plan, the toolchain modernization, was retired on 2026-08-21. A plan is a living document: update a stage's status the moment it goes green, along with what was actually installed and any deviation from the intent. When the undertaking is finished the plan is **deleted** — durable outcomes move into `DECISIONS.md` first, git history keeps the rest. A finished plan left lying around gets read as instructions. With nothing running, `plans/` does not exist.
+- `plans/` — one file per ordered undertaking, named after it. One plan is running: `plans/expression-resolver-specification.md`, opened 2026-08-21, and it **freezes** the resolver work it lists — read it before touching any of that. The plan before it, the toolchain modernization, was retired on 2026-08-21. A plan is a living document: update a stage's status the moment it goes green, along with what was actually installed and any deviation from the intent. When the undertaking is finished the plan is **deleted** — durable outcomes move into `DECISIONS.md` first, git history keeps the rest. A finished plan left lying around gets read as instructions. With nothing running, `plans/` does not exist.
 
 The repository root holds permanent records only; anything temporary lives in `plans/`.
 

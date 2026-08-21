@@ -12,6 +12,13 @@ Entries here are independent of each other. An undertaking whose steps depend on
 
 ---
 
+> **Freeze since 2026-08-21 — read `plans/expression-resolver-specification.md` first.**
+> There is no specification of what the ExpressionResolver is meant to do, and one of the
+> defects found in it turned out to be a year-old regression rather than an intention. Until
+> that specification exists, nothing that changes or documents resolver behaviour gets worked
+> on — the entries concerned are marked *Frozen* below. Toolchain, packaging, benchmark and
+> test-infrastructure entries are unaffected.
+
 - [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
   `defaultjs-common-utils` already went this way, so the two packages diverge today. The
   catch: reaching a non-default executer — and with it `setupExecuter(options)` — is done by
@@ -41,6 +48,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   leave them. Found 2026-08-21.
 
 - [ ] **Every code example in `README.md` uses a default import that does not exist.**
+  **Frozen** — `plans/expression-resolver-specification.md`.
   All examples read `import ExpressionResolver from "@default-js/defaultjs-expression-language"`,
   but `index.js:5` exports only named bindings — `export { ExpressionResolver, ExecuterRegistry }`.
   The default import resolves to `undefined`, so every example in the readme fails at the first
@@ -51,6 +59,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   (`ExecuterRegistry`, executers, `setupExecuter`, resolver chains, scopes). Found 2026-08-21.
 
 - [ ] **Was a `Context` export meant to exist on the public API?**
+  **Frozen** — `plans/expression-resolver-specification.md`.
   `browser.js`, `browser-all-executers.js` and `test/setup.js` all imported a binding
   `Context` from `index.js` that was never exported. The imports were unused and are gone
   (2026-08-21, see `CHANGELOG.md`), so nothing is broken any more — but the fact that three
@@ -101,15 +110,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   path found in that one option; the first was the `./webcontent` casing. Left standing while
   fixing the casing so the change stayed on the agreed scope. Found 2026-08-21.
 
-- [ ] **`target/` holds three dead build artifacts and is no longer gitignored.**
-  `commons.js`, `index.2193891163.js` and `runtime.js` — output of the Karma-era build that
-  redirected webpack into `target/` via `argv.target`. That argument is gone (2026-08-21) and
-  so is the `.gitignore` entry, which means the directory now shows up as untracked in
-  `git status`. Nothing produces it any more and nothing reads it. Delete it. Left on disk
-  because deleting a directory is Frank's call, not a side effect of a config cleanup.
-  Found 2026-08-21.
-
 - [ ] **The default executer announces itself as deprecated, and nothing says what replaces it.**
+  **Frozen** — `plans/expression-resolver-specification.md`.
   `WithScopedExecuter` is what every consumer gets without configuring anything
   (`src/executer/index.js`), and on the first expression it resolves it writes
   `console.warn(new Error("With Scoped expression execution is marked as deprecated."))`
@@ -161,3 +163,101 @@ Entries here are independent of each other. An undertaking whose steps depend on
   on a hot subset would close that, and would also give the eviction order a regression guard
   beyond `test/general/CodeCacheTest.js`. Found 2026-08-21 while checking the fix for
   performance impact.
+
+- [ ] **`src/Utils.js` is dead code, and it is published.**
+  It exports a single function, `stringToHashcode`, and nothing in the repository imports it —
+  not `src/`, not the entries, not the tests; `grep` for the name over `dist/**` returns zero
+  hits in all six bundles, so webpack never sees it either. It still ships, because the `files`
+  array publishes `src/**` raw. Coverage reports it at 0 %, which is how it surfaced
+  (2026-08-21). Either it is somebody's intended public helper — then it needs a test and a
+  mention in the readme — or it goes. Deleting a published file is consumer-visible, so the
+  outcome belongs in `CHANGELOG.md`. Found 2026-08-21 during the first coverage run.
+
+- [ ] **Two `TestUtils` helpers pass the context where the instance API expects a default value.**
+  `createResolveWithExecuterFunction` and `createResolveTextWithExecuterFunction`
+  (`test/TestUtils.js:9-21`) call `resolver.resolve(expression, data, defaultValue, timeout)`,
+  but the instance signature is `resolve(aExpression, aDefault)`
+  (`src/ExpressionResolver.js:253`): the context lands in the default value, the resolver
+  itself is built without one, and every expression resolves against an empty context. The
+  two extra arguments also defeat the `arguments.length == 2` check the `DefaultValue`
+  distinction depends on (`AGENTS.md`, Architecture). Neither helper has a consumer, so
+  nothing is failing today — the trap is that they look usable. Either give them the static
+  `ExpressionResolver.resolve(aExpression, aContext, aDefault, aTimeout)`, which does take all
+  four, or build the resolver with the context and drop the extra arguments. The sibling
+  helper `createResolverWithExecuterFactory` was fixed on 2026-08-21 and is fine.
+  Found 2026-08-21 while covering `setupExecuter`.
+
+- [ ] **Coverage baseline of 2026-08-21, and where the gaps sit.**
+  State after the `setupExecuter` tests: statements 85.28 % (342/401), branches 72.82 %
+  (142/195), functions 83.87 % (78/93), lines 88.91 % (321/361) — so goal 3 is no longer
+  blocked, only unfinished. Branches are the weak axis, and it is concentrated:
+  `ExpressionResolver.js` at 62 % of 104 branches carries more than half of everything
+  uncovered in the package, with the gaps around lines 180-203 and 226-262.
+  `ResolverContextHandle.js` covers 58 % of its functions (11/19, missing around lines 18-30,
+  the proxy traps that no test triggers), and `EsprimaExecuter.js` sits at 83 % of branches.
+  Of the executers only the `setDebug` bodies and one `DEBUG`-guarded `console.log` are left
+  uncovered. `src/Utils.js` at 0 % is listed separately above, and `src/version.js` is
+  generated, so its 0 % is noise. Update these numbers when the picture changes rather than
+  adding a second baseline.
+
+- [ ] **The constructor option `executer` is undocumented and silently ignores an `Executer` instance.**
+  **Frozen** — `plans/expression-resolver-specification.md`.
+  `new ExpressionResolver({ executer })` is how a consumer pins one resolver to a non-default
+  executer, but the JSDoc above the constructor lists only `context`, `parent` and `name`
+  (`src/ExpressionResolver.js:118-128`), so the option exists only in the code. It also accepts
+  a name and nothing else: `typeof executer === "string" ? getExecuterType(executer) :
+  ExpressionResolver.defaultExecuter` (`:130`) falls back to the default for anything that is
+  not a string, an `Executer` instance included — while the static setter
+  `ExpressionResolver.defaultExecuter` (`:98-102`) accepts both a name and an instance. Same
+  concept, two rules, and the stricter one fails without a word. Either accept an instance here
+  too or throw on one; document the option either way. Consumer-visible, so the outcome belongs
+  in `DECISIONS.md`. Found 2026-08-21 while covering `setupExecuter`.
+
+- [ ] **`${scope::expression}` never reaches an ancestor — the recursive call passes its arguments in the wrong order.**
+  **Frozen** — `plans/expression-resolver-specification.md`.
+  `resolve()` is declared as `(aExecuter, aResolver, aExpression, aFilter, aDefault)`
+  (`src/ExpressionResolver.js:64`), but when the scope filter does not match the current link it
+  recurses as `resolve(aResolver.parent, aExpression, aFilter, aDefault, aExecuter)` (`:65`) —
+  five arguments, every one in the wrong slot: the parent resolver arrives as the executer, the
+  expression as the resolver, the filter as the expression. Verified 2026-08-21 in the browser:
+  a leaf named `leaf` under a root named `root`, both carrying `value`, resolves
+  `resolveText("${leaf::value}")` to `from leaf` but `resolveText("${root::value}")` to the
+  string `null`. Addressing a named link of the chain is the feature the scope syntax exists
+  for and it has never worked beyond the resolver one already holds. It is a regression, not an
+  original defect: in beta 3 (`df42f2c`, 2020-02-22) the function took
+  `(aResolver, aExpression, aFilter, aDefault)` and recursed correctly. `aExecuter` was
+  prepended to the parameter list on 2025-07-20 (`38aff7d`, "updated beta code") and the call
+  site was never adjusted — it had `aExecuter` appended at the end instead, which shifted every
+  other argument by one. Invisible for a year because no test uses `scope::` —
+  `ResolverChainTest.js` only resolves unscoped names, which travel through the context proxy
+  instead. Consumer-visible,
+  so the outcome belongs in `CHANGELOG.md`. Found 2026-08-21 while reading the uncovered
+  branches for goal 3.
+
+- [ ] **The instance `resolve()` does not understand the scope syntax at all.**
+  **Frozen** — `plans/expression-resolver-specification.md`.
+  `resolveText()` parses an expression with the `EXPRESSION` regex and hands
+  `MATCH_EXPRESSION_SCOPE` on as the filter (`src/ExpressionResolver.js:76`), but
+  `resolve(aExpression, aDefault)` merely strips `${` and `}` and passes everything in between
+  as the statement, with the filter hardcoded to `null` (`:258`). So `${root::value}` becomes
+  the statement `root::value`, which is not valid JavaScript: the executer throws, the error is
+  swallowed, and the caller gets `undefined`. Verified 2026-08-21 — `resolveText` returns
+  `from leaf` for `${leaf::value}` while `resolve` returns `undefined` for the same input on the
+  same resolver. Two entry points, one syntax, different answers; the readme documents neither.
+  Related to the argument-order defect above: fixing only that one still leaves `resolve()`
+  unable to reach a scope. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
+  Found 2026-08-21.
+
+- [ ] **`getData` and `deleteData` are broken on the filter path.**
+  **Frozen** — `plans/expression-resolver-specification.md`.
+  Both walk to the parent when a filter names another link, and both get it wrong.
+  `getData` (`src/ExpressionResolver.js:199-201`) calls `this.parent.getData(key, filter)`
+  without returning it, so a lookup that has to travel up the chain answers `undefined` instead
+  of the value — verified 2026-08-21: `leaf.getData("value", "root")` returns `undefined` where
+  the root holds `from root`. `deleteData` (`:224-226`) calls `this.parent.deleteDataData(key,
+  filter)` — a method that does not exist, so the same case throws
+  `TypeError: this.parent.deleteDataData is not a function`. The two neighbours built on the
+  same three-branch shape, `updateData` (`:215-217`) and `mergeContext` (`:239-240`), are
+  correct, which is what makes the pair easy to miss. All four are public methods and none of
+  the four has a test. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
+  Found 2026-08-21 while reading the uncovered branches for goal 3.
