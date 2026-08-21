@@ -87,3 +87,15 @@ Entries here are independent of each other. The one undertaking with a forced or
   nothing. Deleting the word `Context` fixes it; the open question is whether a `Context`
   export was meant to exist — `src/ResolverContextHandle.js` is not exported anywhere today.
   Found 2026-08-21 during stage C.
+
+- [ ] **`WebContent/index.html` loads a bundle that no build produces.**
+  The page — the only thing `npm run dev` has to show — contains
+  `<script type="text/javascript" src="defaultjs-expression-language.js">`
+  (`WebContent/index.html:6`), but the three emitted assets are `browser-…`,
+  `browser-all-executers-…` and `module-…`, all prefixed by their entry name. Requested
+  against the running dev server the path answers **404**, verified 2026-08-21; the page
+  loads nothing at all. The classic `<script>` tag itself is right — webpack emits an IIFE,
+  no `output.library` and no `outputModule`, so `browser-…js` is a plain script that sets
+  `GLOBAL.defaultjs.el`. Only the filename is wrong. Whoever fixes this should decide what
+  the page is meant to demonstrate — right now it has no content beyond the script tag.
+  Found during stage D.

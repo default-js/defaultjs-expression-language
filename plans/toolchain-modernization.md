@@ -2,7 +2,7 @@
 
 **Project:** `@default-js/defaultjs-expression-language` v3.0.0
 **Analysis as of:** 2026-08-14
-**Status:** stages 0, A, B and C green (2026-08-21). Stages D–F of part 1 open, part 2 not started.
+**Status:** stages 0 to D green (2026-08-21). Stages E and F of part 1 open, part 2 not started.
 
 A plan, not a collection: the stages depend on each other, and that sequence is what the analysis below buys. Independent items belong in `BACKLOG.md`, settled questions in `DECISIONS.md`.
 
@@ -240,10 +240,32 @@ content by construction: nothing rewrites the files after webpack emitted them.
 
 #### Stage D — webpack majors
 
-**Status:** not started.
+**Status:** **green, 2026-08-21**, with one item left to Frank (see below). Installed in one
+step, as the peer chain demands: `webpack-cli` 4.10.0 → **7.2.2**, `webpack-dev-server`
+4.15.2 → **6.0.0**, `copy-webpack-plugin` 11.0.0 → **14.0.0**. The peers check out against
+what is installed — all three want `webpack ^5.101.0` or looser, and 5.109.2 satisfies it.
 
-Install `webpack-cli@7`, `webpack-dev-server@6` and `copy-webpack-plugin@14` **together** (peer chain).
-Verification: `npm run build:dev`, `npm run build:prod`, and one interactive `npm run dev` against `WebContent/` (overlay, reload, static serving).
+- `npm run build:dev` / `build:prod` — both exit 0, no deprecation notices from CLI 7. The
+  CJS `webpack.config.js` loads unchanged under the new dynamic-import config loader.
+- `npm test` — **122 of 122 passing**.
+- **The artifacts are byte-identical to stage C**, all nine of them. The majors touch the
+  driver, not the output.
+- `npm audit` — 41 → **29** (1 low, 9 moderate, 18 high, 1 critical), **0** with `--omit=dev`.
+  The single remaining critical now sits in the karma chain, which part 2 removes.
+
+**Dev server, verified headless:** started with `webpack serve --mode=development --no-open
+--port 9999`. WDS 6 comes up, logs `Content not from webpack is served from ./webcontent,
+./src/css`, compiles in 348 ms and answers `GET /` with `WebContent/index.html` and
+`GET /browser-defaultjs-expression-language.js` with the 576 KiB bundle. The `devServer`
+block needed no migration, exactly as the analysis expected.
+
+**Left for Frank:** overlay and live reload cannot be checked without a browser. Run
+`npm run dev` once, change a file under `src/`, and confirm the page reloads and that a
+deliberate syntax error shows the overlay.
+
+Noticed while probing the server and written into `BACKLOG.md`: `WebContent/index.html`
+asks for `defaultjs-expression-language.js`, which no build emits — the request answers 404,
+so the demo page loads nothing. Pre-existing, unrelated to this stage.
 
 #### Stage E — update the test toolchain
 

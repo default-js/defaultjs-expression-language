@@ -21,7 +21,7 @@
 	"author": "Frank Schüler",
 	"license": "MIT",
 	"devDependencies": {
-		"copy-webpack-plugin": "^11.0.0",
+		"copy-webpack-plugin": "^14.0.0",
 		"generate-license-file": "^4.2.1",
 		"karma": "^6.4.4",
 		"karma-chrome-launcher": "^3.2.0",
@@ -34,8 +34,8 @@
 		"karma-webpack": "^5.0.1",
 		"puppeteer": "^16.1.1",
 		"webpack": "^5.109.2",
-		"webpack-cli": "^4.10.0",
-		"webpack-dev-server": "^4.7.4"
+		"webpack-cli": "^7.2.2",
+		"webpack-dev-server": "^6.0.0"
 	},
 	"repository": {
 		"type": "git",
