@@ -50,19 +50,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   right now it teaches a broken call. Alongside the fix: the readme documents none of v3
   (`ExecuterRegistry`, executers, `setupExecuter`, resolver chains, scopes). Found 2026-08-21.
 
-- [ ] **`.gitattributes` normalizes line endings inside the generated bundles.**
-  `* text=auto eol=lf` (`.gitattributes:3`) applies to `dist/**` as well. The development
-  bundles contain 771 CRLF pairs — measured in
-  `dist/browser-defaultjs-expression-language.js` — that come from the bundled
-  `@default-js/defaultjs-common-utils` sources, whose own files ship with CRLF
-  (`ObjectUtils.js` alone contributes 619). Committing a fresh build therefore stores
-  different bytes than webpack produced, and the published `dist/` differs from the local
-  build for every consumer. The occurrences seen so far sit in comments, so nothing breaks
-  today; a CRLF inside a template literal of a future dependency version would.
-  `dist/** -text` next to the existing `linguist-generated=true` settles it — the directory
-  is already declared generated. Costs nothing beyond one line, but it changes tracked
-  bytes, so it should not be mixed into a toolchain stage. Found 2026-08-21 during stage 0.
-
 - [ ] **Was a `Context` export meant to exist on the public API?**
   `browser.js`, `browser-all-executers.js` and `test/setup.js` all imported a binding
   `Context` from `index.js` that was never exported. The imports were unused and are gone
@@ -71,18 +58,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   holds the proxy every context passes through and is exported nowhere. Decide whether that
   becomes public API or whether the name simply dies here; the outcome belongs in
   `DECISIONS.md` if it becomes public.
-
-- [ ] **`WebContent/index.html` loads a bundle that no build produces.**
-  The page — the only thing `npm run dev` has to show — contains
-  `<script type="text/javascript" src="defaultjs-expression-language.js">`
-  (`WebContent/index.html:6`), but the three emitted assets are `browser-…`,
-  `browser-all-executers-…` and `module-…`, all prefixed by their entry name. Requested
-  against the running dev server the path answers **404**, verified 2026-08-21; the page
-  loads nothing at all. The classic `<script>` tag itself is right — webpack emits an IIFE,
-  no `output.library` and no `outputModule`, so `browser-…js` is a plain script that sets
-  `GLOBAL.defaultjs.el`. Only the filename is wrong. Whoever fixes this should decide what
-  the page is meant to demonstrate — right now it has no content beyond the script tag.
-  Found during stage D.
 
 - [ ] **Decide whether the build moves from webpack to Vite, once part 2 is done.**
   Taking Vitest puts `vite` in the tree as a direct dependency (`DECISIONS.md`, 2026-08-21),

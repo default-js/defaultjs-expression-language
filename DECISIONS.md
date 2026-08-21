@@ -19,6 +19,48 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-21 — What module format does the webpack config use, and how does it read JSON?
+
+**Decision:** `webpack.config.mjs`, native ESM, reading `package.json` and
+`entries.config.json` through `createRequire(import.meta.url)` rather than through JSON import
+attributes. The rename is deliberately independent of the open `"type": "module"` question.
+
+**Reasoning:** The config was the last CommonJS file involved in the build, while
+`vitest.config.mjs` was already ESM — two module systems across the two config files of one
+repository, for no reason. `.mjs` is explicit and keeps working whichever way `"type"` is
+decided, which is exactly what decouples this from that question. webpack-cli needs no
+configuration for it: `.mjs` sits second in its default extension list, right after `.js`
+(`node_modules/webpack-cli/lib/webpack-cli.js:1953`) — read there, not assumed. Because `.js`
+is tried first, the old file had to be renamed rather than left beside the new one. No npm
+script changed.
+
+`createRequire` over `import … with { type: "json" }` is a verification argument, not a matter
+of taste. Import attributes run on this machine's Node 24.19 with no warning on stderr —
+measured, against the assumption in the backlog entry that requested this work, which claimed
+the opposite. But the documented floor of the project is Node ≥ 22.15 (see the entry below),
+and no Node 22 is installed here to measure against. `createRequire` costs two lines and holds
+across the whole supported window without a claim that could not be checked.
+
+The rewrite was held against the artifacts rather than against the tests alone: a build with
+the old config and a build with the new one produce the same nine files in `dist/`, with
+identical sha256 sums. `__dirname` became `import.meta.dirname`, and `argv.target` went in the
+same rewrite — Karma was its only caller — so `output.path` is now
+`path.resolve(import.meta.dirname, "dist")`.
+
+**Alternatives:** Import attributes are the cleaner ESM form and become the better choice the
+moment the floor is verified against Node 22.15; the change is one line per JSON file.
+Renaming to `.cjs` instead — which the version-generation entry below anticipated — keeps
+CommonJS alive in a package that is otherwise pure untranspiled ESM. Leaving the file as `.js`
+works only until `"type": "module"` is set, at which point it breaks.
+
+**Consequences:** `scripts/generate-version.js` is now the only CommonJS file left in the
+repository, and it is no longer coupled to the config, so the `"type": "module"` decision has
+to deal with it on its own. Everything naming the config has to say `webpack.config.mjs`; the
+entries below were corrected where they describe the present, and left untouched where they
+record the past.
+
+---
+
 ## 2026-08-21 — Which Node version does this project need, and does it go into `engines`?
 
 **Decision:** The toolchain needs **Node ≥ 22.15, and not Node 23**. That floor is recorded in
@@ -71,6 +113,10 @@ lists `src/version.js` in the tarball. The `files` array is an allowlist and out
 The script is CommonJS because this package has no `"type": "module"`. When that question is
 settled it is renamed to `.cjs` together with `webpack.config.js`.
 
+*Update 2026-08-21: `webpack.config.js` became `webpack.config.mjs` on its own — see the entry
+at the top — so that pairing no longer exists. `scripts/generate-version.js` is the last
+CommonJS file in the repository and the `"type": "module"` decision has to handle it alone.*
+
 **Alternatives:** `DefinePlugin` is a smaller change but fixes only the bundles, leaving the raw
 published sources broken — which was the worst of the three defects. Checking `src/version.js`
 into git, as `defaultjs-common-utils` does, avoids a generated file being absent in a fresh
@@ -83,7 +129,7 @@ aware. The version now has to be right in `package.json` before a build, not bef
 
 ## 2026-08-21 — Do we enable tree shaking for the `dist/` bundles?
 
-**Decision:** No. `optimization.usedExports: false` stays in `webpack.config.js`, and a
+**Decision:** No. `optimization.usedExports: false` stays in `webpack.config.mjs`, and a
 `sideEffects` field must **not** be added to `package.json` — at least not as `false`. Both
 were reviewed as part of stage F of the toolchain plan, which suggested the opposite; the
 measurements below overruled it.

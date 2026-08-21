@@ -45,3 +45,10 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   back to the default of 1000 — trimming, and therefore recompiling, five times as often as
   designed. `ContextDeconstructorExecuter` was already correct. Expression-heavy pages hold
   more compiled expressions in memory now and recompile less.
+
+- **The published `dist/` bundles did not match the bytes webpack produced.** `.gitattributes`
+  applied `text=auto eol=lf` to the generated directory as well, so git normalized the CRLF
+  pairs the bundled `@default-js/defaultjs-common-utils` sources bring with them — 771, 886 and
+  771 bytes in the three development bundles. The published files therefore differed from every
+  local build. `dist/**` is now excluded from line-ending conversion and ships exactly as built.
+  The minified bundles and source maps were never affected.

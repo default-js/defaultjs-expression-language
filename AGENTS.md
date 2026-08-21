@@ -81,7 +81,7 @@ The repository root holds permanent records only; anything temporary lives in `p
 | `npm run test:coverage` | the same, with a v8 coverage report into `coverage/` |
 | `npm run build:dev` / `build:prod` | webpack bundles into `dist/` |
 | `npm run build` | `test` plus both builds |
-| `npm run dev` | dev server against `WebContent/` |
+| `npm run dev` | dev server against `WebContent/` — a bare page that loads the browser bundle so the library can be tried out in the browser console. It is not a demo and is not meant to display anything; a blank screen is the intended state. |
 | `npm run build:third-party-licence` | regenerates `LICENSE-OF-THIRD-PARTY` |
 
 ## Architecture

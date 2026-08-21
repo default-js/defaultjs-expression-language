@@ -6,3 +6,12 @@
 dist/**                linguist-generated=true
 package-lock.json      linguist-generated=true
 LICENSE-OF-THIRD-PARTY linguist-generated=true
+
+# The bundles are stored exactly as webpack wrote them. Their CRLF pairs come from bundled
+# dependency sources that ship with CRLF - measured 2026-08-21: this project's own sources
+# hold zero CR bytes, while @default-js/defaultjs-common-utils carries 619 in ObjectUtils.js
+# alone. Under the rule above git normalized them away on checkin, so the published dist/
+# differed from every local build by exactly those bytes: 771, 886 and 771 in the three
+# development bundles. The minified ones and the source maps are unaffected, they contain no
+# line breaks to convert.
+dist/**                -text
