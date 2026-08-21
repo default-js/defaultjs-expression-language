@@ -371,7 +371,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The following npm package may be included in this product:
 
- - acorn@8.15.0
+ - acorn@8.18.0
 
 This package contains the following license:
 
@@ -401,7 +401,7 @@ THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - @default-js/defaultjs-common-utils@0.21.6
+ - @default-js/defaultjs-common-utils@1.0.0
 
 This package contains the following license:
 

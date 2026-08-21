@@ -19,6 +19,68 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-21 — Which Node version does this project need, and does it go into `engines`?
+
+**Decision:** The toolchain needs **Node ≥ 22.15, and not Node 23**. That floor is recorded in
+`.nvmrc` (which names 24, the version developed against) and in the Development section of
+`README.md`. **`engines` stays unset.**
+
+**Reasoning:** Read off the installed tree rather than assumed: `webpack-dev-server@6` declares
+`>= 22.15.0`, the highest floor among all dependencies. `vitest@4` declares
+`^20.0.0 || ^22.0.0 || >=24.0.0`, which is what excludes 23. Everything else sits lower —
+`webpack-cli` at `>=20.9.0`, `playwright` at `>=20`, `webpack` at `>=10.13.0`.
+
+`engines` is npm's field for *consumers*: it is checked when someone installs this package, not
+when we build it. This library targets the browser, ships untranspiled ESM, and does not care
+which Node produced the tarball. Putting a build-time requirement there would refuse or warn on
+installs that are perfectly fine. The only runtime floor that could legitimately go in comes
+from `espree` (`^18.18.0 || ^20.9.0 || >=21.1.0`), and it applies solely to consumers who reach
+for `EsprimaExecuter` under Node — a narrow enough case that a documented note beats a hard
+constraint.
+
+**Alternatives:** Setting `engines` with the toolchain floor would make CI failures louder at
+the cost of every consumer. Setting it to the `espree` range would be defensible if the esprima
+executer were the default; it is not (see the entry of 2026-08-20).
+
+**Consequences:** Nothing enforces the floor. A contributor on Node 20 gets a failure from
+`webpack-dev-server` rather than from npm, and on Node 23 one from Vitest. `.nvmrc` and the
+readme are the only signposts, so both have to be updated when the floor moves.
+
+---
+
+## 2026-08-21 — How does the package version get into the code?
+
+**Decision:** `scripts/generate-version.js` derives `src/version.js` from `package.json` before
+every build, wired in through `prebuild:dev`, `prebuild:prod` and `predev`. The browser entry
+points import `VERSION` from it. `src/version.js` is generated, therefore gitignored, and
+published anyway.
+
+**Reasoning:** The previous approach patched `${version}` into the emitted files with
+`replace-in-file-webpack-plugin`, after webpack had finished. Three defects followed from that:
+the published raw sources `browser.js` and `browser-all-executers.js` kept the literal
+placeholder, because the plugin only rewrote `dist/`; the source maps no longer matched their
+content, because bytes changed after they were generated; and the hardcoded `dir: "dist"`
+rescanned the other mode's artifacts on every build. Generating a module instead makes the
+version a normal import — bundled, minified and mapped like any other code, with nothing
+touching the output afterwards.
+
+That a gitignored file still reaches consumers was verified, not assumed: `npm pack --dry-run`
+lists `src/version.js` in the tarball. The `files` array is an allowlist and outranks
+`.gitignore`.
+
+The script is CommonJS because this package has no `"type": "module"`. When that question is
+settled it is renamed to `.cjs` together with `webpack.config.js`.
+
+**Alternatives:** `DefinePlugin` is a smaller change but fixes only the bundles, leaving the raw
+published sources broken — which was the worst of the three defects. Checking `src/version.js`
+into git, as `defaultjs-common-utils` does, avoids a generated file being absent in a fresh
+clone before the first build; the cost is a generated artifact in the diff of every release.
+
+**Consequences:** A fresh clone has no `src/version.js` until something builds. Nothing imports
+it outside the two browser entries, so tests are unaffected, but any future importer must be
+aware. The version now has to be right in `package.json` before a build, not before a publish.
+
+
 ## 2026-08-21 — Do we enable tree shaking for the `dist/` bundles?
 
 **Decision:** No. `optimization.usedExports: false` stays in `webpack.config.js`, and a
@@ -113,8 +175,9 @@ part of this decision. No `vite.config` is required; a standalone `vitest.config
 `defineConfig` from `vitest/config` is the documented path. The config file has to be `.mjs`
 until the `"type": "module"` question is settled.
 
-The measurements and the full pro/contra per candidate stay in
-`plans/toolchain-modernization.md` until that plan is retired.
+The measurements and the full pro/contra per candidate were recorded in the toolchain
+modernization plan; that plan was retired on 2026-08-21, so the git history up to commit
+`6ca1a4c` is where they live now.
 
 
 ## 2026-08-21 — Do we commit style configuration, and does the tree get normalized?

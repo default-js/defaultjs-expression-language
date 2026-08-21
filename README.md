@@ -14,6 +14,7 @@
     - [Context sensitive behavior](#context-sensitive-behavior)
     - [Default value behavior](#default-value-behavior)
     - [Timeout behavior](#timeout-behavior)
+  - [Development](#development)
   - [License](#license)
 
 ## Intro
@@ -123,6 +124,27 @@ ExpressionResolver.resolve("${test}", global, undefined, 1000);
 ExpressionResolver.resolveText("text ${test} text", global, undefined, 1000);
 // the expression resolver waits 1000ms, before starting the resolving process
 ```
+
+## Development
+
+Building and testing this package needs **Node 22.15 or newer, and not Node 23** —
+`webpack-dev-server` requires `>= 22.15.0`, and Vitest accepts `^20 || ^22 || >=24`, which
+leaves 23 out. `.nvmrc` names the version this is developed against.
+
+This floor applies to the toolchain only, not to the package. `engines` is deliberately left
+unset, because it would be imposed on everyone installing the library, which targets the
+browser and does not care which Node published it.
+
+| | |
+|---|---|
+| `npm test` | the test gate — Vitest in headless Chromium via Playwright |
+| `npm run test:live` | the same in watch mode |
+| `npm run test:coverage` | the same with a coverage report in `coverage/` |
+| `npm run build` | tests plus the development and production bundles into `dist/` |
+| `npm run dev` | development server against `WebContent/` |
+
+The browsers Playwright needs are not installed by `npm install`. Run
+`npx playwright install chromium` once after cloning.
 
 ## License
 

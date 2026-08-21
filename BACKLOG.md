@@ -8,7 +8,7 @@ One paragraph each — where it is, what is wrong or undecided, what it costs. E
 
 Anything that affects consumers of the package additionally belongs in the [issue tracker](https://github.com/default-js/defaultjs-expression-language/issues); that call is Frank's.
 
-Entries here are independent of each other. The one undertaking with a forced order — the toolchain modernization — is tracked in `plans/toolchain-modernization.md` instead, and that file is deleted once it is finished.
+Entries here are independent of each other. An undertaking whose steps depend on each other gets its own file under `plans/` instead, and that file is deleted once it is finished — as the toolchain modernization was on 2026-08-21.
 
 ---
 
@@ -47,8 +47,8 @@ Entries here are independent of each other. The one undertaking with a forced or
 - [ ] **Decide what happens to Dependabot while the v3 cycle runs.**
   Four branches sit on origin — `engine.io-6.2.1`, `json5-2.2.3`, `ua-parser-js-0.7.33`,
   `webpack-5.76.0` — the newest from 2023-03-15, all opened against `master`, all for
-  devDependencies of the old toolchain. `plans/toolchain-modernization.md` sets the target
-  versions itself, so the pull requests contradict the plan rather than help it. They no
+  devDependencies of a toolchain that no longer exists — `karma`, `webpack` 5.76, `engine.io`,
+  `ua-parser-js`. The modernization of 2026-08-21 overtook all four. They no
   longer reach the documentation app now that its version selector runs off tags, so this
   is only about noise: close them and pause Dependabot until after the 3.0.0 release, or
   leave them. Found 2026-08-21.
@@ -135,3 +135,13 @@ Entries here are independent of each other. The one undertaking with a forced or
   configuration and let tree shaking back in, or drop the entry and publish two bundles
   instead of three. Consumer-visible either way, so the outcome belongs in `DECISIONS.md`.
   Found 2026-08-21 during stage F.
+
+- [ ] **`generate-license.config.json` sets a key that does not exist.**
+  The file says `"omitVersion": true` (`generate-license.config.json:5`), but the option
+  `generate-license-file` 4.2.1 knows is **`omitVersions`**, plural — documented in its
+  `README.md:92` and typed in `src/lib/cli/commands/main.d.ts:10`. The singular key is
+  silently ignored, which is why `LICENSE-OF-THIRD-PARTY` carries versions although someone
+  clearly meant it not to. Same class of defect as the `CodeCache` entry above: a
+  misspelled option name that no tool complains about. Fixing the typo changes a published
+  file, so decide first whether the versions should really be dropped — they do make the
+  file churn on every dependency bump. Found 2026-08-21 while closing out the toolchain plan.

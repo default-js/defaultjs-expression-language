@@ -12,7 +12,7 @@ Part of the `defaultjs-*` family (~20 repositories under `c:\_dev_ws\vscode`). I
 
 v3 is an AI-assisted modernization cycle with four goals:
 
-1. **Modernize the toolchain** — current build and test chain, replace Karma. Roadmap and rationale: `plans/toolchain-modernization.md`.
+1. **Modernize the toolchain** — current build and test chain, replace Karma. **Done (2026-08-21):** webpack 5.109 with CLI 7 and dev server 6, Vitest in a real browser instead of Karma, `npm audit` at 0. The reasoning that outlived the work is in `DECISIONS.md`, the rest in the git history.
 2. **Raise code quality** — fix existing defects, sharpen the structure. The pluggable executer strategy is the part of this work already begun.
 3. **Raise test coverage** — coverage is structurally broken today (see the plan). Repair first, extend afterwards.
 4. **Documentation** — for human consumers *and* for AI systems meant to use this package.
@@ -52,7 +52,7 @@ Build and test work is not consumer-visible and stays out.
 
 Sessions end whenever a topic is finished, often without warning. The files under *Records* are the only state that survives; the conversation does not.
 
-0. **Orient** — read `BACKLOG.md` from disk at the start of every session, before anything else; nothing is injected automatically. Read `DECISIONS.md` before proposing anything about architecture or the public API. Read `plans/toolchain-modernization.md` before touching the build, the tests, or dependencies.
+0. **Orient** — read `BACKLOG.md` from disk at the start of every session, before anything else; nothing is injected automatically. Read `DECISIONS.md` before proposing anything about architecture or the public API. If `plans/` exists, read the plan it contains before touching whatever it covers.
 1. **Clarify** — check the request, ask the open questions of intent in one batch before starting.
 2. **Plan** — for anything touching more than one file or changing dependencies: goal, affected files, risk, intended verification. Wait for approval. An approved plan that is not implemented straight away becomes a `BACKLOG.md` entry carrying the agreed scope. Small, locally contained changes go straight in.
 3. **Implement** — the agreed scope, nothing beside it.
@@ -68,7 +68,7 @@ Split by shape: independent items go in the backlog, settled questions get writt
 - `BACKLOG.md` — open items, findings, and work that was agreed but not yet implemented. Entries are deleted once done; git history is the archive.
 - `CHANGELOG.md` — what changed for consumers, per released version, newest first. Keep a Changelog format. Written while the change is made, released by moving `## [Unreleased]` to a version heading.
 - `DECISIONS.md` — architecture and API decisions with their reasoning. Anything that constrains later work, or that would otherwise be argued a second time, gets an entry.
-- `plans/` — one file per ordered undertaking, named after it; currently `plans/toolchain-modernization.md`. A plan is a living document: update a stage's status the moment it goes green, along with what was actually installed and any deviation from the intent. When the undertaking is finished the plan is **deleted** — durable outcomes move into `DECISIONS.md` first, git history keeps the rest. A finished plan left lying around gets read as instructions. With nothing running, `plans/` does not exist.
+- `plans/` — one file per ordered undertaking, named after it. The directory does not exist right now; the last plan, the toolchain modernization, was retired on 2026-08-21. A plan is a living document: update a stage's status the moment it goes green, along with what was actually installed and any deviation from the intent. When the undertaking is finished the plan is **deleted** — durable outcomes move into `DECISIONS.md` first, git history keeps the rest. A finished plan left lying around gets read as instructions. With nothing running, `plans/` does not exist.
 
 The repository root holds permanent records only; anything temporary lives in `plans/`.
 
