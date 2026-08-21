@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {ExpressionResolver} from "../../../index.js";
 import {EXECUTERNAME, setDebug} from "../../../src/executer/EsprimaExecuter.js"
 

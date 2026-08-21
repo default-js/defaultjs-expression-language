@@ -1,8 +1,10 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {ExpressionResolver} from "../../../index.js";
 import {EXECUTERNAME} from "../../../src/executer/WithScopedExecuter.js"
 
-describe("Resolver chain", () => {
-	jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
+// the chain test deliberately runs long-running resolutions; 120s was the jasmine
+// DEFAULT_TIMEOUT_INTERVAL this suite used to set
+describe("Resolver chain", { timeout: 120000 }, () => {
 
 	const executerReset = ExpressionResolver.defaultExecuter;
 	beforeAll(() => {

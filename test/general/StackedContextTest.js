@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { ExpressionResolver } from "../../index.js";
 import { EXECUTERNAME as ContextDeconstructorExecuterName} from "../../src/executer/ContextDeconstructorExecuter.js";
 import { EXECUTERNAME as WithScopedExecuter} from "../../src/executer/WithScopedExecuter.js";

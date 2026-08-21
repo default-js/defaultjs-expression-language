@@ -1,4 +1,4 @@
-import { ExpressionResolver, Context, ExecuterRegistry } from "./index.js";
+import { ExpressionResolver, ExecuterRegistry } from "./index.js";
 import "./src/executer/EsprimaExecuter.js";
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global";
 import { VERSION } from "./src/version.js";

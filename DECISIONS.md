@@ -19,6 +19,61 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-21 — Which test runner replaces Karma?
+
+**Decision:** Vitest 4 in browser mode, with Playwright/Chromium as the provider and
+`@vitest/coverage-v8`. Karma, the seven `karma-*` packages, `jasmine-core`, `puppeteer` and
+`karma.conf.js` go once the new suite reaches parity. webpack stays the bundler and keeps
+doing what it is for: producing `dist/`.
+
+**Reasoning:** Karma is deprecated by its own maintainers — *"Karma is deprecated and is not
+accepting new features or general bug fixes"* (`node_modules/karma/README.md`, 6.4.4) — and
+coverage in that setup never worked, which is goal 3 of the v3 cycle. Four candidates were
+measured the same way (scratch project, `npm i --ignore-scripts`, packages including
+transitive, browser driver counted separately):
+
+| Candidate | packages | size | real browser |
+|---|---|---|---|
+| `jasmine-browser-runner` 5.0.0 | 48 | ~29 MB | yes, via selenium |
+| `vitest` 4.1.11 + browser + `coverage-v8` | 71 + 3 | ~49 MB | yes, via playwright |
+| `@web/test-runner` 1.0.0 + `-playwright` | 293 + 3 | ~58 MB | yes, via playwright |
+| `jest` 30.4.2 + `jest-environment-jsdom` | 336 | ~59 MB | no, jsdom |
+
+Two properties decided it. **Coverage as a feature rather than as glue:** Vitest is one
+devDependency and `coverage: { provider: "v8" }`, with no instrumentation step between source
+and browser. **Surface:** 71 packages against Web Test Runner's 293, on exactly the axis that
+started this cycle — 44 dev vulnerabilities, none of them in `dependencies`.
+
+What explicitly did *not* decide it: that the 122 tests need no rewriting. That is an effort
+argument, and effort is not a selection criterion. It survives only as a footnote.
+
+**Alternatives:** *Jest* is out on substance, not on taste — it runs in Node against jsdom, and
+this package's target environment is the browser; its ESM support is still documented as
+experimental and needs `--experimental-vm-modules`, for a package that is pure untranspiled
+ESM. That webpack is the bundler changes nothing in its favour: the config has no `module` and
+no `resolve` key, so `moduleNameMapper`, the thing that connects Jest to a webpack setup, has
+nothing to map. *Web Test Runner* is the better fit on paper — no bundler in the request path —
+and would win if its dependency tree were not four times the size. *jasmine-browser-runner* is
+the close second and would become the better choice if owning ~50-80 lines of coverage glue
+(`nyc instrument`, extraction through its `middleware` hook or its own webdriver, `nyc report`)
+ever looks cheaper than carrying Vite: it is the smallest tree, needs no change to a single
+test, and its `--esm` mode serves specs as native ES modules, the closest any candidate gets to
+how this package ships.
+
+**Consequences:** `vite` enters the tree as a direct dependency of `vitest` (`^6 || ^7 || ^8`,
+currently 8.2.2), and with it `rolldown` — Vite 8 no longer bundles with Rollup or esbuild.
+Vite majors will drag Vitest along, which is the treadmill part 1 just climbed off, now in the
+test path. Tests are transformed by Vite while `dist/` is bundled by webpack; with zero loaders
+on either side the difference is small, but it is not nothing, and it is the standing argument
+for eventually moving the build to Vite as well — tracked in `BACKLOG.md`, deliberately not
+part of this decision. No `vite.config` is required; a standalone `vitest.config.mjs` using
+`defineConfig` from `vitest/config` is the documented path. The config file has to be `.mjs`
+until the `"type": "module"` question is settled.
+
+The measurements and the full pro/contra per candidate stay in
+`plans/toolchain-modernization.md` until that plan is retired.
+
+
 ## 2026-08-21 — Do we commit style configuration, and does the tree get normalized?
 
 **Decision:** Yes to both. `.editorconfig` and `.gitattributes` enter the repository, and the

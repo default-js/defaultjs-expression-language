@@ -22,6 +22,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **`browser.js` and `browser-all-executers.js` could not be loaded as native ES modules.**
+  Both imported a binding `Context` that `index.js` does not export, which a browser rejects
+  with `SyntaxError: The requested module './index.js' does not provide an export named
+  'Context'`. Since both files are published raw through the `files` array, loading either
+  with `<script type="module">` failed outright. The import was unused and is gone; nothing
+  else about either file changed.
+
 - **`browser.js` and `browser-all-executers.js` were published with an unresolved version
   placeholder.** Both files are part of the `files` array, so anyone importing the raw source
   instead of a bundle got `GLOBAL.defaultjs.el.VERSION === "${version}"`. The version now comes

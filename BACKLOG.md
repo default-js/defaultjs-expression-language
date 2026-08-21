@@ -76,17 +76,14 @@ Entries here are independent of each other. The one undertaking with a forced or
   is already declared generated. Costs nothing beyond one line, but it changes tracked
   bytes, so it should not be mixed into a toolchain stage. Found 2026-08-21 during stage 0.
 
-- [ ] **`browser.js` and `browser-all-executers.js` import a binding that does not exist.**
-  Both start with `import { ExpressionResolver, Context, ExecuterRegistry } from "./index.js"`
-  (`browser.js:1`, `browser-all-executers.js:1`), but `index.js:5` exports only
-  `ExpressionResolver` and `ExecuterRegistry`. `Context` is never used in either file, so
-  webpack drops it without even a warning — but both files are published raw through the
-  `files` array, and native ESM refuses the module outright: `SyntaxError: The requested
-  module './index.js' does not provide an export named 'Context'`, verified against Node 24.
-  A consumer loading `browser.js` with a plain `<script type="module">` therefore gets
-  nothing. Deleting the word `Context` fixes it; the open question is whether a `Context`
-  export was meant to exist — `src/ResolverContextHandle.js` is not exported anywhere today.
-  Found 2026-08-21 during stage C.
+- [ ] **Was a `Context` export meant to exist on the public API?**
+  `browser.js`, `browser-all-executers.js` and `test/setup.js` all imported a binding
+  `Context` from `index.js` that was never exported. The imports were unused and are gone
+  (2026-08-21, see `CHANGELOG.md`), so nothing is broken any more — but the fact that three
+  separate files asked for it suggests it was once intended. `src/ResolverContextHandle.js`
+  holds the proxy every context passes through and is exported nowhere. Decide whether that
+  becomes public API or whether the name simply dies here; the outcome belongs in
+  `DECISIONS.md` if it becomes public.
 
 - [ ] **`WebContent/index.html` loads a bundle that no build produces.**
   The page — the only thing `npm run dev` has to show — contains
@@ -99,3 +96,16 @@ Entries here are independent of each other. The one undertaking with a forced or
   `GLOBAL.defaultjs.el`. Only the filename is wrong. Whoever fixes this should decide what
   the page is meant to demonstrate — right now it has no content beyond the script tag.
   Found during stage D.
+
+- [ ] **Decide whether the build moves from webpack to Vite, once part 2 is done.**
+  Taking Vitest puts `vite` in the tree as a direct dependency (`DECISIONS.md`, 2026-08-21),
+  so the repository would carry two bundlers: Vite for the test path, webpack for `dist/`.
+  That is the one honest cost of the runner decision, and consolidating would remove it —
+  Vite's library mode covers what is needed in principle (several entries, minified and
+  unminified, source maps, controllable file names). Against it: nothing about webpack is
+  broken (5.109.2, zero vulnerabilities, both builds green), `dist/` is published *and*
+  committed, so swapping bundlers changes every published artifact and needs its own
+  verification rather than riding along with a test migration; and Vite 8's bundler is
+  `rolldown` at 1.x. Do not open this before part 2 of the toolchain plan is green — it
+  needs its own plan under `plans/`, and the outcome belongs in `DECISIONS.md`.
+  Raised 2026-08-21 when the runner was decided.
