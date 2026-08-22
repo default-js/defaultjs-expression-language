@@ -12,12 +12,11 @@ Entries here are independent of each other. An undertaking whose steps depend on
 
 ---
 
-> **Freeze since 2026-08-21 — read `plans/expression-resolver-specification.md` first.**
-> There is no specification of what the ExpressionResolver is meant to do, and one of the
-> defects found in it turned out to be a year-old regression rather than an intention. Until
-> that specification exists, nothing that changes or documents resolver behaviour gets worked
-> on — the entries concerned are marked *Frozen* below. Toolchain, packaging, benchmark and
-> test-infrastructure entries are unaffected.
+> **The freeze is lifted (2026-08-22). `SPECIFICATION.md` is the reference now.**
+> The entries that were on hold say what the fix has to achieve and name the section of
+> `SPECIFICATION.md` that defines it — that section is the target, not whatever the code does
+> today. Before any of them is implemented, the conformance suite of
+> `plans/specification-conformance-tests.md` pins the rule with a test.
 
 - [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
   `defaultjs-common-utils` already went this way, so the two packages diverge today. The
@@ -48,7 +47,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   leave them. Found 2026-08-21.
 
 - [ ] **Every code example in `README.md` uses a default import that does not exist.**
-  **Frozen** — `plans/expression-resolver-specification.md`.
+  Target: `SPECIFICATION.md` in full — the readme carries its consumer-facing subset.
   All examples read `import ExpressionResolver from "@default-js/defaultjs-expression-language"`,
   but `index.js:5` exports only named bindings — `export { ExpressionResolver, ExecuterRegistry }`.
   The default import resolves to `undefined`, so every example in the readme fails at the first
@@ -59,7 +58,9 @@ Entries here are independent of each other. An undertaking whose steps depend on
   (`ExecuterRegistry`, executers, `setupExecuter`, resolver chains, scopes). Found 2026-08-21.
 
 - [ ] **Was a `Context` export meant to exist on the public API?**
-  **Frozen** — `plans/expression-resolver-specification.md`.
+  Not answered by `SPECIFICATION.md`: section 9 lists the public surface and
+  `ResolverContextHandle` is not on it, so the name dies here unless a reason to export it turns
+  up. Decide and close.
   `browser.js`, `browser-all-executers.js` and `test/setup.js` all imported a binding
   `Context` from `index.js` that was never exported. The imports were unused and are gone
   (2026-08-21, see `CHANGELOG.md`), so nothing is broken any more — but the fact that three
@@ -111,7 +112,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   fixing the casing so the change stayed on the agreed scope. Found 2026-08-21.
 
 - [ ] **The default executer announces itself as deprecated, and nothing says what replaces it.**
-  **Frozen** — `plans/expression-resolver-specification.md`.
+  Target: `SPECIFICATION.md` 8.2 — the default becomes `context-deconstruction-executer`. What
+  is left here is making the switch and the migration note that comes with it.
   `WithScopedExecuter` is what every consumer gets without configuring anything
   (`src/executer/index.js`), and on the first expression it resolves it writes
   `console.warn(new Error("With Scoped expression execution is marked as deprecated."))`
@@ -201,7 +203,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   adding a second baseline.
 
 - [ ] **The constructor option `executer` is undocumented and silently ignores an `Executer` instance.**
-  **Frozen** — `plans/expression-resolver-specification.md`.
+  Target: `SPECIFICATION.md` 4.2 — the option takes a registered name and nothing else.
   `new ExpressionResolver({ executer })` is how a consumer pins one resolver to a non-default
   executer, but the JSDoc above the constructor lists only `context`, `parent` and `name`
   (`src/ExpressionResolver.js:118-128`), so the option exists only in the code. It also accepts
@@ -209,12 +211,18 @@ Entries here are independent of each other. An undertaking whose steps depend on
   ExpressionResolver.defaultExecuter` (`:130`) falls back to the default for anything that is
   not a string, an `Executer` instance included — while the static setter
   `ExpressionResolver.defaultExecuter` (`:98-102`) accepts both a name and an instance. Same
-  concept, two rules, and the stricter one fails without a word. Either accept an instance here
-  too or throw on one; document the option either way. Consumer-visible, so the outcome belongs
+  concept, two rules, and the stricter one fails without a word. **Decided 2026-08-22** (plan
+  question 40): the option takes a **registered name and nothing else**. Every executer is
+  registered before use, so the name is what addresses it, and an unregistered name already
+  throws through `getExecuter`. What is left to settle is the other end of the asymmetry —
+  whether the static setter `defaultExecuter` stays permissive or is narrowed to names as well —
+  and what the constructor does when it is handed an instance anyway: falling back to the default
+  without a word is the one answer that is now ruled out. Consumer-visible, so the outcome belongs
   in `DECISIONS.md`. Found 2026-08-21 while covering `setupExecuter`.
 
 - [ ] **`${scope::expression}` never reaches an ancestor — the recursive call passes its arguments in the wrong order.**
-  **Frozen** — `plans/expression-resolver-specification.md`.
+  Target: `SPECIFICATION.md` 5.3 and 5.4 — the walk climbs to the link whose name matches, and a
+  name no link carries answers `undefined` with the default value applying.
   `resolve()` is declared as `(aExecuter, aResolver, aExpression, aFilter, aDefault)`
   (`src/ExpressionResolver.js:64`), but when the scope filter does not match the current link it
   recurses as `resolve(aResolver.parent, aExpression, aFilter, aDefault, aExecuter)` (`:65`) —
@@ -235,7 +243,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   branches for goal 3.
 
 - [ ] **The instance `resolve()` does not understand the scope syntax at all.**
-  **Frozen** — `plans/expression-resolver-specification.md`.
+  Target: `SPECIFICATION.md` 4.3 — `resolve` recognizes the scope prefix in the delimited form,
+  and only there.
   `resolveText()` parses an expression with the `EXPRESSION` regex and hands
   `MATCH_EXPRESSION_SCOPE` on as the filter (`src/ExpressionResolver.js:76`), but
   `resolve(aExpression, aDefault)` merely strips `${` and `}` and passes everything in between
@@ -249,7 +258,9 @@ Entries here are independent of each other. An undertaking whose steps depend on
   Found 2026-08-21.
 
 - [ ] **`getData` and `deleteData` are broken on the filter path.**
-  **Frozen** — `plans/expression-resolver-specification.md`.
+  Target: `SPECIFICATION.md` 6.6, which specifies all four data methods along the chain — note
+  that it changes more than these two defects: a filter selects exactly one link and an unmatched
+  filter throws.
   Both walk to the parent when a filter names another link, and both get it wrong.
   `getData` (`src/ExpressionResolver.js:199-201`) calls `this.parent.getData(key, filter)`
   without returning it, so a lookup that has to travel up the chain answers `undefined` instead
@@ -261,3 +272,133 @@ Entries here are independent of each other. An undertaking whose steps depend on
   correct, which is what makes the pair easy to miss. All four are public methods and none of
   the four has a test. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
   Found 2026-08-21 while reading the uncovered branches for goal 3.
+
+- [ ] **An expression that contains braces is not recognized — there is no matching-brace parsing.**
+  Target: `SPECIFICATION.md` 3.1 — an expression is `${`, everything up to the **matching**
+  closing brace, and that brace.
+  `EXPRESSION` (`src/ExpressionResolver.js:13`) matches `[^\{\}]+` between the delimiters, so
+  anything carrying a brace of its own is missed: an object literal `${ {a:1} }`, an arrow
+  function body, a nested template literal. `resolveText` then either leaves the text alone or
+  cuts the expression at the first inner brace. `resolve()` is only half affected — it strips
+  `${`/`}` by `startsWith`/`endsWith` instead of by the regex — which is a second, independent
+  parsing rule for the same syntax. Named by Frank on 2026-08-22 during the specification
+  interview as behaviour that has to be implemented, not as an open question. **Decided
+  2026-08-22** (`SPECIFICATION.md` 4.3): the same single-pass parser also replaces the `split`/`join`
+  replacement in `resolveText`, so every occurrence of an expression is evaluated on its own
+  instead of once per distinct expression, and the quadratic behaviour over the text goes away.
+  Consumer-visible, so the outcome belongs in `CHANGELOG.md`. Expect further findings here once
+  tests exist.
+
+- [ ] **A resolver built on the global object throws on every lookup.**
+  Target: `SPECIFICATION.md` 6.4 — the global object stays a supported context object.
+  `#initPropertyCache` special-cases `data == GLOBAL` and returns the wrapper from
+  `createGlobalCacheWrapper` (`src/ResolverContextHandle.js:14-32`), whose `get(property)`
+  answers `GLOBAL[property]` — a **value**. But `#getPropertyDef` (`:168`) is contracted to
+  return a `ResolverContextHandle`, and the `get` trap then evaluates `proxy.#data[property]` on
+  that value: `TypeError: Cannot read private member #data from an object whose class did not
+  declare it`. `execute()` swallows it, so the caller sees `undefined` and a warning. Verified
+  2026-08-22 against `src/` under node 24.19: `new ExpressionResolver({ context: globalThis })`
+  answers `undefined` for `${Math.round(1.5)}` and for any global that holds a truthy value; a
+  global holding `undefined` survives only because the trap short-circuits on falsy. Reach:
+  `EsprimaExecuter` declares `defaultContext: GLOBAL` (`src/executer/EsprimaExecuter.js:129`),
+  so every resolver built while that executer is the default is affected, and passing `window`
+  explicitly is the documented way to reach the global context. Note the ordinary global
+  fallback is unaffected — it works through the JavaScript scope chain of the generated code,
+  not through this path. **Fix agreed 2026-08-22** (`SPECIFICATION.md` 6.4): the wrapper already receives
+  the handle it never uses — its `get` returns that handle instead of the value, and the
+  contract "a lookup answers which link holds the name" holds again. Document alongside it that
+  `ownKeys` then reports every global name, which `ContextDeconstructorExecuter` destructures on
+  every execution. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
+  Found 2026-08-22 while working out the specification questions.
+
+- [ ] **A write to an unknown name inside an expression lands on `globalThis`.**
+  Target: `SPECIFICATION.md` 6.5 — the negative guarantee and the three-level switch.
+  Verified 2026-08-22 against `src/` under node 24.19 with both executers: `${brandNew = 1}`
+  leaves the resolver's own context untouched and sets `globalThis.brandNew`. Under
+  `WithScopedExecuter` the `has` trap answers false for a name the chain does not carry
+  (`src/ResolverContextHandle.js:65-68`), so the assignment falls out of the `with` block into
+  global scope; under `ContextDeconstructorExecuter` the generated function is sloppy-mode and an
+  undeclared assignment does the same. A write to a name that **does** exist in the chain behaves
+  correctly — it lands in the resolver's own context and leaves the parent link alone. Writing
+  from inside an expression is unspecified behaviour (see `SPECIFICATION.md` 6.5), but writing to
+  the global object is not merely unspecified: the template engine and this resolver run in CMS
+  systems where users author expressions. **Fix agreed 2026-08-22** (`SPECIFICATION.md` 6.5): a switch that
+  *allows* writing to the global object, at three levels each falling back to the one above it —
+  `ExpressionResolver.allowGlobalWrite` for the whole application, a constructor option
+  `allowGlobalWrite` per resolver, and a fifth argument on the static `resolve` / `resolveText`
+  per call. **Off by default.** While it
+  is off, a write to a name the chain does not carry is caught and executed in the own context of
+  the resolver the expression is evaluated on — the same destination as a write to a name that
+  already exists somewhere in the chain, so there is one rule and no special case. Under
+  `WithScopedExecuter` that means having `has` answer true for every name, with `get` falling
+  back to `GLOBAL[property]` so reads are unaffected. Under `ContextDeconstructorExecuter` the write cannot be caught at all, so there
+  the protected state means generating the body in strict mode: the assignment throws and is
+  reported as an execution error.
+  Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
+  Found 2026-08-22 while working out the specification questions.
+
+- [ ] **`RESERVED_NAMES` in the esprima executer misspells `global`.**
+  Related to `SPECIFICATION.md` 6.4, because it decides what an expression can reach.
+  `src/executer/EsprimaExecuter.js:27` lists `"gobal"` where `"global"` was meant. The list names
+  the identifiers the AST rewrite leaves alone; everything else is rewritten to `ctx?.name`. So
+  `global` is rewritten and resolves against the context instead of the global object, while the
+  misspelled `gobal` is protected and nothing ever writes it. Harmless in a browser, where the
+  global is `window` or `self` and both are on the list — but this package is used from node
+  tooling as well, and the entry is dead either way. The same list is what keeps `fetch`,
+  `console`, `Object`, `Array`, `Map` and `Set` reachable inside an expression, so it is worth
+  reviewing as a whole rather than only fixing the typo. Found 2026-08-22 while working out the
+  global-fallback question.
+
+- [ ] **`effectiveChain` is a copy of `chain`, and a resolver without a name has none.**
+  Target: `SPECIFICATION.md` 5.1 and 5.5.
+  `chain` and `effectiveChain` (`src/ExpressionResolver.js:159-171`) build the same string by the
+  same rule, only through their own getter, so no input tells them apart; a link without a name
+  contributes the literal `"/null"` to both. Agreed 2026-08-22: `chain` names **every** link,
+  `effectiveChain` only the links whose context **holds at least one value**, and `contextChain`
+  collects the contexts of exactly those links instead of all of them — so both describe a state
+  that changes over a resolver's lifetime, unlike the structural `chain`. Alongside it, and the reason the
+  context became the deciding characteristic: **every resolver gets a name**. Where the caller
+  passes none, one is generated — prefix `ER` plus a counter — so `name` never answers `null` and
+  every link can appear in a chain path. All three getters are supported public API (plan
+  question 17), so all three need tests. Consumer-visible, so the outcome belongs in
+  `CHANGELOG.md`. Found 2026-08-22 while drafting the specification.
+
+- [ ] **The static entry points take no configuration object.**
+  Target: `SPECIFICATION.md` 4.1.
+  `ExpressionResolver.resolve` and `resolveText` are positional only
+  (`src/ExpressionResolver.js:298,322`), so every argument beyond the context has to be reached
+  by passing the ones before it, and the call site says nothing about what a bare `true` at the
+  end would mean. Agreed 2026-08-22: both static methods additionally accept **one configuration
+  object** carrying everything — `{ expression | text, context, defaultValue, timeout,
+  allowGlobalWrite }`. Which form is in use is decided by the first argument alone, `typeof
+  arguments[0] === "string"`, so no key of the object is inspected and a context carrying a key
+  named `context` can never be mistaken for a configuration. Two details belong to the same
+  change: the positional form gains `aAllowGlobalWrite` as its fifth argument (see the
+  global-write entry above), and in the configuration form "a default value was passed" is the
+  presence of the key `defaultValue` rather than an `arguments.length` check — which is the more
+  precise rule the `DefaultValue` distinction always wanted. Purely additive, so no consumer
+  breaks. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
+  Found 2026-08-22 while reviewing the draft specification.
+
+- [ ] **`buildSecure` drops the options a secure context needs most.**
+  Target: `SPECIFICATION.md` 6.7.
+  `buildSecure` (`src/ExpressionResolver.js:348`) filters the context and then builds the
+  resolver with `{ context, name, parent }` only. `executer` is missing by oversight — a secure
+  resolver cannot be pinned to an execution strategy — and the `allowGlobalWrite` switch agreed
+  on 2026-08-22 cannot be set there either, although `buildSecure` exists for exactly the CMS
+  case that switch was invented for: users authoring expressions. Agreed 2026-08-22: forward the
+  full constructor option set on top of `propFilter` and `option`. Purely additive. Found
+  2026-08-22 during the consistency pass over the draft specification.
+
+- [ ] **The data methods have no rules along the chain.**
+  Target: `SPECIFICATION.md` 6.6.
+  `getData`, `updateData`, `deleteData` and `mergeContext` each take a `filter`, and what they do
+  with the chain was never specified — the code answers three different things and one of them is
+  a defect (see the entry on the filter path above). Agreed 2026-08-22: a filter selects exactly
+  one link, and **a filter matching no link throws** in all four instead of being silently
+  ignored, which is what happens today. `updateData` without a filter searches from the calling
+  resolver towards the root and changes the value where the key lives, creating it on the calling
+  resolver only when no link carries it. `deleteData` removes the key from exactly one link — the
+  addressed one, or the first one carrying it; a chain-wide switch was weighed and dropped. `mergeContext` stays a shallow `Object.assign` into one link's context.
+  Consumer-visible in several places, so the outcome belongs in `CHANGELOG.md`.
+  Found 2026-08-22 while specifying the write path.

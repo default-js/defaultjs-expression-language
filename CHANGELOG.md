@@ -13,6 +13,14 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ## [Unreleased]
 
+### Added
+
+- **`SPECIFICATION.md` ships with the package.** It states what the resolver does, rule by
+  rule — expression syntax, the resolver chain and its scopes, the context and what it
+  guarantees, error handling, the executers, and the whole public surface. Where the code does
+  not keep a rule yet, the specification says so and section 10 lists every such place, so the
+  document is usable as a reference before those fixes land.
+
 ### Removed
 
 - **`esprima` is no longer a declared runtime dependency.** It was never imported — the two

@@ -19,6 +19,185 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-22 — Where does the specification of the resolver live, and what is it for?
+
+**Decision:** A permanent `SPECIFICATION.md` in the repository root, written from an interview
+with the author rather than from the code, and published with the package. `README.md` carries
+the consumer-facing subset, this file carries the reasoning behind individual answers.
+
+**Reasoning:** There was no statement of what the `ExpressionResolver` is meant to do. The code
+could not supply one: at least one of its behaviours turned out to be a year-old regression
+rather than an intention, so every fix derived from reading it risked cementing an accident and
+every test written against it risked pinning one. A specification records *what*, this file
+records *why* — different documents, and merging them would have buried the rules in argument.
+
+**Alternatives:** Folding it into `DECISIONS.md` was rejected for the reason above. Putting it
+into `README.md` alone was rejected because internal semantics — the chain walk, the snapshot
+rule, error handling — have no place in a getting-started document but must be written down
+somewhere.
+
+**Consequences:** A fourth permanent record to keep in step. The specification states intended
+behaviour, so it disagrees with the code in fourteen places listed in its section 10; each one
+is a `BACKLOG.md` entry, and the specification is the reference for what the fix has to achieve.
+Publishing it adds a file to the `files` array.
+
+## 2026-08-22 — Does a key holding `undefined` shadow a value nearer the root?
+
+**Decision:** Yes. A lookup is decided by whether a link **carries the key**, not by what the key
+holds. A key defined as `undefined` answers and stops the walk; a key a link does not carry is
+passed on to its parent.
+
+**Reasoning:** It is what JavaScript scoping itself does, and the property cache is keyed by name,
+so it is also the cheapest rule — one map lookup per link, no value inspection.
+
+**Alternatives:** Reading `undefined` as "not there" and walking on was proposed, on the ground
+that the package elsewhere uses `undefined` to mean a thing does not exist. It was rejected:
+that rule is about what a *lookup answers to the caller*, not about how a link's own keys are
+read. It would also have made it impossible for a link to deliberately hide an inherited value.
+
+**Consequences:** A context built as `{ item: obj.missing }` carries the key `item` and hides
+whatever the parents hold under that name. Combined with the default-value rule the caller still
+sees a value where one was passed, so the effect surfaces only when no default is given.
+
+## 2026-08-22 — Is a context a snapshot or read live?
+
+**Decision:** **Names are a snapshot, values are live.** The set of keys a link contributes is
+captured when the resolver is built; the values behind them are read at the moment of the lookup.
+A key added directly to the handed-in object afterwards is invisible until
+`contextHandle.resetCache()`, `updateData` or `mergeContext` rebuilds the set.
+
+**Reasoning:** That cache is what makes the chain walk cheap — one map lookup per link. It also
+matches how the package is used: a link of a stacking context is filled and then used, not
+extended while it is being read.
+
+**Alternatives:** A live fallback — `Reflect.has(data, property)` on every cache miss — was
+weighed and rejected. It doubles the cost of the miss path, which is the path that walks the
+entire chain, and `ownKeys`, which `ContextDeconstructorExecuter` calls on *every* execution,
+would have to be rebuilt live along with it.
+
+**Consequences:** Mutating an object handed to a resolver is not enough to make a new key visible,
+which is a documented side effect rather than a defect. It also decides `effectiveChain`: a link
+counts as carrying values by what the cache holds, so keys the cache drops — reserved words,
+names that are not valid variable names — do not count.
+
+## 2026-08-22 — Is reaching the global object a promise of the package?
+
+**Decision:** No. It is described as a **mechanism** and the details belong to the executer.
+`WithScopedExecuter` and `ContextDeconstructorExecuter` run the statement as ordinary JavaScript,
+so the engine resolves a name the chain does not carry against the global object and neither
+executer can prevent it. `EsprimaExecuter` rewrites identifiers onto one context variable and
+reaches globals only through its `RESERVED_NAMES` list or a global context object.
+
+**Reasoning:** The resolver does not execute anything itself. Promising a global fallback would
+be promising something only some executers keep, and the esprima executer already breaks it.
+
+**Alternatives:** Specifying it as a guarantee every executer must honour would give consumers one
+rule to rely on, at the price of constraining every future execution strategy — including a
+sandboxed one, which is the direction a CMS deployment would want.
+
+**Consequences:** `buildSecure` filters the context, not the globals: `fetch`, `console` and
+`document` stay reachable from an expression. It is a way to hand over a cleaned context, not a
+sandbox, and must not be documented as one. A consumer who wants a name resolved locally puts it
+into the context so the engine finds it before walking out.
+
+## 2026-08-22 — What happens when an expression writes?
+
+**Decision:** Writing from inside an expression is **not specified**; `updateData` and
+`mergeContext` are the supported path. One guarantee is given, and it is negative: while writing
+to the global object is not explicitly allowed, an assignment inside an expression must not
+create or change anything there. The switch that allows it exists at three levels, each falling
+back to the one above — `ExpressionResolver.allowGlobalWrite`, the constructor option
+`allowGlobalWrite`, and the fifth argument of the static `resolve` / `resolveText` — and defaults
+to `false`.
+
+**Reasoning:** What an assignment does is decided by the executer, not by this package.
+`WithScopedExecuter` routes it through the context proxy and can be intercepted;
+`ContextDeconstructorExecuter` writes to a destructured local binding and cannot; `EsprimaExecuter`
+cannot execute an assignment at all, because `x = 5` is rewritten to `ctx?.x = 5`, a syntax error.
+Promising a destination would promise what only one executer can keep. The negative guarantee is
+different in kind: expressions are authored by users in CMS deployments, and a page where an
+expression can write to `window` is a problem regardless of which executer is in use.
+
+**Alternatives:** Specifying "a write always lands in the own context" was worked out and
+rejected: it is implementable for the `with`-based executer only, and choosing it would have
+locked `with` in as the default against the decision to move away from it.
+
+**Consequences:** The protected state means different things per executer — interception for the
+`with`-based one, strict-mode generation and a reported error for the deconstructor. That
+difference is part of the specification rather than hidden behind the switch. Turning the switch
+on restores plain JavaScript behaviour, including accidental globals.
+
+## 2026-08-22 — Is an expression in a text evaluated once or once per occurrence?
+
+**Decision:** **Once per occurrence.** `${counter++}` twice in one text increments twice.
+
+**Reasoning:** Measured before deciding, against `src/` under node 24.19: one warm evaluation of
+`${a + b}` costs about 3.2 µs; a text with 500 identical occurrences resolves in 0.05 ms today,
+so evaluating each occurrence separately would add about 1.6 ms. Against that, a text with 500
+*distinct* expressions costs 21.8 ms today — about 44 µs per expression, more than ten times the
+evaluation it performs, because `resolveText` runs the regex and then `split`/`join`s the whole
+text once per expression. The saving that one-evaluation-per-expression buys is real but small,
+and it is dwarfed by the replacement machinery it sits inside.
+
+**Alternatives:** Keeping one evaluation per distinct expression and documenting the side effect
+was the cheaper option and would have stayed correct for side-effect-free expressions. It was
+rejected because an expression with a side effect has to mean what it says.
+
+**Consequences:** The rewrite rides on the single-pass parser that finding the matching closing
+brace needs anyway: walk the text once, evaluate each expression where it stands, build the
+result. That also removes the quadratic behaviour over the number of distinct expressions.
+
+## 2026-08-22 — How does a caller reach the newer options of the static entry points?
+
+**Decision:** Two call forms. The positional one keeps its shape and gains
+`aAllowGlobalWrite` as a fifth argument; alongside it, a **single configuration object** carries
+everything: `resolve({ expression, context, defaultValue, timeout, allowGlobalWrite })`. Which
+form is in use is decided by the first argument alone — an expression is always a string, a
+configuration always an object. The instance methods stay positional.
+
+**Reasoning:** An options object in *second* position cannot be told apart from a context: a
+context is an arbitrary object and may itself carry a key named `context`, so any detection would
+be a heuristic and therefore a trap. Moving the expression into the object removes the ambiguity
+entirely and costs one `typeof` per call, which is not measurable against 3.2 µs of evaluation.
+The instance methods need no such form because everything a configuration would carry beyond the
+default value is already fixed on the instance and must not be overridable per call.
+
+**Alternatives:** Object-only for the new options would have kept one call shape per method and
+reads better at the call site — `resolve(e, ctx, undefined, undefined, true)` tells nobody what
+`true` means. It was rejected because existing positional code should not have to be restructured
+to reach a switch.
+
+**Consequences:** Two shapes to document and test per static method. In the configuration form
+"a default value was passed" becomes the presence of the key `defaultValue`, which is more precise
+than the `arguments.length` check the positional form has to keep using. The configuration form is
+what the documentation recommends as soon as more than a context and a default are involved.
+
+## 2026-08-22 — How far along the chain does each data method reach?
+
+**Decision:** Per method, by convention, and written down: `getData` reads along the chain and the
+nearest link carrying the key answers. `updateData` changes the value **where the key lives**,
+creating it on the calling resolver only when no link carries it. `deleteData` removes the key
+from exactly **one** link. `mergeContext` assigns shallowly into **one** link's context and does
+not search. A `filter` selects exactly one link, and **a filter matching no link throws** in all
+four.
+
+**Reasoning:** These methods are the path with guaranteed behaviour, identical under every
+executer, so their reach has to be stated rather than inherited from whatever the code does — the
+code answers three different things today and one of them is a defect. The throw follows the same
+line: a filter naming a link that does not exist is a mistake in the calling code, unlike a scope
+name inside an expression, which is data and must never stop a render.
+
+**Alternatives:** A switch widening `deleteData` to the whole chain was agreed and then withdrawn:
+a filter names one link, a chain-wide switch names all of them, and the two contradict each other
+in one call. Rather than invent a rule for the contradiction, the method stays at one link;
+walking the chain and deleting per link is three lines of consumer code, since `parent` and `name`
+are public.
+
+**Consequences:** An unmatched filter is silently ignored today, so this is consumer-visible.
+`mergeContext` becomes the only way to define a key on one link when a link nearer the root
+already carries it — `mergeContext({ key: value })` with a one-key object. A separate `setData`
+was proposed for that and dropped: no method is added, the surface stays at four.
+
 ## 2026-08-21 — What module format does the webpack config use, and how does it read JSON?
 
 **Decision:** `webpack.config.mjs`, native ESM, reading `package.json` and

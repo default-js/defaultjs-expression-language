@@ -58,6 +58,7 @@
 		"LICENSE",
 		"LICENSE-OF-THIRD-PARTY",
 		"README.md",
+		"SPECIFICATION.md",
 		"CHANGELOG.md"
 	]
 }

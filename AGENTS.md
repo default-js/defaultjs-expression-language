@@ -10,12 +10,13 @@ Part of the `defaultjs-*` family (~20 repositories under `c:\_dev_ws\vscode`). I
 
 ## Vision for v3
 
-v3 is an AI-assisted modernization cycle with four goals:
+v3 is an AI-assisted modernization cycle with five goals:
 
 1. **Modernize the toolchain** — current build and test chain, replace Karma. **Done (2026-08-21):** webpack 5.109 with CLI 7 and dev server 6, Vitest in a real browser instead of Karma, `npm audit` at 0. The reasoning that outlived the work is in `DECISIONS.md`, the rest in the git history.
-2. **Raise code quality** — fix existing defects, sharpen the structure. The pluggable executer strategy is the part of this work already begun. **On hold since 2026-08-21** for everything touching the resolver: there is no specification of what the ExpressionResolver is meant to do, so a fix derived from the code risks cementing an accident — one of the defects found is a year-old regression. See `plans/expression-resolver-specification.md` for what is frozen and what is not.
+2. **Raise code quality** — fix existing defects, sharpen the structure. The pluggable executer strategy is the part of this work already begun. The freeze that held this back is **lifted (2026-08-22)**: `SPECIFICATION.md` now says what the resolver is meant to do, so a fix has something to be derived from other than the code. Fourteen places where the code and the specification disagree are listed in its section 10 and carried as `BACKLOG.md` entries.
 3. **Raise test coverage** — the structural blocker is gone: the Vitest migration made `npm run test:coverage` work, and it reported 84.28 % of statements on 2026-08-21. What is left is extending it; the named gaps are in `BACKLOG.md`.
-4. **Documentation** — for human consumers *and* for AI systems meant to use this package. Downstream of the specification plan; documenting an unspecified behaviour only describes the accident a second time.
+4. **Documentation** — for human consumers *and* for AI systems meant to use this package. `SPECIFICATION.md` (2026-08-22) is the first half of it and the reference the rest is written against; `README.md` still teaches a broken call and documents none of v3.
+5. **Do not lose performance** — the resolver must not come out of this cycle slower than it went in, and coming out faster is the actual goal. Every change that touches a hot path is measured against `npm run bench` before and after, and a regression is a defect like any other. Two of the decisions in `DECISIONS.md` were already taken on measurements rather than taste; keep it that way. Note the benchmark caveat in `BACKLOG.md` before comparing single runs.
 
 What this repository is meant to become a template for is **the way we work and shape the project** — the sibling repositories are otherwise none of this project's business. Carrying results over to them is Frank's own task and must not influence decisions made here.
 
@@ -75,8 +76,9 @@ Split by shape: independent items go in the backlog, settled questions get writt
 
 - `BACKLOG.md` — open items, findings, and work that was agreed but not yet implemented. Entries are deleted once done; git history is the archive.
 - `CHANGELOG.md` — what changed for consumers, per released version, newest first. Keep a Changelog format. Written while the change is made, released by moving `## [Unreleased]` to a version heading.
-- `DECISIONS.md` — architecture and API decisions with their reasoning. Anything that constrains later work, or that would otherwise be argued a second time, gets an entry.
-- `plans/` — one file per ordered undertaking, named after it. One plan is running: `plans/expression-resolver-specification.md`, opened 2026-08-21, and it **freezes** the resolver work it lists — read it before touching any of that. The plan before it, the toolchain modernization, was retired on 2026-08-21. A plan is a living document: update a stage's status the moment it goes green, along with what was actually installed and any deviation from the intent. When the undertaking is finished the plan is **deleted** — durable outcomes move into `DECISIONS.md` first, git history keeps the rest. A finished plan left lying around gets read as instructions. With nothing running, `plans/` does not exist.
+- `DECISIONS.md` — architecture and API decisions with their reasoning. Anything that constrains later work, or that would otherwise be argued a second time, gets an entry. It answers *why*; `SPECIFICATION.md` answers *what*.
+- `SPECIFICATION.md` — what the resolver does, rule by rule, and what it is meant to do where the code does not yet keep up. Written 2026-08-22 from an interview with Frank rather than from the code, because the code is not a reliable witness to its own intent. It is the reference for every fix to the resolver, and it is published with the package.
+- `plans/` — one file per ordered undertaking, named after it. One plan is running: `plans/specification-conformance-tests.md`, opened 2026-08-22 — the suite that pins every rule of the specification before any of the fourteen fixes is written. The two plans before it, the toolchain modernization and the specification itself, were retired on 2026-08-21 and 2026-08-22. A plan is a living document: update a stage's status the moment it goes green, along with what was actually installed and any deviation from the intent. When the undertaking is finished the plan is **deleted** — durable outcomes move into `DECISIONS.md` first, git history keeps the rest. A finished plan left lying around gets read as instructions. With nothing running, `plans/` does not exist.
 
 The repository root holds permanent records only; anything temporary lives in `plans/`.
 
