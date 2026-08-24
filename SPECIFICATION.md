@@ -54,13 +54,28 @@ An expression begins with `${` and ends at the **matching** closing brace. Brace
 statement — an object literal, an arrow function body, a nested template literal — are part of
 the statement and must be counted, not terminated on.
 
+Two rules bound that counting.
+
+**A brace inside a string literal does not count.** `${ "}" }` is one expression whose statement
+is `"}"`, and the expression ends at the brace that follows it. The same holds for `'` and for a
+template literal, and it holds in both directions: neither an opening nor a closing brace inside a
+literal changes the count.
+
+**An opening `${` without a matching closing brace is not an expression.** The text stands as
+written, unchanged, and nothing is evaluated. There is no error and no partial replacement.
+
 *Not yet implemented* — the current regular expression cannot nest; see `BACKLOG.md`, "An
 expression that contains braces is not recognized".
 
 ### 3.2 Escaping
 
 A backslash directly before the `$` escapes the expression. It is not evaluated, and the text
-stands as written without the backslash.
+stands as written without the backslash. This holds per occurrence: an escaped one stands even
+where the same expression appears unescaped elsewhere in the text, and the other way round.
+
+*Not yet implemented* — where both forms appear in one text, the escape is lost or the backslash
+is left in front of the resolved value; see `BACKLOG.md`, "An escaped expression is resolved
+anyway".
 
 ### 3.3 Scope prefix
 
@@ -183,11 +198,12 @@ promise is awaited before it is answered or inserted into a text.
 Every resolver carries a `name` and may carry a `parent`. A resolver sees its own context and
 the contexts of **all its parents**; it never sees the context of a link below it.
 
-A name is not optional. Where the caller passes none, the resolver **generates** one: the prefix
-`ER` followed by a counter, `ER1`, `ER2`, and so on. A generated name obeys the character rule of
-3.3 and is therefore addressable like any other, but it is not predictable and is not meant to be
-addressed — it exists so that every link can be named in a chain path and so that `name` never
-answers `null`.
+A name is not optional. Where the caller passes none, the resolver **generates** one. The only
+requirement on a generated name is that it is **unique** and obeys the character rule of 3.3; its
+shape is not part of this specification, and a consumer must not depend on it. `ER` plus a
+counter — `ER1`, `ER2` — is what the implementation uses. A generated name is addressable like
+any other, but it is not meant to be addressed: it exists so that every link can be named in a
+chain path and so that `name` never answers `null`.
 
 *Not yet implemented* — an unnamed resolver keeps `name` at `null` today and contributes the
 literal `"/null"` to a chain path; see `BACKLOG.md`.
@@ -208,6 +224,10 @@ or a method defined on a class is reachable from an expression.
 
 `${name::statement}` climbs the chain until it reaches the link whose `name` equals the prefix,
 and evaluates the statement there — against that link's context and the contexts above it.
+
+Where more than one link carries the name, the **first one found while climbing** answers, and
+the ones above it are shadowed — the same rule as 5.2, and for the same reason: a chain is built
+by descending, so the nearest link is the one the caller most recently introduced.
 
 *Not yet implemented* — the recursion passes its arguments in the wrong order and never reaches
 an ancestor; see `BACKLOG.md`.
@@ -237,22 +257,21 @@ parent adds nothing to a lookup, and does not appear here.
 `contextChain` answers the contexts of exactly those links, this resolver's first, the root's
 last.
 
-A link counts as providing a context when its context **holds at least one value**. Whether a
-context object was handed in is irrelevant, and an empty object does not count.
+A link counts as providing a context when the caller **handed one to the constructor** — any
+value that is neither `null` nor `undefined` — **or** when a value has been set on it since,
+through `mergeContext`, `updateData`, or a write from an expression. What the context holds is
+irrelevant: an empty object counts, and so does an object holding only names an expression cannot
+reach.
 
-Two consequences follow from that and are part of the rule:
+A link therefore provides no context only in one case: it was built without one — `context: null`,
+`context: undefined`, or the option left out — and nothing has been written to it since. Note that
+this is the one place where `context: null` and `context: {}` are told apart; for a lookup they
+behave the same (6.3).
 
-- `effectiveChain` and `contextChain` describe a **state, not a structure**. A link that is empty
-  now and receives a value later — through `mergeContext`, `updateData`, or a write from an
-  expression — joins both from that moment on. A key added directly to the object the caller
-  handed in does **not** count until the cache is rebuilt, by the snapshot rule of 6.2. `chain`
-  is the opposite: it is structural and does not change. Neither result should be cached by a
-  consumer.
-- What counts as a value is what the link's property cache holds, which is the same set of names
-  an expression can reach: keys inherited through the **prototype chain** count, and keys the
-  cache drops do not — reserved words, and names that are not valid variable names. An object
-  holding only `{ class: 1 }` is therefore an empty context here, exactly as `class` is
-  unreachable from an expression.
+One consequence follows from that and is part of the rule: `effectiveChain` and `contextChain`
+describe a **state, not a structure**. A link built without a context joins both the moment a
+value is set on it. `chain` is the opposite: it is structural and does not change. Neither result
+should be cached by a consumer.
 
 When no link qualifies, `effectiveChain` is the empty string, while `chain` still answers the
 full path.
@@ -418,6 +437,9 @@ ExpressionResolver.buildSecure({ context, propFilter, option,
                                  name, parent, executer, allowGlobalWrite })
 ```
 
+*Not yet implemented at all* — `buildSecure` throws a `TypeError` on every call today, before a
+resolver is built; see `BACKLOG.md`. Everything below is what it is meant to do.
+
 Builds a resolver over a **filtered copy** of the context, so that properties a consumer does
 not want reachable never enter the evaluation. The motivating case is real: the template engine
 and this resolver run inside CMS systems where users author expressions.
@@ -483,10 +505,18 @@ made; see `BACKLOG.md`.
 
 ### 8.3 Behaviour that is the executer's own
 
-An executer chooses how a statement reaches the global object (6.4), and whether a write can be
-caught (6.5). Both differ between the implementations, and a consumer who cares has to read the
-executer's own description. Everything else in this document holds regardless of the executer in
-use.
+An executer chooses how a statement reaches the global object (6.4), whether a write can be
+caught (6.5), and **how a statement addresses a value of the context**. All three differ between
+the implementations, and a consumer who cares has to read the executer's own description.
+Everything else in this document holds regardless of the executer in use.
+
+The third is the one that changes how an expression is written, so it is spelled out here.
+`WithScopedExecuter`, `ContextDeconstructorExecuter` and `EsprimaExecuter` put the properties of
+the context into scope: the property `value` is addressed as `${value}`. `ContextObjectExecuter`
+does not — it hands the context to the statement as the object `ctx`, and the same property is
+addressed as `${ctx.value}`. An executer may make such a demand; what it may not do is change
+which link of the chain answers a lookup, or any other rule of this document. Switching executer
+can therefore mean rewriting expressions, and that is intended, not a defect.
 
 ### 8.4 Tuning
 
@@ -519,17 +549,18 @@ Every rule above that the code does not keep today, in one place:
 
 | Rule | `BACKLOG.md` entry |
 |---|---|
-| 3.1 matching closing brace | An expression that contains braces is not recognized |
+| 3.1 matching closing brace, string literals, an unterminated `${` | An expression that contains braces is not recognized |
+| 3.2 escaping one occurrence while another stands unescaped | An escaped expression is resolved anyway |
 | 4.1 the configuration form of the static calls | The static entry points take no configuration object |
 | 4.3 one evaluation per occurrence | An expression that contains braces is not recognized, decision C |
 | 4.3 `resolve` and the scope prefix | The instance `resolve()` does not understand the scope syntax at all |
 | 5.1 a generated name where none was passed | `effectiveChain` is a copy of `chain`, and a resolver without a name |
-| 5.3 climbing to a named link | `${scope::expression}` never reaches an ancestor |
+| 5.3 climbing to a named link, and the nearest of two links sharing a name | `${scope::expression}` never reaches an ancestor |
 | 5.4 `undefined` for an unknown scope | same entry |
 | 5.5 `effectiveChain` and `contextChain` skip links without a context | `effectiveChain` is a copy of `chain`, and a resolver without a name |
 | 6.4 the global object as a context | A resolver built on the global object throws on every lookup |
 | 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |
 | 6.6 `getData`, `deleteData` with a filter | `getData` and `deleteData` are broken on the filter path |
 | 6.6 the rules of the four data methods along the chain | The data methods have no rules along the chain |
-| 6.7 `buildSecure` forwards every constructor option | `buildSecure` drops the options a secure context needs most |
+| 6.7 `buildSecure` at all — it throws on every call — and the option set it forwards | `buildSecure` throws on every call, and drops the options a secure context needs most |
 | 8.2 the default executer | The default executer announces itself as deprecated |

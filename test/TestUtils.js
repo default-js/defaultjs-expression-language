@@ -1,4 +1,25 @@
 import ExpressionResolver from "../src/ExpressionResolver.js";
+import { EXECUTERNAME as WithScopedExecuterName } from "../src/executer/WithScopedExecuter.js";
+import { EXECUTERNAME as ContextObjectExecuterName } from "../src/executer/ContextObjectExecuter.js";
+import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../src/executer/ContextDeconstructorExecuter.js";
+import { EXECUTERNAME as EsprimaExecuterName } from "../src/executer/EsprimaExecuter.js";
+
+/**
+ * Every registered executer, each with the name a statement has to use to reach a given property
+ * of the context under it. Three of them put the context properties into scope, so the property
+ * `value` is the variable `value`; ContextObjectExecuter hands the context to the statement as
+ * the object `ctx`, so the same property is `ctx.value`. SPECIFICATION.md 8.3 grants an executer
+ * that freedom - see DECISIONS.md, 2026-08-24.
+ *
+ * A conformance suite whose rule has to hold under every executer loops over this and asks for a
+ * name through `variableName`, so what it measures is the rule and not the spelling.
+ */
+export const EXECUTERS = [
+	{ name: WithScopedExecuterName, variableName: (property) => property },
+	{ name: ContextObjectExecuterName, variableName: (property) => `ctx.${property}` },
+	{ name: ContextDeconstructorExecuterName, variableName: (property) => property },
+	{ name: EsprimaExecuterName, variableName: (property) => property }
+];
 
 export const createResolverWithExecuterFactory = (executer) => {
 	return (option) => {

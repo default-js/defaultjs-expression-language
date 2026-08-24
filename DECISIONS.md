@@ -19,6 +19,155 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-24 — How does a test state a rule the code does not keep yet?
+
+**Decision:** It is written as a normal test and marked `it.fails`. Vitest then counts it as passing
+while it fails, and the moment the behaviour becomes correct the test **fails for passing**, which
+forces the marker to be removed in the same change that lands the fix. Every such test carries a
+comment naming the `BACKLOG.md` entry it waits for. Before a marker is written down, the test is
+run **once without it** and its failure message is read against what the specification predicts.
+This is how `test/spec/` was built between 2026-08-22 and 2026-08-24, and it is how any later test
+for an agreed but unimplemented rule is written.
+
+**Reasoning:** Fourteen places where the code and `SPECIFICATION.md` disagree had to be pinned
+before any of them was fixed — several touch the same three files and some interact, so fixing
+them without the rules pinned first would have been changing behaviour nobody was watching. A
+skipped test states nothing and rots silently; a failing test cannot be committed with a green
+gate; a comment in the specification is not executable. `it.fails` is the only one of the three
+that both keeps the gate green and cleans itself up. The run-without-the-marker step is the
+countermeasure to its one weakness: a `.fails` test also passes when it fails for the *wrong*
+reason — a typo, a wrong import, a misunderstood rule. It paid for itself twice, once on a
+backslash that the shell had eaten out of a test string, and once on a nested template literal
+that failed differently than predicted.
+
+**Alternatives:** `it.skip` with a comment — rejected, it proves nothing and nothing ever forces
+it back on. Writing the tests only when each fix is written — rejected for the reason above, and
+because it would have left the specification's interview-written rules unexecuted; several of them
+had never run at all, and writing them out is what turned them from agreed sentences into verified
+behaviour.
+
+**Consequences:** A green gate no longer means "everything specified works" but "everything works
+that is not marked as pending", and the count of expected fails is the measure of what is left —
+68 on 2026-08-24. Whoever fixes a backlog entry has to remove markers as part of it and will be
+told by a red gate if they forget. A whole-suite review with every marker stripped is worth
+repeating before a release: it is what proves no marker has gone stale.
+
+## 2026-08-24 — How does a test express a rule that has to hold under every executer?
+
+**Decision:** The suite loops over an `EXECUTERS` table exported from `test/TestUtils.js`, which
+lists every registered executer together with a `variableName(property)` function answering the
+name a statement has to use to reach a context property under it. A test names that variable in a
+constant of its own and inserts it into the expression, so it measures the rule rather than the
+spelling. Executer-specific behaviour is not skipped in those loops — it is stated in
+`test/spec/ExecuterTest.js`, per executer, in a table of the three freedoms 8.3 grants.
+
+**Reasoning:** The rules of sections 5, 6 and 7 have to hold under every executer, so testing them
+under one proves a quarter of what is claimed. Writing them out four times by hand would have been
+four places to update. The `variableName` indirection exists because
+`ContextObjectExecuter` addresses a context value as `ctx.value` while the others use the bare
+name: without it the section 5 suite would have reported five rules broken under that executer
+which it in fact keeps. Keeping the executer-specific answers in one table in `ExecuterTest.js`
+rather than as conditions spread through the loops means a new executer is described in one place,
+and a difference nobody intended shows up as a wrong table row instead of a skipped test.
+
+**Alternatives:** `describe.each` — rejected, it widens the vitest surface the suite deliberately
+keeps at `describe`/`it`/`expect` and three matchers, and a plain `for` loop reads the same.
+Running each suite under the default executer only — rejected: 8.3 says everything outside its
+three freedoms holds regardless of the executer, and that sentence is worth checking rather than
+trusting.
+
+**Consequences:** Adding an executer means one row in `EXECUTERS`, one row in the `FREEDOMS` table
+of `ExecuterTest.js`, and the whole conformance suite runs against it. A test that must differ per
+executer — the negative guarantee of 6.5 is the one case so far — picks its marker inside the loop
+(`const pin = leaksToday ? it.fails : it`) instead of being marked wholesale, because a blanket
+marker fails on the executers that already keep the rule.
+
+## 2026-08-24 — What do the edge cases of the expression parser and of the scope walk do?
+
+**Decision:** Three rules, all now in `SPECIFICATION.md`. A brace inside a string literal does not
+count towards the matching brace, so `${ "}" }` is one expression with the statement `"}"`. An
+opening `${` with no matching closing brace is not an expression at all: the text stands
+unchanged, no error, no partial replacement. And where two links of a chain carry the same name,
+`${name::statement}` answers from the first one found while climbing towards the root.
+
+**Reasoning:** All three were found by probing the edge cases of sections 3 and 5 on 2026-08-24,
+before the matching-brace parser and the scope-walk fix are written — which is the only cheap
+moment to decide them. Counting a brace inside a string literal would cut `${ "}" }` in the middle
+of a literal, which no reader of the expression would expect. Leaving an unterminated `${` alone
+keeps the failure mode of the syntax uniform: text that is not an expression is text. The scope
+walk taking the first hit makes 5.3 behave like 5.2, so one mental model covers both lookups, and
+it follows how a chain is used: the deeper link is the one introduced most recently.
+
+**Alternatives:** For the unterminated delimiter, throwing or replacing up to the end of the text.
+Rejected — both turn a typo in a template into a hard failure or into silent corruption, and a
+template engine feeding this package cannot always guarantee the text it passes. For duplicate
+names, answering from the root-most link. Rejected: it would mean a resolver deeper in the chain
+cannot shadow a name, which contradicts the purpose of the chain stated in section 1.
+
+**Consequences:** The parser of the brace fix has to know string literals — `'`, `"` and backtick
+— which is more than counting characters, and it has to be able to reach the end of the text
+without a match and then do nothing. Both are now pinned by tests marked `fails`. Still open, and
+noted in `BACKLOG.md` rather than decided here: what an escaped backslash in front of an
+expression means, and what an empty statement `${}` evaluates to.
+
+## 2026-08-24 — May an executer dictate how a statement addresses a context value?
+
+**Decision:** Yes. How a context value is written inside a statement is the executer's own, a
+third freedom alongside the two 8.3 already granted. `ContextObjectExecuter` demands `ctx.` in
+front of every context value; the other three put the properties into scope, where the bare name
+works. `SPECIFICATION.md` 8.3 now says so, with both dialects spelled out.
+
+**Reasoning:** The conformance suite of section 5 turned the difference up on 2026-08-24: five
+tests failed under `ContextObjectExecuter` alone. Addressed as `ctx.value` that executer keeps
+**every** rule of 5.2 the other three keep — shadowing, the walk to an ancestor, a key holding
+`undefined`, the prototype chain. So the chain, which is what section 5 is about, is not affected
+at all; only the spelling is. An executer is a strategy for turning a statement into a value, and
+what a statement may look like is part of that strategy. Forbidding it would mean rewriting
+`ContextObjectExecuter` around a rule nothing needed.
+
+**Alternatives:** Make every executer put the context properties into scope, keeping `ctx.` as an
+addition. Rejected: it removes the one property that distinguishes `ContextObjectExecuter` from
+the others without a consumer asking for it. It would become the better choice if expressions
+ever have to be portable between executers — that is the cost below.
+
+**Consequences:** Switching executer can mean rewriting expressions, and that is now documented
+rather than discovered. `README.md` has to carry the dialects once it is rewritten, since it is
+what a consumer and an AI system read first. Test code that runs one case against several
+executers needs the name per executer — `test/spec/ChainTest.js` carries a `variableName`
+function for exactly that. Open alongside it, and only an idea so far: making the `ctx` prefix of
+`ContextObjectExecuter` configurable, so a consumer can pick the identifier. It has its own
+`BACKLOG.md` entry.
+
+## 2026-08-24 — When does a link count as providing a context?
+
+**Decision:** When the caller handed a context to the constructor — anything that is neither
+`null` nor `undefined` — or when a value has been set on the link since. What the context holds
+does not matter: an empty object counts. A link provides no context only if it was built without
+one and nothing has been written to it since. This replaces the rule written on 2026-08-22, under
+which a link counted only while its context held at least one reachable value.
+
+**Reasoning:** The older rule needed a definition of "holds a value", and pinning it in stage 2
+of the conformance plan showed that definition does not exist: `#initPropertyCache` walks the
+prototype chain to its end, so the cache of even `{}` holds `hasOwnProperty`, `toString` and the
+rest of `Object.prototype`. Read literally, every context would be non-empty and `effectiveChain`
+would equal `chain` again; read as intended, the specification would have had to draw a boundary
+somewhere inside the prototype chain — own keys plus everything up to but excluding
+`Object.prototype` — and then explain why `{ class: 1 }` is empty while `{ value: 1 }` is not.
+That is a lot of rule for a getter whose purpose is debug output. Deciding it at construction is
+one comparison, needs no cache, and cannot drift as the context changes shape.
+
+**Alternatives:** The 2026-08-22 rule with the prototype boundary written out. It would become
+the better choice if a consumer ever needs `effectiveChain` to answer "which links can actually
+contribute a value to a lookup" rather than "which links were given a context" — the two differ
+for a link handed an empty object.
+
+**Consequences:** `context: null` and `context: {}` are told apart here, and only here; for a
+lookup they stay equivalent (6.3). A link built without a context joins `effectiveChain` and
+`contextChain` the moment a value is written to it, so both still describe a state rather than a
+structure. The three assertions in
+`test/ExecuterTests/WithScopedExecuterTests/ResolverChainTest.js` that expect a `context: null`
+link to appear in `effectiveChain` are wrong under this rule and are marked as such.
+
 ## 2026-08-22 — Where does the specification of the resolver live, and what is it for?
 
 **Decision:** A permanent `SPECIFICATION.md` in the repository root, written from an interview

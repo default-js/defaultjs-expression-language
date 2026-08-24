@@ -21,6 +21,19 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   not keep a rule yet, the specification says so and section 10 lists every such place, so the
   document is usable as a reference before those fixes land.
 
+  Revised on 2026-08-24, while every rule was being written out as a test. Six rules changed or
+  were added, none of them describing behaviour that exists yet — they say what the pending fixes
+  have to produce. **3.1**: a brace inside a string literal does not count towards the matching
+  closing brace, and an opening `${` without a matching brace is not an expression, so the text
+  stands unchanged. **3.2**: escaping holds per occurrence, even where the same expression also
+  appears unescaped. **5.1**: a generated name only has to be unique — the `ER1` shape is what the
+  implementation does, not a promise. **5.3**: where two links carry the same name, the first one
+  found climbing towards the root answers. **5.5**: a link provides a context when the caller
+  handed one to the constructor or a value has been written to it since; what the context holds
+  no longer decides anything, so an empty object counts. **8.3**: how a statement addresses a
+  context value is the executer's own — `ContextObjectExecuter` requires `ctx.value` where the
+  other three take `value`, so switching executer can mean rewriting expressions.
+
 ### Removed
 
 - **`esprima` is no longer a declared runtime dependency.** It was never imported — the two

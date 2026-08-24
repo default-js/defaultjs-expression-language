@@ -27,7 +27,12 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `exports` field. An `exports` field must therefore whitelist `./src/executer/*`, or every
   consumer following the intended pattern breaks. Open alongside it: tuning the *default*
   executer needs the same deep import even though the consumer never imported that module —
-  decide whether that stays as is or gets a documented entry point. Not to be mixed into the
+  decide whether that stays as is or gets a documented entry point. **`./src/Executer.js` needs
+  the same treatment**, noted 2026-08-24: `SPECIFICATION.md` 9 lists `Executer` as public — it is
+  the interface an own implementation builds on — but `index.js` exports only `ExpressionResolver`
+  and `ExecuterRegistry`, so the only way to it is the deep import, which `test/spec/PublicSurfaceTest.js`
+  now pins. Either whitelist it too, or export it from `index.js` and drop it from the deep-import
+  list. Not to be mixed into the
   toolchain work; the outcome belongs in `DECISIONS.md`. Found 2026-08-20.
 
 - [ ] **Decide whether to move `espree` 10 → 11.**
@@ -111,6 +116,29 @@ Entries here are independent of each other. An undertaking whose steps depend on
   path found in that one option; the first was the `./webcontent` casing. Left standing while
   fixing the casing so the change stayed on the agreed scope. Found 2026-08-21.
 
+- [ ] **A `parent` that is not an `ExpressionResolver` is silently dropped.**
+  `constructor` keeps `parent` only when it passes `parent instanceof ExpressionResolver`
+  (`src/ExpressionResolver.js:131`), and answers `null` otherwise. So a caller who passes the
+  wrong thing — a context object, a resolver from a different copy of the package, `undefined`
+  from a lookup that missed — gets a resolver that silently has no chain at all, and every lookup
+  that should have climbed answers the default instead. `SPECIFICATION.md` 4.2 does not mention
+  the case. Compare the neighbouring option: an unregistered `executer` name **throws**, which is
+  the behaviour that makes a mistake visible at construction rather than at the first resolution.
+  Decide whether `parent` follows it. Consumer-visible if it changes, so the outcome belongs in
+  `DECISIONS.md` and in `CHANGELOG.md`. Found 2026-08-24 while probing the edge cases of section 4.
+
+- [ ] **Should the `ctx` prefix of `ContextObjectExecuter` be configurable?**
+  An idea, not agreed work. That executer hands the context to the statement as the object `ctx`
+  (`src/executer/ContextObjectExecuter.js:20-27`), so every context value is addressed as
+  `${ctx.value}`. That this differs from the other three executers is settled and intended — see
+  `DECISIONS.md`, 2026-08-24 — but the identifier itself is hard-coded, and a consumer whose
+  context legitimately carries a property named `ctx` has no way out. Raised by Frank on
+  2026-08-24 when the dialect question was decided. Open with it: whether the option belongs on
+  `setupExecuter(options)` next to `size`, and what happens to the code cache when the identifier
+  changes — the cache is keyed by the statement text alone, so entries compiled under the old
+  identifier would answer for the new one. Consumer-visible, so the outcome belongs in
+  `DECISIONS.md` and in `CHANGELOG.md`.
+
 - [ ] **The default executer announces itself as deprecated, and nothing says what replaces it.**
   Target: `SPECIFICATION.md` 8.2 — the default becomes `context-deconstruction-executer`. What
   is left here is making the switch and the migration note that comes with it.
@@ -124,6 +152,15 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `AGENTS.md` records why `with` is being retired or what consumers should move to, and the
   readme documents none of it. Consumer-visible either way, so the outcome belongs in
   `DECISIONS.md` and in `CHANGELOG.md`. Found 2026-08-21 while running the performance cases.
+  **What the migration note has to warn about, measured 2026-08-24** in stage 4: an assignment
+  inside an expression behaves differently on the two executers, and it fails silently. Under
+  `WithScopedExecuter`, `${ known = "after" }` lands in the context and `getData("known")` answers
+  `"after"`; under `ContextDeconstructorExecuter` the same expression answers `"after"` as its
+  value while the context still holds `"before"`, because the assignment hits a destructured local
+  binding. `SPECIFICATION.md` 6.5 allows exactly this — it promises nothing about a written value
+  being readable afterwards — so it is conformant, not a defect. But a consumer carried over by a
+  change of default gets no error, only a value that stops persisting. Pinned per executer in
+  `test/spec/ExecuterTest.js`.
 
 - [ ] **A name found at the top of a resolver chain costs as much as one found at the bottom.**
   Measured 2026-08-21 with `npm run bench`. `test/PerformanceTests/RandomScope.bench.js` builds
@@ -189,18 +226,33 @@ Entries here are independent of each other. An undertaking whose steps depend on
   helper `createResolverWithExecuterFactory` was fixed on 2026-08-21 and is fine.
   Found 2026-08-21 while covering `setupExecuter`.
 
-- [ ] **Coverage baseline of 2026-08-21, and where the gaps sit.**
-  State after the `setupExecuter` tests: statements 85.28 % (342/401), branches 72.82 %
-  (142/195), functions 83.87 % (78/93), lines 88.91 % (321/361) — so goal 3 is no longer
-  blocked, only unfinished. Branches are the weak axis, and it is concentrated:
-  `ExpressionResolver.js` at 62 % of 104 branches carries more than half of everything
-  uncovered in the package, with the gaps around lines 180-203 and 226-262.
-  `ResolverContextHandle.js` covers 58 % of its functions (11/19, missing around lines 18-30,
-  the proxy traps that no test triggers), and `EsprimaExecuter.js` sits at 83 % of branches.
-  Of the executers only the `setDebug` bodies and one `DEBUG`-guarded `console.log` are left
-  uncovered. `src/Utils.js` at 0 % is listed separately above, and `src/version.js` is
-  generated, so its 0 % is noise. Update these numbers when the picture changes rather than
-  adding a second baseline.
+- [ ] **Coverage as of 2026-08-24, and the five things still uncovered.**
+  After the conformance suite: statements **92.51 %** (371/401), branches **90.76 %** (177/195),
+  functions **90.32 %** (84/93), lines **94.45 %** (341/361). The baseline this replaces, measured
+  2026-08-21 after the `setupExecuter` tests, was 85.28 % / 72.82 % / 83.87 % / 88.91 % — branches
+  were the weak axis at 72.82 % and are now the second strongest. `ExpressionResolver.js`, which
+  carried more than half of everything uncovered in the package, is at 99.1 % of lines and 100 %
+  of functions.
+  What is left is five items, and none of them is "write more tests for a rule":
+  1. `src/Utils.js`, 0 %, all nine lines — dead code, its own entry above. Deleting it is what
+     closes this, not a test.
+  2. The `setDebug` bodies of `ContextDeconstructorExecuter.js:13` and `EsprimaExecuter.js:13`,
+     plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:41`. The public
+     surface test asserts both exports exist but never flips them, deliberately: a debug switch
+     has no observable effect to assert on.
+  3. `ResolverContextHandle.js:24,27,30` — the `set`, `delete` and `keys` of
+     `createGlobalCacheWrapper`. Unreachable today because a resolver on the global object throws
+     on the first lookup; this closes itself when that entry is fixed and
+     `test/spec/ContextTest.js` "takes the global object as an ordinary link of the chain" goes
+     green.
+  4. `ResolverContextHandle.js:118` (`get parent`) and `:122-123` (`updateData` on the handle,
+     not the one on the resolver). Both are public on a class that section 9 does not list, so
+     decide whether they are surface at all before covering them — see the `Context` export entry.
+  5. `ExpressionResolver.js:60` — the outer `catch` of `execute`. The inner `try` already swallows
+     every executer error, so nothing reaches it; it is unreachable rather than untested, and the
+     honest fix is to remove it with the error-path work, not to contrive a test.
+  `src/version.js` is generated, so its 0 % stays noise. Update these numbers when the picture
+  changes rather than adding a third baseline.
 
 - [ ] **The constructor option `executer` is undocumented and silently ignores an `Executer` instance.**
   Target: `SPECIFICATION.md` 4.2 — the option takes a registered name and nothing else.
@@ -238,7 +290,10 @@ Entries here are independent of each other. An undertaking whose steps depend on
   site was never adjusted — it had `aExecuter` appended at the end instead, which shifted every
   other argument by one. Invisible for a year because no test uses `scope::` —
   `ResolverChainTest.js` only resolves unscoped names, which travel through the context proxy
-  instead. Consumer-visible,
+  instead. **Decided 2026-08-24** (`SPECIFICATION.md` 5.3) and pinned by a test marked `fails`:
+  where two links carry the same name, the walk answers from the **first one found climbing
+  towards the root**, the same shadowing rule as 5.2 — so the recursion has to stop at the first
+  match rather than collect or prefer the root. Consumer-visible,
   so the outcome belongs in `CHANGELOG.md`. Found 2026-08-21 while reading the uncovered
   branches for goal 3.
 
@@ -272,6 +327,11 @@ Entries here are independent of each other. An undertaking whose steps depend on
   correct, which is what makes the pair easy to miss. All four are public methods and none of
   the four has a test. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
   Found 2026-08-21 while reading the uncovered branches for goal 3.
+  **One conformance test depends on this typo, noted 2026-08-24:** `test/spec/ContextTest.js`,
+  "deleteData throws on a filter that matches no link", passes today — but because
+  `deleteDataData` raises a `TypeError`, not because an unknown scope is rejected on purpose. It
+  carries no `fails` marker, since it does pass; it starts proving its rule the moment the typo
+  is gone. Re-read it with this fix and make sure it still passes for the right reason.
 
 - [ ] **An expression that contains braces is not recognized — there is no matching-brace parsing.**
   Target: `SPECIFICATION.md` 3.1 — an expression is `${`, everything up to the **matching**
@@ -287,7 +347,39 @@ Entries here are independent of each other. An undertaking whose steps depend on
   replacement in `resolveText`, so every occurrence of an expression is evaluated on its own
   instead of once per distinct expression, and the quadratic behaviour over the text goes away.
   Consumer-visible, so the outcome belongs in `CHANGELOG.md`. Expect further findings here once
-  tests exist.
+  tests exist. **What the parser has to do, decided 2026-08-24** (`DECISIONS.md`, `SPECIFICATION.md`
+  3.1) and pinned by tests marked `fails`: a brace inside a string literal — `'`, `"` or a template
+  literal — does not count, in neither direction, so `${ "}" }` is one expression with the
+  statement `"}"`; and an opening `${` that never finds its matching brace is not an expression at
+  all, the text stands unchanged with nothing evaluated and no error. Counting characters is
+  therefore not enough — the parser has to know literals. **Two questions this fix still has to
+  answer**, both found while probing the edge cases on 2026-08-24 and neither decided: what an
+  escaped backslash before an expression means — today `"\\${value}"` leaves both backslashes and
+  resolves nothing, while 3.2 only regulates a single backslash — and what an empty statement
+  `${}` evaluates to; today the two entry points disagree, `resolve` answers the default and
+  `resolveText` leaves `${}` standing.
+  **A third symptom, verified 2026-08-24** by the conformance test of 3.1: where the
+  statement carries a nested template literal, the regex matches the *inner* placeholder of that
+  literal, so a fragment of the statement is evaluated and substituted while the expression around
+  it stands — `"${ `a${1 + 1}b` }"` answers ``"${ `a2b` }"``. The text is corrupted rather than
+  left alone, which makes this the loudest of the three symptoms.
+
+- [ ] **An escaped expression is resolved anyway when the same expression also stands unescaped in
+  the text.**
+  Target: `SPECIFICATION.md` 3.2 — a backslash before the `$` escapes that occurrence: it is not
+  evaluated and the text stands as written, without the backslash.
+  `resolveText` replaces by `text.split(match[0]).join(result)`
+  (`src/ExpressionResolver.js:281`), and the escaped occurrence differs from the unescaped one by
+  nothing but that backslash, so one `split` reaches both. Two symptoms, each verified 2026-08-24
+  by a conformance test of section 3.2: `"\${value} ${value}"` answers `"resolved resolved"` —
+  the escaped match is replaced by `${value}` first, and the next round finds that replacement
+  again and evaluates it; `"${value} \${value}"` answers `"resolved \resolved"` — the unescaped
+  match is replaced everywhere it occurs, and the backslash is left standing in front of the
+  result. A text carrying only escaped occurrences is correct, which is why this survived
+  unnoticed. Same root as the entry above and covered by the same fix: a single-pass parser knows
+  which occurrence it stands on and replaces by position instead of by `split`/`join`.
+  Consumer-visible, so the outcome belongs in `CHANGELOG.md`. Found 2026-08-24 in stage 1 of
+  `plans/specification-conformance-tests.md`.
 
 - [ ] **A resolver built on the global object throws on every lookup.**
   Target: `SPECIFICATION.md` 6.4 — the global object stays a supported context object.
@@ -348,6 +440,25 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `console`, `Object`, `Array`, `Map` and `Set` reachable inside an expression, so it is worth
   reviewing as a whole rather than only fixing the typo. Found 2026-08-22 while working out the
   global-fallback question.
+  **What the list costs, measured 2026-08-24** in stage 4 of the conformance plan: under this
+  executer `${ Math.round(1.5) }` answers `undefined`, because `Math` is not on the list and is
+  therefore rewritten to `ctx?.Math`. The same holds for every global the list does not name —
+  `JSON`, `Date`, `Number`, `Promise`. The other three executers answer `2`. That is legal under
+  8.3, which lets an executer decide how a statement reaches the global object, and it is pinned
+  as such in `test/spec/ExecuterTest.js` — but it makes the list the whole surface a consumer of
+  this executer gets, which is the argument for reviewing it rather than patching one typo.
+  **Agreed 2026-08-24: rework the list as a whole, not the typo alone.** The direction to try
+  first, Frank's: build it initially from the global context — the names of `GLOBAL` itself —
+  instead of maintaining a hand-written list that is a typo away from a dead entry and silently
+  drops whatever nobody thought of. Four things to settle when it is written, because a derived
+  list is not simply a longer one: it is a **snapshot** taken when the module loads, so a global
+  added later is not on it; it makes every global reachable, which removes the property 6.4 leans
+  on today, that a typo and an empty value are indistinguishable; a context property must keep
+  winning over a global of the same name, so the list decides only what is *not* rewritten, never
+  what shadows what; and the hand-written entries that are not names of globals at all —
+  `await`, `async`, `this`, `typeof`, `instanceof`, `undefined` — are syntax, not identifiers, and
+  have to survive the change. Consumer-visible, so the outcome belongs in `DECISIONS.md` and in
+  `CHANGELOG.md`.
 
 - [ ] **`effectiveChain` is a copy of `chain`, and a resolver without a name has none.**
   Target: `SPECIFICATION.md` 5.1 and 5.5.
@@ -362,6 +473,19 @@ Entries here are independent of each other. An undertaking whose steps depend on
   every link can appear in a chain path. All three getters are supported public API (plan
   question 17), so all three need tests. Consumer-visible, so the outcome belongs in
   `CHANGELOG.md`. Found 2026-08-22 while drafting the specification.
+  **The rule was simplified on 2026-08-24** (`DECISIONS.md`), after stage 2 showed the original
+  one had no workable definition of "holds a value": the property cache walks the prototype chain
+  to its end, so even `{}` holds the members of `Object.prototype`. What counts now is what the
+  caller handed to the constructor — a link provides a context unless it was built with `null`,
+  with `undefined`, or without the option, and nothing has been written to it since. So the fix
+  needs no inspection of the context at all: one flag per link, set at construction and set again
+  by `mergeContext`, `updateData` and a write from an expression. `SPECIFICATION.md` 5.5 carries
+  the rule.
+  **Three existing assertions expect the wrong result and are already marked `fails`:**
+  `test/ExecuterTests/WithScopedExecuterTests/ResolverChainTest.js:63,73,83` each expect
+  `effectiveChain` to be `/first/second/third` on a chain with one link built as `context: null` —
+  under 5.5 that link does not appear. The corrected expectations stand in the file; remove the
+  markers with this fix.
 
 - [ ] **The static entry points take no configuration object.**
   Target: `SPECIFICATION.md` 4.1.
@@ -379,10 +503,27 @@ Entries here are independent of each other. An undertaking whose steps depend on
   precise rule the `DefaultValue` distinction always wanted. Purely additive, so no consumer
   breaks. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
   Found 2026-08-22 while reviewing the draft specification.
+  **One question the fix has to answer**, found 2026-08-24 while probing the edge cases: `typeof
+  arguments[0] === "string"` decides between the two forms, so what happens to a first argument
+  that is neither a string nor an object needs stating. Today `resolve(123, {}, "fallback")` and
+  `resolve(null, {}, "fallback")` both answer the default after a `TypeError` inside the `catch`
+  — an accident, not a rule. `SPECIFICATION.md` 4.1 says nothing about it either.
 
-- [ ] **`buildSecure` drops the options a secure context needs most.**
+- [ ] **`buildSecure` throws on every call, and drops the options a secure context needs most.**
   Target: `SPECIFICATION.md` 6.7.
-  `buildSecure` (`src/ExpressionResolver.js:348`) filters the context and then builds the
+  **`buildSecure` is unusable today, found 2026-08-24 in stage 3 of the conformance plan.** It
+  calls `ObjectUtils.filter({ data: context, propFilter, option })`
+  (`src/ExpressionResolver.js:349`), passing one object where the helper takes three positional
+  arguments: `filter(data, propFilter, { deep })`
+  (`@default-js/defaultjs-common-utils/src/ObjectUtils.js:553`). So the wrapper object arrives as
+  the data, `propFilter` arrives as `undefined`, and the call dies with
+  `TypeError: propFilter is not a function` before a resolver is ever built — verified in the
+  browser, every call, whatever is passed. The method therefore has no working consumer and
+  cannot have had one since the argument shape of `filter` last changed. Note what the same
+  mistake would have caused had `propFilter` been optional: the "secure" context would have been
+  the wrapper object, carrying the **unfiltered** original under the key `data`. Fix the call
+  shape first; the option set below is the same change.
+  Beyond that, `buildSecure` filters the context and then builds the
   resolver with `{ context, name, parent }` only. `executer` is missing by oversight — a secure
   resolver cannot be pinned to an execution strategy — and the `allowGlobalWrite` switch agreed
   on 2026-08-22 cannot be set there either, although `buildSecure` exists for exactly the CMS
