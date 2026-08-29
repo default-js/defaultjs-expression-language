@@ -15,8 +15,14 @@ Entries here are independent of each other. An undertaking whose steps depend on
 > **The freeze is lifted (2026-08-22). `SPECIFICATION.md` is the reference now.**
 > The entries that were on hold say what the fix has to achieve and name the section of
 > `SPECIFICATION.md` that defines it — that section is the target, not whatever the code does
-> today. Before any of them is implemented, the conformance suite of
-> `plans/specification-conformance-tests.md` pins the rule with a test.
+> today. Every one of them is already pinned by a test in `test/spec/`, marked `it.fails` until
+> the fix lands.
+>
+> **Four of them are owned by a running plan (2026-08-29):** the scope walk, the instance
+> `resolve` and its scope syntax, the matching-brace parser, and the escape that reaches the
+> wrong occurrence. They share three functions of one file, so they are ordered in
+> `plans/expression-parsing.md` rather than picked up one by one. Read it before touching
+> `src/ExpressionResolver.js`.
 
 - [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
   `defaultjs-common-utils` already went this way, so the two packages diverge today. The
