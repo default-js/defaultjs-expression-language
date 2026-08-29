@@ -77,6 +77,10 @@ meant to be JavaScript, and a second opening delimiter cannot be part of it.
 
 ### 3.2 Escaping
 
+**This is a rule of `resolveText`.** It exists so that an expression can stand in surrounding
+text without being evaluated. `resolve` has no surrounding text — its input is one expression —
+so a backslash there belongs to the statement and is handed to the executer with it (4.3).
+
 The backslashes directly before the `$` are counted. An **odd** number escapes the delimiter: it
 opens nothing, and exactly **one** backslash is consumed. An **even** number does not escape: the
 expression is evaluated and no backslash is consumed. So `\${value}` answers `${value}`,
@@ -190,15 +194,19 @@ The scope prefix is recognized only in the delimited form: `resolve("${scope::st
 addresses the scope, `resolve("scope::statement")` does not. Both entry points parse the prefix by
 the same rule (3.3).
 
-A delimited input that does not end with `}` is **rejected with a `SyntaxError`**, and that error
-is thrown rather than answered with the default value: it is a rejection of the form, not an
-execution error (7). Nothing beyond that is checked — whether the statement between the delimiters
-is valid JavaScript is the executer's business, and an error there is caught like any other.
+A delimited input that does not end with `}` is **rejected with a `SyntaxError`**. Nothing beyond
+that is checked — whether the statement between the delimiters is valid JavaScript is the
+executer's business, and whatever it raises reaches the caller (7).
+
+The escaping of 3.2 does **not** apply to `resolve`. A leading backslash is part of the statement,
+so `resolve("\${value}")` hands `\${value}` to the executer, which cannot compile it.
 
 ### 4.4 Default value
 
-A default value replaces a result of `null` **and** of `undefined`. Whether it was passed at all
-is what counts, not what it holds: passing `undefined` as the default is a deliberate choice by
+A default value replaces a result of `null` **and** of `undefined`. It never covers an **error**,
+in neither entry point: whatever default was passed, `resolve` raises and `resolveText` leaves the
+expression standing (7). Whether it was passed
+at all is what counts, not what it holds: passing `undefined` as the default is a deliberate choice by
 the caller and is honoured, and it is indistinguishable in its effect from passing nothing.
 
 In `resolveText` the default applies per expression. Without a default, `undefined` and `null`
@@ -472,14 +480,28 @@ does not exist yet; see `BACKLOG.md`.
 
 ## 7. Errors
 
-An error raised while a statement executes is **caught**. A warning names the statement that
-failed, and the call answers `undefined` — where a default value was passed, that default. One
-failing expression never stops the rest: a text keeps rendering, a template keeps building.
+An error raised while a statement executes reaches the two entry points differently, and that
+difference is the whole of this section. What they share: **a default value never covers an
+error.** It answers a missing result (4.4), never a statement that failed.
 
-A **form that an entry point rejects itself** is not an execution error and is not caught: nothing
-has been executed yet. `resolve` throws a `SyntaxError` for a delimited input that does not end
-with `}` (4.3). `resolveText` throws nothing at all — in a text, anything that is not an expression
-is text (3.1).
+**`resolveText` catches, and leaves the expression standing.** A warning names the statement that
+failed, the expression stays in the text exactly as it was written — delimiters, scope prefix and
+statement — and the rest of the text keeps rendering. One failing expression never stops a template
+from building, and what stands in its place is the expression itself, which is what an author needs
+in order to find it.
+
+**`resolve` logs the error and hands it on.** The statement and the error are written to the
+console, and the error is then raised to the caller. A caller who wants a fallback for a broken
+expression writes the `try`/`catch` and can see what went wrong.
+
+The two differ because their callers do. A text is a document that has to render whatever else is
+in it, and a single broken expression in it is a defect in that expression, not in the page.
+`resolve` is called from code, for one value, and answering `undefined` there hides a mistake at
+the place where it can still be found.
+
+A **form that an entry point rejects itself** follows the same line: `resolve` throws a
+`SyntaxError` for a delimited input that does not end with `}` (4.3), while in a text anything that
+is not an expression is text and no error arises at all (3.1).
 
 A statement that takes longer than one second produces a warning naming it. The resolution is
 not affected.

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {ExpressionResolver} from "../../../index.js";
+import { catchError } from "../../TestUtils.js";
 import {EXECUTERNAME} from "../../../src/executer/EsprimaExecuter.js"
 
 describe("resolve test:", () => {
@@ -140,10 +141,12 @@ describe("resolve test:", () => {
 		expect(result).toBe(0);
 	});
 
-	it("resolve escaped expression \"\\${test}\" to \"${test}\"", async () => {
+	// Since 2026-08-29 the escaping of 3.2 is a rule of resolveText alone: in resolve the
+	// backslash belongs to the statement, and that statement does not compile.
+	it("resolve escaped expression \"\\${test}\" raises, the escape is a rule of the text form", async () => {
 		const expression = "${test}";
-		const result = await ExpressionResolver.resolve("\\" + expression, {});
-		expect(result).toBe(expression);
+		const error = await catchError(() => ExpressionResolver.resolve("\\" + expression, {}));
+		expect(error instanceof SyntaxError).toBe(true);
 	});
 
 	it("resolve \"${`${test}`}\"", async () => {

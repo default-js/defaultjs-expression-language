@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {ExpressionResolver} from "../../../index.js";
+import { catchError } from "../../TestUtils.js";
 import {EXECUTERNAME} from "../../../src/executer/WithScopedExecuter.js"
 
 describe("Test resolve", () => {
@@ -23,10 +24,12 @@ describe("Test resolve", () => {
 		expect(result).toBe("fail");
 	});
 
-	it("resolve \"${test instanceof Array }\" to default", async () => {
+	// Since 2026-08-29 the default value no longer covers an error: "test" is a name no link
+	// carries, so the statement raises and resolve lets it through - SPECIFICATION.md 7.
+	it("resolve \"${test instanceof Array }\" raises instead of answering the default", async () => {
 		const expression = "${test instanceof Array }";
-		const result = await ExpressionResolver.resolve(expression, {}, false);
-		expect(result).toBe(false);
+		const error = await catchError(() => ExpressionResolver.resolve(expression, {}, false));
+		expect(error instanceof Error).toBe(true);
 	});
 
 
@@ -78,8 +81,8 @@ describe("Test resolve", () => {
 
 	it("resolve \"${test}\" throw an error with no default", async () => {
 		const expression = "${test}";
-		const result = await ExpressionResolver.resolve(expression, {}, expression);
-		expect(result).toBe(expression);
+		const error = await catchError(() => ExpressionResolver.resolve(expression, {}, expression));
+		expect(error instanceof Error).toBe(true);
 	});
 
 	it("resolve \"${test}\" as Object", async () => {
@@ -127,10 +130,12 @@ describe("Test resolve", () => {
 		expect(result).toBe(0);
 	});
 
-	it("resolve escaped expression \"\\${test}\" to \"${test}\"", async () => {
+	// Since 2026-08-29 the escaping of 3.2 is a rule of resolveText alone: in resolve the
+	// backslash belongs to the statement, and that statement does not compile.
+	it("resolve escaped expression \"\\${test}\" raises, the escape is a rule of the text form", async () => {
 		const expression = "${test}";
-		const result = await ExpressionResolver.resolve("\\" + expression, {});
-		expect(result).toBe(expression);
+		const error = await catchError(() => ExpressionResolver.resolve("\\" + expression, {}));
+		expect(error instanceof SyntaxError).toBe(true);
 	});
 
 	it("resolve \"${`${test}`}\"", async () => {

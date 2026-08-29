@@ -357,46 +357,70 @@ answered 0.0032 ms at depth 10 against 0.0015 in the other two — the same sing
 stage 0 baseline recorded, not a mode. The object `parseScope` allocates per occurrence does not
 show in the text cases either.
 
-**Stage 4 — the error policy (7).** Pending the decision below. Whatever it turns out to be,
-`resolveText` must not abort because one expression is broken: the per-occurrence loop of stage 2
-catches around each occurrence and renders `undefined`, which is what section 7 already promises.
+**Stage 4 — the error policy (7).** Decided 2026-08-29 and done the same day; the reasoning is in
+`DECISIONS.md`, "Does `resolve` catch the errors of a statement?".
+
+`execute` no longer catches at all — section 7 now gives the two entry points different answers, so
+each handles it for itself. `resolve` logs the statement and the error through `warnFailedStatement`
+and re-raises; the default value no longer covers an error. `resolveText` catches around each
+occurrence, warns, puts the default or `undefined` in place of the expression and renders on. With
+it, 3.2 became a rule of `resolveText` alone: in `resolve` a backslash belongs to the statement.
+
+**16 tests were rewritten to the new expectations and seen red first, and 9 more were moved rather
+than changed.** The nine pin the chain, an executer's dialect or the global-write guarantee — not
+the error policy — and they had only ever expressed those rules *through* a name no link carries.
+They ask through `resolveText` now, which still answers the default and can state the rule for
+every executer alike. `test/TestUtils.js` gained `catchError`, so an expected error is asserted
+without widening the matcher surface. Two more turned up only when the gate ran, both pinning the
+escape rule in `resolve` that this stage removed. `npm test` green: **406 passed and 29 expected
+fail (435)**.
+
+**The benchmark needed a second pass, and that is the lesson worth keeping.** The first batch
+answered 35 % slower across the board — including `no expression at all`, which this stage cannot
+reach and which is the drift indicator. So the batch was not comparable, and the numbers were taken
+again **alternating** old source and new source within one session:
+
+| case | stage 3 | stage 4 |
+|---|---|---|
+| 20 distinct expressions | 0.0344 / 0.0362 | 0.0323 / 0.0349 |
+| one expression 20 times | 0.0335 / 0.0395 | 0.0308 / 0.0317 |
+| no expression at all | 0.0003 | 0.0003 |
+| WarmResolve depth 1 000 | 0.0314 / 0.0342 | 0.0229 / 0.0246 |
+
+Measured against each other rather than against yesterday, the new code is **not slower and in
+places faster** — `execute` lost a `Promise` allocation per execution. Both halves sat at 0.0003 ms
+on the drift indicator, against 0.0002 in the stage 3 batch, so the machine had simply moved.
+**Where the drift indicator has moved, alternate the two versions inside one batch instead of
+comparing across batches.**
+
+**The rule for `resolveText` was sharpened right after,** on the same day and for the same reason
+as the first half: an expression whose statement failed now **stands in the text as written**
+instead of being replaced by the default value or by `undefined`, and the default covers an error
+in neither entry point. Seven more tests moved to that expectation, seen red first. Four of them
+had been using the default value as their instrument for something else — the chain rule of 5.2 and
+5.3, the cast of an object default in 4.4, the reach of a global under `esprima-executer` — and two
+of those now assert the rule itself rather than the answer, because what a text says for a failing
+statement is no longer uniform across the executers: `expect(result.includes("from leaf")).toBe(false)`
+states "never sees the context of a link below" for all four, where an expected string cannot. Measured
+alternating again, the two versions are indistinguishable — 20 distinct expressions at 0.0261 and
+0.0277 ms against 0.0287 and 0.0256 — and the drift indicator was back at 0.0002 ms, the value the
+stage 3 batch had, which settles the earlier 35 % as drift and nothing else.
 
 **Stage 5 — close out.** `npm run test:coverage`, and the coverage entry in `BACKLOG.md` updated —
 several of its numbers move, and its item 5, the unreachable outer `catch` of `execute`, is touched
 by stage 4 and has to be re-read. Then the records below, then this file is deleted.
 
-## The open decision — how far does "resolve may throw" reach?
+## The decision that was open — resolved 2026-08-29
 
-Settled: a form that `resolve` rejects itself — `${` without a closing `}` — throws. Not settled:
-what happens when the statement itself is not valid JavaScript.
+How far "resolve may throw" reaches was the one question this plan carried. It reaches all the way:
+`resolve` catches nothing and hands every error on, and the default value covers a missing result
+but never a failing statement.
 
-`resolve("${a} ${b}")` passes the shallow form check — it starts with `${`, it ends with `}` — and
-becomes the statement `a} ${b`. `resolve("\\${value}")` with an even backslash run does not start
-with `${` and becomes a statement in full. Both are invalid JavaScript, both fail when the executer
-compiles them, and both answer `undefined` or the default today, because `execute` (`:43-51`)
-catches every executer error by design — section 7.
-
-Frank's position on 2026-08-29 was that a statement the user got wrong need not be caught by the
-resolver. Two things have to be weighed before that becomes the rule:
-
-1. **It flips a passing conformance test.** `test/spec/EntryPointTest.js`, "resolve does not
-   recognize a scope prefix without the delimiters", resolves `scope::value` as a bare statement
-   and expects `undefined`. `scope::value` is a syntax error, so under the wider rule that call
-   throws. The test pins 4.3 and would have to be rewritten together with the rule.
-2. **Telling the two apart is not free.** `instanceof SyntaxError` is the obvious discriminator and
-   it is wrong: a valid statement can raise a `SyntaxError` at runtime, `${ JSON.parse("{") }`
-   being the everyday case. The reliable line is **when** the error appears — the executers compile
-   synchronously and return a promise, so a synchronous throw out of `anExecuter.execute` is a
-   compile failure while a rejection is a runtime failure. That holds for the three executers that
-   build code through `new Function` (verified 2026-08-29); `EsprimaExecuter` parses synchronously
-   through `espree` and has to be checked before it is relied on. The known blind spot: anything
-   else that throws synchronously before the code runs is misread as a syntax error —
-   `ContextDeconstructorExecuter` reads the context keys first, and on a resolver built over the
-   global object that read throws today, which is a separate backlog entry.
-
-Until this is decided, stages 0 to 3 are unaffected: none of them widens or narrows what is caught.
-Stage 4 is where it lands, and the outcome belongs in `DECISIONS.md`, in `SPECIFICATION.md` 4.3 and
-7, and in `CHANGELOG.md`.
+The counter-proposal — letting only errors from statements that do not *compile* through, so that a
+name no link carries stays soft — was measured before the decision: it would have spared 14 of the
+25 affected tests, and the discrimination was verified to be implementable, since all four executers
+compile synchronously and execute asynchronously. Frank weighed it and chose the simpler contract.
+`DECISIONS.md` carries both sides.
 
 ## Verification
 

@@ -131,8 +131,10 @@ describe("Specification 8.2 - the implementations", () => {
 
 	it("cannot execute an assignment under esprima-executer", async () => {
 		const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer: EsprimaExecuterName });
-		const result = await resolver.resolve("${ x = 5 }", "fallback");
-		expect(result).toBe("fallback");
+		// the assignment raises, so per 7 the expression stands as written and the default does not
+		// cover it
+		const result = await resolver.resolveText("${ x = 5 }", "fallback");
+		expect(result).toBe("${ x = 5 }");
 	});
 });
 
@@ -151,14 +153,16 @@ for (const { name: executer, variableName } of EXECUTERS) {
 
 		it(`${reachesGlobals ? "reaches" : "does not reach"} a global that no link carries`, async () => {
 			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
-			const result = await resolver.resolve("${ Math.round(1.5) }", "no global");
-			expect(result).toBe(reachesGlobals ? 2 : "no global");
+			// where the executer does not reach the global, the statement raises on it and per 7 the
+			// expression stands as written - the default does not cover an error
+			const result = await resolver.resolveText("${ Math.round(1.5) }", "no global");
+			expect(result).toBe(reachesGlobals ? "2" : "${ Math.round(1.5) }");
 		});
 
 		it(`an assignment to a key the context carries ${assignmentLandsInContext ? "lands there" : "does not land there"}`, async () => {
 			const variableNameKnown = variableName("known");
 			const resolver = new ExpressionResolver({ context: { known: "before" }, name: "root", executer });
-			await resolver.resolve(`\${${variableNameKnown} = "after"}`);
+			await resolver.resolveText(`\${${variableNameKnown} = "after"}`);
 			expect(resolver.getData("known")).toBe(assignmentLandsInContext ? "after" : "before");
 		});
 	});
@@ -168,8 +172,11 @@ describe("Specification 8.3 - only context-object-executer demands the ctx prefi
 
 	it("does not answer a bare context name under context-object-executer", async () => {
 		const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer: ContextObjectExecuterName });
-		const result = await resolver.resolve("${ value }", "fallback");
-		expect(result).toBe("fallback");
+		// through resolveText, because a bare name is a ReferenceError under this executer and
+		// resolve lets that through (7) - what is pinned here is the dialect, not the error policy.
+		// The expression stands as written, which is what a failing statement does in a text.
+		const result = await resolver.resolveText("${ value }", "fallback");
+		expect(result).toBe("${ value }");
 	});
 
 	for (const name of [WithScopedExecuterName, ContextDeconstructorExecuterName, EsprimaExecuterName]) {

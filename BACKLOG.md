@@ -261,9 +261,10 @@ Entries here are independent of each other. An undertaking whose steps depend on
   4. `ResolverContextHandle.js:118` (`get parent`) and `:122-123` (`updateData` on the handle,
      not the one on the resolver). Both are public on a class that section 9 does not list, so
      decide whether they are surface at all before covering them — see the `Context` export entry.
-  5. `ExpressionResolver.js:60` — the outer `catch` of `execute`. The inner `try` already swallows
-     every executer error, so nothing reaches it; it is unreachable rather than untested, and the
-     honest fix is to remove it with the error-path work, not to contrive a test.
+  5. ~~`ExpressionResolver.js:60`, the outer `catch` of `execute`~~ — **gone 2026-08-29** with the
+     error policy of section 7: `execute` no longer catches at all, so neither the unreachable
+     `catch` nor the swallowing one is there any more. The four numbers above predate the whole of
+     `plans/expression-parsing.md` and are stale; they are re-measured when that plan closes.
   `src/version.js` is generated, so its 0 % stays noise. Update these numbers when the picture
   changes rather than adding a third baseline.
 
@@ -436,9 +437,11 @@ Entries here are independent of each other. An undertaking whose steps depend on
   Found 2026-08-22 while reviewing the draft specification.
   **One question the fix has to answer**, found 2026-08-24 while probing the edge cases: `typeof
   arguments[0] === "string"` decides between the two forms, so what happens to a first argument
-  that is neither a string nor an object needs stating. Today `resolve(123, {}, "fallback")` and
-  `resolve(null, {}, "fallback")` both answer the default after a `TypeError` inside the `catch`
-  — an accident, not a rule. `SPECIFICATION.md` 4.1 says nothing about it either.
+  that is neither a string nor an object needs stating. **Changed 2026-08-29** with the error
+  policy of section 7: `resolve(123, {}, "fallback")` and `resolve(null, {}, "fallback")` used to
+  answer the default after a `TypeError` inside the `catch`; the `TypeError` now reaches the caller,
+  which is at least visible but still an accident rather than a rule. `SPECIFICATION.md` 4.1 says
+  nothing about it either.
 
 - [ ] **The data methods have no rules along the chain.**
   Target: `SPECIFICATION.md` 6.6.

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {ExpressionResolver} from "../../../index.js";
+import { catchError } from "../../TestUtils.js";
 import {EXECUTERNAME } from "../../../src/executer/ContextDeconstructorExecuter.js";
 
 describe(`${EXECUTERNAME} resolve test: `, () => {
@@ -58,9 +59,11 @@ describe(`${EXECUTERNAME} resolve test: `, () => {
 		expect(result instanceof Date).toBe(true);
 	});
 
+	// Since 2026-08-29 a name no link carries raises out of resolve instead of answering undefined
+	// - SPECIFICATION.md 7, pinned in test/spec/ErrorTest.js.
 	it("varname not defined", async () => {
-		const result = await ExpressionResolver.resolve("${test}", {});
-		expect(typeof result === "undefined").toBe(true);
+		const error = await catchError(() => ExpressionResolver.resolve("${test}", {}));
+		expect(error instanceof Error).toBe(true);
 	});
 
 	it("illegal object member", async () => {

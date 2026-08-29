@@ -114,7 +114,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			const leakName = `leaked_${executer.replace(/-/g, "_")}`;
 			const variableNameLeak = variableName(leakName);
 			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
-			await resolver.resolve(`\${${variableNameLeak} = 1}`);
+			await resolver.resolveText(`\${${variableNameLeak} = 1}`);
 			const leaked = leakName in globalThis;
 			delete globalThis[leakName];
 			expect(leaked).toBe(false);

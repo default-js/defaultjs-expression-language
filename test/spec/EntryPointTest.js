@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
+import { catchError } from "../TestUtils.js";
 import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/executer/ContextDeconstructorExecuter.js";
 
 /**
@@ -68,9 +69,11 @@ describe("Specification 4.1 - the static entry points, configuration form", () =
 
 describe("Specification 4.2 - the instance entry points", () => {
 
+	// The key exists and holds undefined, so the lookup succeeds and 4.4 applies. A key no link
+	// carries would raise instead, which is section 7 and not what this test is about.
 	it("resolve takes expression and default positionally", async () => {
-		const resolver = new ExpressionResolver({ context: { value: "resolved" } });
-		const result = await resolver.resolve("${ missing }", "fallback");
+		const resolver = new ExpressionResolver({ context: { value: undefined } });
+		const result = await resolver.resolve("${ value }", "fallback");
 		expect(result).toBe("fallback");
 	});
 
@@ -170,10 +173,12 @@ describe("Specification 4.3 - resolve answers a value, resolveText answers a tex
 		expect(error instanceof SyntaxError).toBe(true);
 	});
 
+	// "scope::value" is handed to the executer as a statement, which is what the rule says - and it
+	// is not valid JavaScript, so the executer fails and resolve lets that error through (7).
 	it("resolve does not recognize a scope prefix without the delimiters", async () => {
 		const resolver = new ExpressionResolver({ name: "scope", context: { value: "from scope" } });
-		const result = await resolver.resolve("scope::value");
-		expect(result).toBeUndefined();
+		const error = await catchError(() => resolver.resolve("scope::value"));
+		expect(error instanceof SyntaxError).toBe(true);
 	});
 });
 
@@ -221,8 +226,10 @@ describe("Specification 4.4 - the default value", () => {
 
 	// 4.3 casts towards string, and 4.4 puts the default where the value would have stood, so a
 	// default that is an object is cast like any other value.
+	// The key exists and holds undefined, so the lookup answers and the default takes its place. A
+	// key no link carries would raise instead, and per 7 the expression would stand.
 	it("casts a default that is an object towards string in resolveText", async () => {
-		const result = await ExpressionResolver.resolveText("${ missing }", {}, { a: 1 });
+		const result = await ExpressionResolver.resolveText("${ missing }", { missing: undefined }, { a: 1 });
 		expect(result).toBe("[object Object]");
 	});
 });

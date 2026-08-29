@@ -42,37 +42,29 @@ const execute = async function (anExecuter, aStatement, aContext) {
 	aStatement = normalize(aStatement);
 	if (aStatement == null) return undefined;
 
-	try {
-		return await new Promise((resolve) => {
-			const timeout = setTimeout(
-				() =>
-					console.warn(`Long running statement:
+	// an error is deliberately not caught here: section 7 gives the two entry points different
+	// answers to it, so each of them handles it for itself
+	const timeout = setTimeout(
+		() =>
+			console.warn(`Long running statement:
 				"${aStatement}"
 			`),
-				EXECUTION_WARN_TIMEOUT,
-			);
-			resolve(
-				(async () => {
-					let result = undefined;
-					try {
-						result = await anExecuter.execute(aStatement, aContext);
-					} catch (e) {
-						console.warn(`Execution error on statement!
-							statement:
-							${aStatement}
-							error:
-							${e}
-							`)
-					} finally {
-						clearTimeout(timeout);
-					}
-					return result;
-				})(),
-			);
-		});
-	} catch (e) {
-		console.error(`Error by statement "${aStatement}":`, e);
+		EXECUTION_WARN_TIMEOUT,
+	);
+	try {
+		return await anExecuter.execute(aStatement, aContext);
+	} finally {
+		clearTimeout(timeout);
 	}
+};
+
+const warnFailedStatement = (aStatement, anError) => {
+	console.warn(`Execution error on statement!
+		statement:
+		${aStatement}
+		error:
+		${anError}
+		`);
 };
 
 const withDefault = (aResult, aDefault) => {
@@ -393,15 +385,11 @@ export default class ExpressionResolver {
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		try {
 			aExpression = aExpression.trim();
-			const delimiter = aExpression.indexOf(EXPRESSION_START);
-			const backslashes = delimiter > 0 ? countBackslashes(aExpression, delimiter) : 0;
 
-			// 3.2: an odd run escapes the delimiter, so the input is no expression at all and
-			// stands as written, one backslash less
-			if (backslashes === delimiter && backslashes % 2 === 1) return aExpression.substring(1);
-
-			// 4.3: the whole input is one expression, so its end is the end of the input
-			if (delimiter === 0) {
+			// 4.3: the whole input is one expression, so its end is the end of the input. The
+			// escaping of 3.2 does not apply here - it is a rule of the text form, and there is no
+			// surrounding text, so a backslash belongs to the statement.
+			if (aExpression.startsWith(EXPRESSION_START)) {
 				if (!aExpression.endsWith("}")) throw new SyntaxError(`Expression does not end with "}": ${aExpression}`);
 
 				const { scope, statement } = parseScope(aExpression.substring(2, aExpression.length - 1));
@@ -411,10 +399,10 @@ export default class ExpressionResolver {
 			// 4.3: anything else is a statement in full, and carries no scope prefix
 			return await resolve(this.#executer, this, normalize(aExpression), null, defaultValue);
 		} catch (e) {
-			// a form this method rejects itself is not an execution error - see SPECIFICATION.md 7
-			if (e instanceof SyntaxError) throw e;
-			console.error('error at executing statment"', aExpression, '":', e);
-			return defaultValue.hasValue ? defaultValue.value : aExpression;
+			// 7: the error is logged and handed on. resolve answers a value or says why it cannot,
+			// and a default value covers a missing result, never an error.
+			warnFailedStatement(aExpression, e);
+			throw e;
 		}
 	}
 
@@ -435,14 +423,24 @@ export default class ExpressionResolver {
 		let text = "";
 		let position = 0;
 		for (const occurrence of occurrences) {
-			if (occurrence.escaped)
-				// 3.2: the escaping backslash is consumed, the expression itself stands as written
-				text += aText.substring(position, occurrence.start - 1) + aText.substring(occurrence.start, occurrence.end);
-			else {
-				const result = await resolve(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue);
-				text += aText.substring(position, occurrence.start) + toText(result);
-			}
+			// 3.2: an escaping backslash is consumed, everything else in front of the expression
+			// stands as written
+			text += aText.substring(position, occurrence.escaped ? occurrence.start - 1 : occurrence.start);
 			position = occurrence.end;
+
+			if (occurrence.escaped) {
+				text += aText.substring(occurrence.start, occurrence.end);
+				continue;
+			}
+
+			try {
+				text += toText(await resolve(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue));
+			} catch (e) {
+				// 7: an expression whose statement failed stands as written, and the default value
+				// does not cover it. The rest of the text keeps rendering.
+				warnFailedStatement(occurrence.statement, e);
+				text += aText.substring(occurrence.start, occurrence.end);
+			}
 		}
 
 		return text + aText.substring(position);

@@ -36,6 +36,30 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Changed
 
+- **`resolve` no longer catches an error — it logs it and hands it on.** A statement that fails
+  used to answer `undefined`, or the default value where one was passed, and the caller had no way
+  to tell a broken expression from one that legitimately resolved to nothing. `resolve` now writes
+  the statement and the error to the console and then raises the error. **A default value does not
+  cover an error any more**: it answers a missing result, never a failing statement. A caller who
+  wants a fallback writes the `try`/`catch`.
+
+  `resolveText` keeps catching, but no longer replaces what failed: **the expression stays in the
+  text exactly as it was written**, a warning names it, and the rest of the text renders. Where it
+  used to leave `undefined` or the default value, the reader now sees the expression that could not
+  be evaluated — which is what an author needs in order to find it. The two entry points differ on
+  purpose: a document has to render, a value has a caller standing right there. See
+  `SPECIFICATION.md` 7.
+
+  This is the loudest change of the release for anyone calling `resolve` directly. What used to be
+  a silent `undefined` is now a rejected promise, so every call site that relied on the default
+  value as a safety net needs one.
+
+- **Escaping is a rule of `resolveText` alone.** `resolve("\${value}")` used to answer the text
+  `${value}`; it now hands `\${value}` to the executer as a statement, which cannot compile it, so
+  the error reaches the caller. The escape exists so that an expression can stand in surrounding
+  text without being evaluated, and `resolve` has no surrounding text — its input is one
+  expression. See `SPECIFICATION.md` 3.2.
+
 - **An empty statement answers `undefined`.** `${}` used to answer `null`, and before the parser
   landed it was not recognized as an expression at all. It is one now, and it answers what
   `return;` answers in JavaScript. A default value applies to it like to any other result, and in

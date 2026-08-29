@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {ExpressionResolver} from "../../../index.js";
+import { catchError } from "../../TestUtils.js";
 import {EXECUTERNAME} from "../../../src/executer/WithScopedExecuter.js"
 
 // the chain test deliberately runs long-running resolutions; 120s was the jasmine
@@ -95,12 +96,14 @@ describe("Resolver chain", { timeout: 120000 }, () => {
 		const second = new ExpressionResolver({ context: { second: "second" }, name: "second", parent: first });
 		const third = new ExpressionResolver({ context: { third: "third" }, name: "third", parent: second });
 
-		let result = await third.resolve("${first == 'first' && second == 'second' && third =='third'}", "fail");
-		expect(result).toBe("fail");
+		// "first" is carried by no link yet, so the statement raises and resolve lets it through
+		// instead of answering the default - SPECIFICATION.md 7, since 2026-08-29.
+		const error = await catchError(() => third.resolve("${first == 'first' && second == 'second' && third =='third'}", "fail"));
+		expect(error instanceof Error).toBe(true);
 
 		third.updateData("first", "first");
 
-		result = await third.resolve("${first == 'first' && second == 'second' && third =='third'}", "fail");
+		const result = await third.resolve("${first == 'first' && second == 'second' && third =='third'}", "fail");
 		expect(result).toBe(true);
 	});
 
@@ -109,8 +112,11 @@ describe("Resolver chain", { timeout: 120000 }, () => {
 		const second = new ExpressionResolver({ context: { second: "second" }, name: "second - resolver", parent: first });
 		const third = new ExpressionResolver({ context: { third: "third" }, name: "third - resolver", parent: second });
 
+		// "first" is carried by no link yet, so that statement raises - since 2026-08-29 the
+		// expression stands as written and the default does not cover it (SPECIFICATION.md 7),
+		// while the rest of the text renders as before.
 		let result = await third.resolveText("${first} ${second} ${third}", "fail");
-		expect(result).toBe("fail second third");
+		expect(result).toBe("${first} second third");
 
 		first.updateData("first", "first");
 

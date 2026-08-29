@@ -42,8 +42,11 @@ describe(`${EXECUTERNAME} context behavior test:`, () => {
 	});
 
 	it("\"${document.location}\" from browser window context and local context", async () => {
+		// the context carries no "document", so the statement raises on it - since 2026-08-29 the
+		// expression then stands as written instead of being replaced (SPECIFICATION.md 7). What the
+		// test shows is unchanged: the browser's own document is not reached.
 		let result = await ExpressionResolver.resolveText("${document.location}", { test: "local context" });
-		expect(result).toBe("undefined");
+		expect(result).toBe("${document.location}");
 
 		result = await ExpressionResolver.resolveText("${test}", { test: "local context" });
 		expect(result == "local context").toBe(true);

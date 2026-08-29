@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
+import { catchError } from "../TestUtils.js";
 
 /**
  * Conformance tests for SPECIFICATION.md section 3 - expression syntax.
@@ -118,26 +119,13 @@ describe("Specification 3.2 - a backslash before the $ escapes the expression", 
 		expect(result).toBe("Test ${\"resolved\"} Test");
 	});
 
-	// The parity rule holds in resolve as well: three backslashes are an odd run, so one is
-	// consumed and the rest stands. An even run does not escape, and an input that does not begin
-	// with the delimiter is a statement in full - here one that is not valid JavaScript, so the
-	// default value applies (7).
-	it("resolve consumes one backslash of an odd run before the delimiter", async () => {
-		const result = await ExpressionResolver.resolve("\\\\\\${value}", { value: "resolved" });
-		expect(result).toBe("\\\\${value}");
-	});
-
-	// Green before the parity rule as well, for the same reason it is green now: an input that does
-	// not begin with the delimiter goes to the executer as a statement, and that one does not
-	// compile either way.
-	it("resolve does not escape on an even run before the delimiter", async () => {
-		const result = await ExpressionResolver.resolve("\\\\${value}", { value: "resolved" }, "fallback");
-		expect(result).toBe("fallback");
-	});
-
-	it("resolve leaves an escaped expression standing, without the backslash", async () => {
-		const result = await ExpressionResolver.resolve("\\${value}", { value: "resolved" });
-		expect(result).toBe("${value}");
+	// 3.2 is a rule of the text form alone. It exists so that an expression can stand in
+	// surrounding text without being evaluated, and `resolve` has no surrounding text - its input
+	// is one expression. A backslash there is part of the statement, and that statement does not
+	// compile, so the error reaches the caller (7).
+	it("does not hold in resolve, where a backslash belongs to the statement", async () => {
+		const error = await catchError(() => ExpressionResolver.resolve("\\${value}", { value: "resolved" }));
+		expect(error instanceof SyntaxError).toBe(true);
 	});
 });
 

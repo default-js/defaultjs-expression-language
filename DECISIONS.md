@@ -19,6 +19,49 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-29 — Does `resolve` catch the errors of a statement?
+
+**Decision:** No. `resolve` logs the statement and the error and then raises it to the caller.
+`resolveText` keeps catching and renders on, but leaves the expression that failed standing in the
+text exactly as it was written. **A default value covers an error in neither of them** — it answers
+a missing result and nothing else. Sections 3.2 and 7 of `SPECIFICATION.md` are therefore rules of
+`resolveText` alone.
+
+*The second half was sharpened the same day.* `resolveText` first kept its old answer, putting the
+default value or `undefined` where the expression had stood; Frank changed it to leaving the
+expression as written, for the same reason the first half exists: `undefined` in the middle of a
+rendered page says nothing about what went wrong, while the expression itself points at it. It also
+makes the default value mean one thing across the whole package instead of two.
+
+**Reasoning:** Frank's, and it is about who is standing there. `resolveText` renders a document:
+one broken expression must not take the page with it. `resolve` is called from code for one value,
+and answering `undefined` hides the mistake at the only place where it is still cheap to find. The
+default value carried two meanings before this — "the expression answered nothing" and "the
+expression blew up" — and a caller could not tell them apart; it now carries one, the one 4.4
+gives it.
+
+**Alternatives:** Keeping the catch and letting only errors from statements that do not *compile*
+through, so that a name no link carries stays soft. That was the counter-proposal, and it was
+measured on 2026-08-29: `resolve` catching nothing costs **25 tests**, and only 11 of them are the
+error rule itself — the other 14 are the resolver's ordinary business, a name the chain does not
+carry, which is a `ReferenceError` under two of the four executers. `ChainTest`'s "never sees the
+context of a link below" was the sharpest of them: the chain's own isolation guarantee, expressed
+through a missing name. The distinction was verified to be implementable — all four executers
+compile synchronously and execute asynchronously, so a non-compiling statement throws out of
+`Executer.execute` while a missing name arrives as a rejected promise. Frank weighed it and chose
+the simpler contract: `resolve` answers a value or says why it cannot, with no second class of
+error that is quietly absorbed.
+
+**Consequences:** The 14 tests were not deleted but moved: where what is pinned is the chain, the
+dialect of an executer or the global-write guarantee — not the error policy — they now ask through
+`resolveText`, which still answers the default and can state the rule for every executer alike.
+`test/TestUtils.js` gained `catchError`, so an expected error is asserted by hand and the suite
+keeps to `toBe`/`toBeDefined`/`toBeUndefined`. `execute` no longer swallows, which removed the
+unreachable outer `catch` the coverage entry in `BACKLOG.md` carried as item 5, and with it a
+`Promise` allocation per execution. And a consumer calling `resolve` directly must now handle a
+rejected promise where a silent `undefined` used to arrive — the loudest breaking change of 3.0.0,
+made while the version is still unreleased.
+
 ## 2026-08-29 — What do the open edges of the expression syntax do?
 
 **Decision:** Four rules, all now in `SPECIFICATION.md`, settled with Frank before the parser was

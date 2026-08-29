@@ -76,12 +76,17 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from root");
 		});
 
+		// Asked through resolveText, not resolve: under two of the four executers a name no link
+		// carries raises a ReferenceError, and resolve lets that through since 2026-08-29 (7). What
+		// the text then answers still differs per executer - the expression stands where the
+		// statement raised, the default applies where it merely answered undefined - so what is
+		// asserted is the rule itself: the value of the link below is not reachable.
 		it("never sees the context of a link below", async () => {
 			const variableNameLeafOnly = variableName("leafOnly");
 			const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer });
 			new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root, executer });
-			const result = await root.resolve(`\${${variableNameLeafOnly}}`, "fallback");
-			expect(result).toBe("fallback");
+			const result = await root.resolveText(`\${${variableNameLeafOnly}}`, "fallback");
+			expect(result.includes("from leaf")).toBe(false);
 		});
 
 		it("stops the walk at a key that holds undefined", async () => {
@@ -153,12 +158,15 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from inner");
 		});
 
+		// What the text answers differs per executer - the expression stands where the statement
+		// raised, the default applies where it merely answered undefined (7) - so what is asserted
+		// is the rule itself: the value of the link below is not reachable from the addressed one.
 		it("does not see a link below the one the prefix names", async () => {
 			const variableNameLeafOnly = variableName("leafOnly");
 			const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root, executer });
 			const result = await leaf.resolveText(`\${root::${variableNameLeafOnly}}`, "fallback");
-			expect(result).toBe("fallback");
+			expect(result.includes("from leaf")).toBe(false);
 		});
 	});
 
