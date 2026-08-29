@@ -43,6 +43,17 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **`ExpressionResolver.buildSecure` threw a `TypeError` on every call.** It passed
+  `ObjectUtils.filter` a single object where that helper takes three positional arguments, so
+  the wrapper object arrived as the data to be filtered and `propFilter` arrived as
+  `undefined` — every call died inside the filter before a resolver was built, whatever was
+  handed in. The method therefore had no working consumer. The three arguments are now passed
+  in the places `filter` expects, which also makes the documented default `deep: true` take
+  effect. The constructor options travel inside `option` together with `deep` —
+  `buildSecure({ context, propFilter, option : { deep, name, parent, executer } })` — and
+  `executer` is among them, which was missing by oversight, so a secure resolver could not be
+  pinned to an execution strategy. See `SPECIFICATION.md` 6.7.
+
 - **The expression cache evicted the entries it should have kept.** `CodeCache` refreshed a
   marker on every read but ordered the eviction by write time, so it dropped the least
   recently *written* entry instead of the least recently used one. For this workload that is

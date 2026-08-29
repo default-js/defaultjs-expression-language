@@ -433,12 +433,9 @@ object; there is no separate method for it and none is planned.
 ### 6.7 `buildSecure`
 
 ```javascript
-ExpressionResolver.buildSecure({ context, propFilter, option,
-                                 name, parent, executer, allowGlobalWrite })
+ExpressionResolver.buildSecure({ context, propFilter,
+                                 option : { deep, name, parent, executer, allowGlobalWrite } })
 ```
-
-*Not yet implemented at all* — `buildSecure` throws a `TypeError` on every call today, before a
-resolver is built; see `BACKLOG.md`. Everything below is what it is meant to do.
 
 Builds a resolver over a **filtered copy** of the context, so that properties a consumer does
 not want reachable never enter the evaluation. The motivating case is real: the template engine
@@ -449,13 +446,12 @@ from an expression through the mechanism of 6.4 — under `EsprimaExecuter` `fet
 are even explicitly protected. `buildSecure` is a way to hand over a cleaned context; it is not
 a sandbox and must not be documented as one.
 
-`buildSecure` forwards the **full constructor option set**, on top of its own `propFilter` and
-`option`. `executer` was missing by oversight; `allowGlobalWrite` matters here more than anywhere
-else, because the CMS case that motivates this method is exactly the case the switch of 6.5 was
-invented for.
+`option` carries the filter's own `deep` together with the **full constructor option set**, which
+`buildSecure` hands on unchanged. `allowGlobalWrite` matters here more than anywhere else, because
+the CMS case that motivates this method is exactly the case the switch of 6.5 was invented for.
 
-*Not yet implemented* — only `context`, `name` and `parent` are passed on today; see
-`BACKLOG.md`.
+*Not yet implemented* — `allowGlobalWrite` is not forwarded, because the constructor option of 6.5
+does not exist yet; see `BACKLOG.md`.
 
 ## 7. Errors
 
@@ -562,5 +558,5 @@ Every rule above that the code does not keep today, in one place:
 | 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |
 | 6.6 `getData`, `deleteData` with a filter | `getData` and `deleteData` are broken on the filter path |
 | 6.6 the rules of the four data methods along the chain | The data methods have no rules along the chain |
-| 6.7 `buildSecure` at all — it throws on every call — and the option set it forwards | `buildSecure` throws on every call, and drops the options a secure context needs most |
+| 6.7 `allowGlobalWrite` as an option of `buildSecure` | A write to an unknown name inside an expression lands on `globalThis` |
 | 8.2 the default executer | The default executer announces itself as deprecated |

@@ -333,21 +333,29 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * build a secure context object
+	 * build a resolver over a filtered copy of the context
+	 *
+	 * The filter is applied to the context only, never to the globals, so this is a way to hand
+	 * over a cleaned context and not a sandbox.
+	 *
+	 * `option` carries the filter's own `deep` together with the constructor options `name`,
+	 * `parent` and `executer`, which are handed on as they are.
 	 *
 	 * @static
-
-	 * @param {object} arg
+	 * @param {object} arg the filter arguments, plus the whole constructor option set
 	 * @param {object} arg.context
 	 * @param {function} arg.propFilter
-	 * @param {{ deep: boolean; }} [arg.option={ deep: true }]
-	 * @param {string} arg.name
-	 * @param {ExpressionResolver} arg.parent
-	 * @returns {object}
+	 * @param {object} [arg.option={ deep: true, name: null, parent: null, executer: null }]
+	 * @param {boolean} [arg.option.deep=true]
+	 * @param {string} [arg.option.name=null]
+	 * @param {ExpressionResolver} [arg.option.parent=null]
+	 * @param {string} [arg.option.executer=null]
+	 * @returns {ExpressionResolver}
 	 */
-	static buildSecure({ context, propFilter, option = { deep: true }, name, parent }) {
-		context = ObjectUtils.filter({ data: context, propFilter, option });
-		return new ExpressionResolver({ context, name, parent });
+	static buildSecure({ context, propFilter, option = { deep: true, name: null, parent: null, executer: null } }) {
+		const { deep = true, name, parent, executer } = option;
+		context = ObjectUtils.filter(context, propFilter, {deep});
+		return new ExpressionResolver({ context, name, parent, executer });
 	}
 }
 

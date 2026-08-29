@@ -426,6 +426,12 @@ Entries here are independent of each other. An undertaking whose steps depend on
   back to `GLOBAL[property]` so reads are unaffected. Under `ContextDeconstructorExecuter` the write cannot be caught at all, so there
   the protected state means generating the body in strict mode: the assignment throws and is
   reported as an execution error.
+  **`buildSecure` has to forward it in the same change.** Since 2026-08-29 it takes the
+  constructor options inside its `option` argument and names them one by one
+  (`src/ExpressionResolver.js:355`), so `allowGlobalWrite` has to be added to that destructuring
+  as well — `SPECIFICATION.md` 6.7 carries it as pending and section 10 points here. The CMS case
+  that motivates `buildSecure` is the case this switch was invented for, so the two belong
+  together.
   Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
   Found 2026-08-22 while working out the specification questions.
 
@@ -508,28 +514,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   that is neither a string nor an object needs stating. Today `resolve(123, {}, "fallback")` and
   `resolve(null, {}, "fallback")` both answer the default after a `TypeError` inside the `catch`
   — an accident, not a rule. `SPECIFICATION.md` 4.1 says nothing about it either.
-
-- [ ] **`buildSecure` throws on every call, and drops the options a secure context needs most.**
-  Target: `SPECIFICATION.md` 6.7.
-  **`buildSecure` is unusable today, found 2026-08-24 in stage 3 of the conformance plan.** It
-  calls `ObjectUtils.filter({ data: context, propFilter, option })`
-  (`src/ExpressionResolver.js:349`), passing one object where the helper takes three positional
-  arguments: `filter(data, propFilter, { deep })`
-  (`@default-js/defaultjs-common-utils/src/ObjectUtils.js:553`). So the wrapper object arrives as
-  the data, `propFilter` arrives as `undefined`, and the call dies with
-  `TypeError: propFilter is not a function` before a resolver is ever built — verified in the
-  browser, every call, whatever is passed. The method therefore has no working consumer and
-  cannot have had one since the argument shape of `filter` last changed. Note what the same
-  mistake would have caused had `propFilter` been optional: the "secure" context would have been
-  the wrapper object, carrying the **unfiltered** original under the key `data`. Fix the call
-  shape first; the option set below is the same change.
-  Beyond that, `buildSecure` filters the context and then builds the
-  resolver with `{ context, name, parent }` only. `executer` is missing by oversight — a secure
-  resolver cannot be pinned to an execution strategy — and the `allowGlobalWrite` switch agreed
-  on 2026-08-22 cannot be set there either, although `buildSecure` exists for exactly the CMS
-  case that switch was invented for: users authoring expressions. Agreed 2026-08-22: forward the
-  full constructor option set on top of `propFilter` and `option`. Purely additive. Found
-  2026-08-22 during the consistency pass over the draft specification.
 
 - [ ] **The data methods have no rules along the chain.**
   Target: `SPECIFICATION.md` 6.6.

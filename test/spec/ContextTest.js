@@ -297,42 +297,36 @@ describe("Specification 6.7 - buildSecure", () => {
 
 	const propFilter = (name) => name !== "secret";
 
-	// not implemented, waits for BACKLOG.md "`buildSecure` drops the options a secure context needs most"
-	it.fails("builds a resolver over the filtered context", async () => {
+	it("builds a resolver over the filtered context", async () => {
 		const secure = ExpressionResolver.buildSecure({ context: { open: "ok", secret: "hidden" }, propFilter });
 		const result = await secure.resolve("${ open }", "fallback");
 		expect(result).toBe("ok");
 	});
 
-	// not implemented, waits for BACKLOG.md "`buildSecure` drops the options a secure context needs most"
-	it.fails("does not carry a property the filter rejected", async () => {
+	it("does not carry a property the filter rejected", async () => {
 		const secure = ExpressionResolver.buildSecure({ context: { open: "ok", secret: "hidden" }, propFilter });
 		const result = await secure.resolve("${ typeof secret }");
 		expect(result).toBe("undefined");
 	});
 
-	// not implemented, waits for BACKLOG.md "`buildSecure` drops the options a secure context needs most"
-	it.fails("filters the context, not the globals - it is not a sandbox", async () => {
+	it("filters the context, not the globals - it is not a sandbox", async () => {
 		const secure = ExpressionResolver.buildSecure({ context: { open: "ok", secret: "hidden" }, propFilter });
 		const result = await secure.resolve("${ typeof Math }", "fallback");
 		expect(result).toBe("object");
 	});
 
-	// not implemented, waits for BACKLOG.md "`buildSecure` drops the options a secure context needs most"
-	it.fails("forwards name and parent to the constructor", async () => {
+	it("forwards name and parent to the constructor", async () => {
 		const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root" });
-		const secure = ExpressionResolver.buildSecure({ context: { open: "ok" }, propFilter, name: "secure", parent: root });
+		const secure = ExpressionResolver.buildSecure({ context: { open: "ok" }, propFilter, option: { name: "secure", parent: root } });
 		expect(secure.name).toBe("secure");
 		expect(secure.parent === root).toBe(true);
 	});
 
-	// not implemented, waits for BACKLOG.md "`buildSecure` drops the options a secure context needs most"
-	it.fails("forwards the executer to the constructor", async () => {
+	it("forwards the executer to the constructor", async () => {
 		const secure = ExpressionResolver.buildSecure({
 			context: { open: "ok" },
 			propFilter,
-			name: "secure",
-			executer: EXECUTERS[1].name
+			option: { name: "secure", executer: EXECUTERS[1].name }
 		});
 		const result = await secure.resolve("${ ctx.open }", "fallback");
 		expect(result).toBe("ok");
