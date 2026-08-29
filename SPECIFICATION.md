@@ -350,10 +350,16 @@ This is what makes a typo in an expression indistinguishable from an empty value
 accepted (section 7).
 
 The global object may also be handed in as a context object; it is then an ordinary link of the
-chain.
+chain. Two consequences follow from what such a link is, and both are intended:
 
-*Not yet implemented* — a resolver built on the global object throws on every lookup; see
-`BACKLOG.md`.
+- It carries **every** name, so it answers every lookup that reaches it and no link below it is
+  ever consulted. A global-object link therefore belongs at the root of a chain, not in the
+  middle of one.
+- The set of names it contributes is every own name of the global object, which
+  `ContextDeconstructorExecuter` destructures on every execution.
+
+*Not yet implemented* — under `ContextDeconstructorExecuter` a resolver on the global object
+still fails, for an unrelated reason; see `BACKLOG.md`.
 
 ### 6.5 Writing from inside an expression
 
@@ -592,7 +598,7 @@ Every rule above that the code does not keep today, in one place:
 | 4.1 the configuration form of the static calls | The static entry points take no configuration object |
 | 5.1 a generated name where none was passed | `effectiveChain` is a copy of `chain`, and a resolver without a name |
 | 5.5 `effectiveChain` and `contextChain` skip links without a context | `effectiveChain` is a copy of `chain`, and a resolver without a name |
-| 6.4 the global object as a context | A resolver built on the global object throws on every lookup |
+| 6.4 the global object as a context, under `ContextDeconstructorExecuter` | The `ownKeys` trap drops symbols, and a global context is where that breaks |
 | 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |
 | 6.6 `getData`, `deleteData` with a filter | `getData` and `deleteData` are broken on the filter path |
 | 6.6 the rules of the four data methods along the chain | The data methods have no rules along the chain |

@@ -95,6 +95,17 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **A resolver built on the global object threw on every lookup.** `new ExpressionResolver({
+  context: globalThis })` — and every resolver built while `EsprimaExecuter` is the default,
+  since that executer declares the global object as its default context — answered `undefined`
+  for every name, `${ Math.round(1.5) }` included. The property cache of a global context is a
+  wrapper rather than a `Map`, and its lookup answered the value of the property where the caller
+  expects the link holding it, so reading the property off that answer raised a `TypeError` that
+  the executer swallowed. The wrapper answers the link now, and the global object is an ordinary
+  link of the chain: it carries every name, so it answers every lookup that reaches it and nothing
+  below it is consulted. Under `ContextDeconstructorExecuter` such a resolver can still fail for
+  an unrelated reason — see `SPECIFICATION.md` 6.4 and `BACKLOG.md`.
+
 - **The instance `resolve` did not understand the scope syntax.** It stripped the delimiters and
   passed everything between them to the executer with the scope filter hardcoded to `null`, so
   `resolver.resolve("${scope::statement}")` handed `scope::statement` to the executer, which could

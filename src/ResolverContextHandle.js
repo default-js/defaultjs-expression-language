@@ -11,6 +11,18 @@ const RESERVED_WORDS = new Set([
 	"let", "package", "private", "protected", "public", "static", "await", "null", "true", "false", "constructor", "undefined"
 ]);
 
+/**
+ * Property cache for a context that is the global object itself.
+ *
+ * It answers like the Map it replaces: every name is present, and the value is the handle
+ * holding it - never the value of the property. That is the contract of #getPropertyDef,
+ * whose caller reads the property off the handle it gets back.
+ *
+ * Because every name is present, such a link answers every lookup and nothing below it is
+ * reached, and ownKeys reports every name of the global object.
+ *
+ * @param {ResolverContextHandle} handle
+ */
 const createGlobalCacheWrapper = (handle) => {
 
 	return {
@@ -18,7 +30,7 @@ const createGlobalCacheWrapper = (handle) => {
 			return true;
 		},
 		get: (property) => {
-			return GLOBAL[property];
+			return handle;
 		},
 		set: (property, value) => {
 			return false;

@@ -124,9 +124,20 @@ for (const { name: executer, variableName } of EXECUTERS) {
 
 describe("Specification 6.4 - the global object as a context object", () => {
 
-	// not implemented, waits for BACKLOG.md "A resolver built on the global object throws on every lookup"
-	it.fails("takes the global object as an ordinary link of the chain", async () => {
+	it("takes the global object as an ordinary link of the chain", async () => {
 		const resolver = new ExpressionResolver({ context: globalThis, name: "global" });
+		const result = await resolver.resolve("${ Math.round(1.5) }", "fallback");
+		expect(result).toBe(2);
+	});
+
+	// The rule holds under three of the four executers. The deconstruction executer destructures
+	// the context, which asks the proxy for ownKeys, and that trap reports only string names -
+	// a target carrying a non-configurable own symbol therefore violates the proxy invariant and
+	// the engine throws. In this runner the symbol is vitest's own Symbol(matchers-object) on
+	// globalThis.
+	// not implemented, waits for BACKLOG.md "The `ownKeys` trap drops symbols, and a global context is where that breaks"
+	it.fails("takes the global object as an ordinary link under the deconstruction executer", async () => {
+		const resolver = new ExpressionResolver({ context: globalThis, name: "global", executer: ContextDeconstructorExecuterName });
 		const result = await resolver.resolve("${ Math.round(1.5) }", "fallback");
 		expect(result).toBe(2);
 	});

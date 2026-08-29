@@ -276,11 +276,11 @@ Entries here are independent of each other. An undertaking whose steps depend on
      plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:41`. The public
      surface test asserts both exports exist but never flips them, deliberately: a debug switch
      has no observable effect to assert on.
-  3. `ResolverContextHandle.js:24,27,30` — the `set`, `delete` and `keys` of
-     `createGlobalCacheWrapper`. Unreachable today because a resolver on the global object throws
-     on the first lookup; this closes itself when that entry is fixed and
-     `test/spec/ContextTest.js` "takes the global object as an ordinary link of the chain" goes
-     green.
+  3. The `set` and `delete` of `createGlobalCacheWrapper` (`ResolverContextHandle.js`). Reachable
+     since the global-context fix of 2026-08-29 — `keys` now runs — but only a write or a delete
+     through a resolver built on the global object reaches the other two, and nothing does that
+     today. Whether they should be exercised at all depends on the global-write switch of 6.5,
+     which is what decides whether such a write is allowed in the first place.
   4. `ResolverContextHandle.js:118` (`get parent`) and `:122-123` (`updateData` on the handle,
      not the one on the resolver). Both are public on a class that section 9 does not list, so
      decide whether they are surface at all before covering them — see the `Context` export entry.
@@ -328,27 +328,26 @@ Entries here are independent of each other. An undertaking whose steps depend on
   carries no `fails` marker, since it does pass; it starts proving its rule the moment the typo
   is gone. Re-read it with this fix and make sure it still passes for the right reason.
 
-- [ ] **A resolver built on the global object throws on every lookup.**
-  Target: `SPECIFICATION.md` 6.4 — the global object stays a supported context object.
-  `#initPropertyCache` special-cases `data == GLOBAL` and returns the wrapper from
-  `createGlobalCacheWrapper` (`src/ResolverContextHandle.js:14-32`), whose `get(property)`
-  answers `GLOBAL[property]` — a **value**. But `#getPropertyDef` (`:168`) is contracted to
-  return a `ResolverContextHandle`, and the `get` trap then evaluates `proxy.#data[property]` on
-  that value: `TypeError: Cannot read private member #data from an object whose class did not
-  declare it`. `execute()` swallows it, so the caller sees `undefined` and a warning. Verified
-  2026-08-22 against `src/` under node 24.19: `new ExpressionResolver({ context: globalThis })`
-  answers `undefined` for `${Math.round(1.5)}` and for any global that holds a truthy value; a
-  global holding `undefined` survives only because the trap short-circuits on falsy. Reach:
-  `EsprimaExecuter` declares `defaultContext: GLOBAL` (`src/executer/EsprimaExecuter.js:129`),
-  so every resolver built while that executer is the default is affected, and passing `window`
-  explicitly is the documented way to reach the global context. Note the ordinary global
-  fallback is unaffected — it works through the JavaScript scope chain of the generated code,
-  not through this path. **Fix agreed 2026-08-22** (`SPECIFICATION.md` 6.4): the wrapper already receives
-  the handle it never uses — its `get` returns that handle instead of the value, and the
-  contract "a lookup answers which link holds the name" holds again. Document alongside it that
-  `ownKeys` then reports every global name, which `ContextDeconstructorExecuter` destructures on
-  every execution. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
-  Found 2026-08-22 while working out the specification questions.
+- [ ] **The `ownKeys` trap drops symbols, and a global context is where that breaks.**
+  Target: `SPECIFICATION.md` 6.4 — the global object stays a supported context object, under
+  every executer.
+  The trap collects the string keys of the property caches along the chain
+  (`src/ResolverContextHandle.js:100-111`) and never reports a symbol. A proxy must report every
+  non-configurable own property of its target, so as soon as the target carries a
+  non-configurable own symbol the trap violates the invariant and the engine throws
+  `TypeError: 'ownKeys' on proxy: trap result did not include 'Symbol(...)'`. Verified 2026-08-29
+  in the test browser: `new ExpressionResolver({ context: globalThis, executer:
+  "context-deconstruction-executer" })` throws on the first expression, because that executer
+  destructures the context and destructuring asks for `ownKeys`; the symbol it trips over there is
+  vitest's own `Symbol(matchers-object)` on `globalThis`. The other three executers answer
+  correctly since the global-context fix of the same day — `${ Math.round(1.5) }` is `2` and an own
+  global property reads back. So the reach is narrow but real: any context object carrying a
+  non-configurable own symbol, and the global object is the one consumers actually hand in.
+  A frozen context object is the second case. The fix is to report symbols as well, which means
+  deciding what the property cache does with them: it skips non-string names on purpose
+  (`:161-162`), because a symbol is not a variable name — so the trap has to reach past the cache
+  to the data objects rather than the cache learning about symbols. Consumer-visible, so the
+  outcome belongs in `CHANGELOG.md`. Found 2026-08-29 while fixing the global-context lookup.
 
 - [ ] **A write to an unknown name inside an expression lands on `globalThis`.**
   Target: `SPECIFICATION.md` 6.5 — the negative guarantee and the three-level switch.
