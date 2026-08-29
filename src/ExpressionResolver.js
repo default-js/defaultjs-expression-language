@@ -61,13 +61,19 @@ const execute = async function (anExecuter, aStatement, aContext) {
 	}
 };
 
-const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpression, aFilter, aDefault) {
-	if (aFilter && aResolver.name != aFilter) return aResolver.parent ? resolve(aResolver.parent, aExpression, aFilter, aDefault, aExecuter) : null;
-
-	const result = await execute(aExecuter, aExpression, aResolver.context);
-	if (result !== null && typeof result !== "undefined") return result;
+const withDefault = (aResult, aDefault) => {
+	if (aResult !== null && typeof aResult !== "undefined") return aResult;
 	else if (aDefault instanceof DefaultValue && aDefault.hasValue) return aDefault.value;
-	return result;
+	return aResult;
+};
+
+const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpression, aFilter, aDefault) {
+	// a scope no link of the chain carries answers undefined, and the default applies to it like
+	// to any other result - see SPECIFICATION.md 5.4
+	if (aFilter && aResolver.name != aFilter)
+		return aResolver.parent ? resolve(aExecuter, aResolver.parent, aExpression, aFilter, aDefault) : withDefault(undefined, aDefault);
+
+	return withDefault(await execute(aExecuter, aExpression, aResolver.context), aDefault);
 };
 
 const resolveMatch = async (aExecuter, resolver, match, defaultValue) => {

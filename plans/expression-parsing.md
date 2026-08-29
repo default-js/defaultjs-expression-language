@@ -190,6 +190,46 @@ filter, and can serve as its regression guard.
 Markers removed: `test/spec/ChainTest.js`, four in 5.3 and two in 5.4, six markers over four
 executers.
 
+**Done 2026-08-29.** The six markers came off first and the gate was run red: **24 failing cases**,
+every one of them reporting `expected 'null' to be …` — the walk answering the string `null`
+instead of climbing, and 5.4 skipping the default on top. That is what the specification predicts,
+so the tests fail for the right reason.
+
+The fix is in `src/ExpressionResolver.js`: the recursion now passes `(aExecuter, aResolver.parent,
+aExpression, aFilter, aDefault)` in that order, and the default handling moved into `withDefault`,
+which both exits share — so the end of a walk that matched nothing answers `undefined` through the
+same rule that applies to a result of `null`. `npm test` green: **374 passed and 39 expected fail
+(413)**, up from 350 passed and 63 expected fail.
+
+`npm run bench`, three runs, against the stage 0 baseline. The stable cases, `mean` in
+milliseconds:
+
+| Bench | case | before | after |
+|---|---|---|---|
+| ColdResolve — non-matching context | 10 | 0.0019–0.0026 | 0.0018 |
+| | 1 000 | 0.0189–0.0245 | 0.0167–0.0171 |
+| ColdResolve — no context | 10 | 0.0019–0.0022 | 0.0017–0.0018 |
+| | 1 000 | 0.0150–0.0198 | 0.0130–0.0134 |
+| WarmResolve | 10 | 0.0016–0.0017 | 0.0015 |
+| | 1 000 | 0.0176–0.0189 | 0.0167–0.0173 |
+| RandomScope | 1 000 | 0.0119–0.0131 | 0.0104–0.0110 |
+| ResolveText | 20 distinct | 0.0604–0.0718 | 0.0453–0.0464 |
+| | one expression 20 times | 0.0042–0.0049 | 0.0034–0.0036 |
+| | no expression at all | 0.0006–0.0007 | 0.0005 |
+| | expressions carrying literals | 0.0124–0.0129 | 0.0094–0.0095 |
+
+**Every case improved by 10 % to 25 %, and none of that belongs to this change.** The proof stands
+in the table: `no expression at all` gained 17 %, and stage 1 cannot reach it — a text with no
+`${` in it never calls the internal `resolve` at all. The whole batch drifted, by more than the
+one added function call could ever account for. What the measurement says is therefore only this:
+**no regression is detectable**, and the drift between two batches is larger than the effect being
+looked for. All three runs also landed in the fast mode of the deep sizes, against a mixture
+before.
+
+Carry this method into the later stages: **name a case the change cannot reach and read the batch
+drift off it.** For stage 2 that is `WarmResolve`, which goes through `resolve` and never touches
+the text path; for stage 1 it was `no expression at all`.
+
 **Stage 2 — the scanner in `resolveText` (3.1, 3.2, 4.3).** `EXPRESSION`, the four `MATCH_`
 constants, `resolveMatch` and the `split`/`join` loop go; `scan` and `parseScope` arrive.
 `resolveText` walks the occurrences once and builds the result by position, so an escaped
@@ -273,9 +313,12 @@ Stage 4 is where it lands, and the outcome belongs in `DECISIONS.md`, in `SPECIF
 pass, the test is run and seen red, and its failure message is read against what the specification
 predicts — a message that does not match is a finding, not a formality.
 
-`npm run bench` at stage 0, at the end of stage 2 with both scanner variants, and once at the end
-of stage 3, because the instance `resolve` is on the hot path of all three existing benchmarks.
-Several runs each; only depths 10 and 1 000 are stable enough to judge a small change.
+`npm run bench` at the end of **every** stage that touches `src/` — corrected 2026-08-29, the
+first version of this plan skipped stage 1, which changes the internal `resolve` and therefore
+sits on the hot path of all four benchmarks. At the end of stage 2 with both scanner variants.
+Several runs each; only depths 10 and 1 000 and the four text cases are stable enough to judge a
+small change, and each comparison names a case the change cannot reach, to read the batch drift
+off it.
 
 `npm run build` is not affected — no entry point, no dependency and no published file changes shape
 — but it runs once at the end anyway, together with a diff of `dist/`.

@@ -43,6 +43,20 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **`${scope::statement}` never reached an ancestor of the chain.** The internal walk was
+  declared as `(aExecuter, aResolver, aExpression, aFilter, aDefault)` but recursed with its five
+  arguments rotated by one, so the parent resolver arrived where the executer was expected and the
+  walk died on the first step. Addressing a named link other than the one the call was made on has
+  therefore never worked: `resolveText("${root::value}")` answered the text `null` where the root
+  holds a value. It is a regression, not an original defect — the call site was not adjusted when
+  `aExecuter` was prepended to the parameter list in 2025-07. Where two links carry the same name,
+  the first one found climbing towards the root now answers, the same shadowing rule as an
+  unprefixed lookup. See `SPECIFICATION.md` 5.3.
+
+- **A scope prefix that no link carries answered `null` and skipped the default value.** It now
+  answers `undefined`, and a default value passed to `resolve` or `resolveText` applies to it as
+  it does to every other result. See `SPECIFICATION.md` 5.4.
+
 - **`ExpressionResolver.buildSecure` threw a `TypeError` on every call.** It passed
   `ObjectUtils.filter` a single object where that helper takes three positional arguments, so
   the wrapper object arrived as the data to be filtered and `propFilter` arrived as

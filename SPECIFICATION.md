@@ -229,16 +229,10 @@ Where more than one link carries the name, the **first one found while climbing*
 the ones above it are shadowed — the same rule as 5.2, and for the same reason: a chain is built
 by descending, so the nearest link is the one the caller most recently introduced.
 
-*Not yet implemented* — the recursion passes its arguments in the wrong order and never reaches
-an ancestor; see `BACKLOG.md`.
-
 ### 5.4 A prefix no link carries
 
 The result is `undefined` — the link does not exist, and `undefined` is what JavaScript uses to
 say so. A default value, if one was passed, then applies as it does everywhere else.
-
-*Not yet implemented* — today `null` is answered and the default value is skipped; see
-`BACKLOG.md`.
 
 ### 5.5 Inspecting the chain
 
@@ -551,8 +545,6 @@ Every rule above that the code does not keep today, in one place:
 | 4.3 one evaluation per occurrence | An expression that contains braces is not recognized, decision C |
 | 4.3 `resolve` and the scope prefix | The instance `resolve()` does not understand the scope syntax at all |
 | 5.1 a generated name where none was passed | `effectiveChain` is a copy of `chain`, and a resolver without a name |
-| 5.3 climbing to a named link, and the nearest of two links sharing a name | `${scope::expression}` never reaches an ancestor |
-| 5.4 `undefined` for an unknown scope | same entry |
 | 5.5 `effectiveChain` and `contextChain` skip links without a context | `effectiveChain` is a copy of `chain`, and a resolver without a name |
 | 6.4 the global object as a context | A resolver built on the global object throws on every lookup |
 | 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |

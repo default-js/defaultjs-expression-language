@@ -22,7 +22,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
 > `resolve` and its scope syntax, the matching-brace parser, and the escape that reaches the
 > wrong occurrence. They share three functions of one file, so they are ordered in
 > `plans/expression-parsing.md` rather than picked up one by one. Read it before touching
-> `src/ExpressionResolver.js`.
+> `src/ExpressionResolver.js`. The scope walk landed on 2026-08-29 in stage 1 and its entry
+> is gone; the other three are still open below.
 
 - [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
   `defaultjs-common-utils` already went this way, so the two packages diverge today. The
@@ -283,31 +284,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   without a word is the one answer that is now ruled out. Consumer-visible, so the outcome belongs
   in `DECISIONS.md`. Found 2026-08-21 while covering `setupExecuter`.
 
-- [ ] **`${scope::expression}` never reaches an ancestor — the recursive call passes its arguments in the wrong order.**
-  Target: `SPECIFICATION.md` 5.3 and 5.4 — the walk climbs to the link whose name matches, and a
-  name no link carries answers `undefined` with the default value applying.
-  `resolve()` is declared as `(aExecuter, aResolver, aExpression, aFilter, aDefault)`
-  (`src/ExpressionResolver.js:64`), but when the scope filter does not match the current link it
-  recurses as `resolve(aResolver.parent, aExpression, aFilter, aDefault, aExecuter)` (`:65`) —
-  five arguments, every one in the wrong slot: the parent resolver arrives as the executer, the
-  expression as the resolver, the filter as the expression. Verified 2026-08-21 in the browser:
-  a leaf named `leaf` under a root named `root`, both carrying `value`, resolves
-  `resolveText("${leaf::value}")` to `from leaf` but `resolveText("${root::value}")` to the
-  string `null`. Addressing a named link of the chain is the feature the scope syntax exists
-  for and it has never worked beyond the resolver one already holds. It is a regression, not an
-  original defect: in beta 3 (`df42f2c`, 2020-02-22) the function took
-  `(aResolver, aExpression, aFilter, aDefault)` and recursed correctly. `aExecuter` was
-  prepended to the parameter list on 2025-07-20 (`38aff7d`, "updated beta code") and the call
-  site was never adjusted — it had `aExecuter` appended at the end instead, which shifted every
-  other argument by one. Invisible for a year because no test uses `scope::` —
-  `ResolverChainTest.js` only resolves unscoped names, which travel through the context proxy
-  instead. **Decided 2026-08-24** (`SPECIFICATION.md` 5.3) and pinned by a test marked `fails`:
-  where two links carry the same name, the walk answers from the **first one found climbing
-  towards the root**, the same shadowing rule as 5.2 — so the recursion has to stop at the first
-  match rather than collect or prefer the root. Consumer-visible,
-  so the outcome belongs in `CHANGELOG.md`. Found 2026-08-21 while reading the uncovered
-  branches for goal 3.
-
 - [ ] **The instance `resolve()` does not understand the scope syntax at all.**
   Target: `SPECIFICATION.md` 4.3 — `resolve` recognizes the scope prefix in the delimited form,
   and only there.
@@ -319,8 +295,9 @@ Entries here are independent of each other. An undertaking whose steps depend on
   swallowed, and the caller gets `undefined`. Verified 2026-08-21 — `resolveText` returns
   `from leaf` for `${leaf::value}` while `resolve` returns `undefined` for the same input on the
   same resolver. Two entry points, one syntax, different answers; the readme documents neither.
-  Related to the argument-order defect above: fixing only that one still leaves `resolve()`
-  unable to reach a scope. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
+  The argument-order defect of the walk, which this one shares the syntax with, was fixed on
+  2026-08-29 in stage 1 of `plans/expression-parsing.md` — so `resolveText` reaches a named
+  link now, while `resolve` still cannot reach a scope at all. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
   Found 2026-08-21.
 
 - [ ] **`getData` and `deleteData` are broken on the filter path.**

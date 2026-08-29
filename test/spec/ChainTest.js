@@ -126,8 +126,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from leaf");
 		});
 
-		// not implemented, waits for BACKLOG.md "${scope::expression} never reaches an ancestor"
-		it.fails("climbs to the ancestor the prefix names", async () => {
+		it("climbs to the ancestor the prefix names", async () => {
 			const variableNameValue = variableName("value");
 			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: root, executer });
@@ -135,8 +134,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from root");
 		});
 
-		// not implemented, waits for BACKLOG.md "${scope::expression} never reaches an ancestor"
-		it.fails("evaluates against the addressed link and the contexts above it", async () => {
+		it("evaluates against the addressed link and the contexts above it", async () => {
 			const variableNameRootOnly = variableName("rootOnly");
 			const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer });
 			const middle = new ExpressionResolver({ context: { middleOnly: "from middle" }, name: "middle", parent: root, executer });
@@ -145,8 +143,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from root");
 		});
 
-		// not implemented, waits for BACKLOG.md "${scope::expression} never reaches an ancestor"
-		it.fails("answers from the first link carrying the name, climbing towards the root", async () => {
+		it("answers from the first link carrying the name, climbing towards the root", async () => {
 			const variableNameValue = variableName("value");
 			const outer = new ExpressionResolver({ context: { value: "from outer" }, name: "dup", executer });
 			const inner = new ExpressionResolver({ context: { value: "from inner" }, name: "dup", parent: outer, executer });
@@ -155,8 +152,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from inner");
 		});
 
-		// not implemented, waits for BACKLOG.md "${scope::expression} never reaches an ancestor"
-		it.fails("does not see a link below the one the prefix names", async () => {
+		it("does not see a link below the one the prefix names", async () => {
 			const variableNameLeafOnly = variableName("leafOnly");
 			const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root, executer });
@@ -167,8 +163,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 
 	describe(`Specification 5.4 - a prefix no link carries [${executer}]`, () => {
 
-		// not implemented, waits for BACKLOG.md "${scope::expression} never reaches an ancestor"
-		it.fails("answers undefined", async () => {
+		it("answers undefined", async () => {
 			const variableNameValue = variableName("value");
 			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: root, executer });
@@ -176,8 +171,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("undefined");
 		});
 
-		// not implemented, waits for BACKLOG.md "${scope::expression} never reaches an ancestor"
-		it.fails("lets the default value apply", async () => {
+		it("lets the default value apply", async () => {
 			const variableNameValue = variableName("value");
 			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: root, executer });
