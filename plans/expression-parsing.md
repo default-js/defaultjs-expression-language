@@ -42,7 +42,7 @@ them, and `DECISIONS.md` gets one entry for the batch.
 | 3.1 | A brace inside a string, template or **regex** literal does not count, in neither direction. Comments are **not** examined — a documented limit. | 2026-08-24; regex and comments 2026-08-29 |
 | 3.1 | A `${` met **outside** a literal while a statement is open starts a **new** expression: the open one is abandoned and its text stands. | 2026-08-29 |
 | 3.1 | An opening `${` that never finds its matching brace is not an expression. The text stands unchanged, no error, no partial replacement. | 2026-08-22 |
-| 3.2 | The backslashes immediately before the `$` are counted. An **odd** number escapes the expression: exactly **one** backslash is consumed, nothing is evaluated. An **even** number does not escape: the expression is evaluated and **no** backslash is consumed. There is no general unescaping. | 2026-08-29 |
+| 3.2 | The backslashes immediately before the `$` are counted. An **odd** number escapes the **delimiter**: exactly **one** backslash is consumed and the `${` opens nothing, so the text behind it is scanned like any other and a delimiter inside what would have been the statement resolves. An **even** number does not escape: the expression is evaluated and **no** backslash is consumed. There is no general unescaping. | 2026-08-29, sharpened the same day |
 | 3.3 | The scope prefix is parsed by **both** entry points, through one shared rule. | 2026-08-29 |
 | 3.4 | An empty statement answers `undefined` — the same as `return;` in JavaScript. | 2026-08-29 |
 | 4.3 | `resolveText` evaluates **every occurrence on its own** and replaces **by position**. | 2026-08-22 |
@@ -244,6 +244,60 @@ measured twice, on `ResolveText.bench.js` and on `WarmResolve.bench.js`, once wi
 regex-literal branch and once without, several runs each. The numbers go to Frank and he decides
 whether the branch is kept. If it is dropped, a `}` inside a regex literal becomes a documented
 limit of 3.1 alongside comments. Either outcome belongs in `DECISIONS.md`.
+
+**Done 2026-08-29.** Nine markers came off first — eight in `SyntaxTest.js`, one in
+`EntryPointTest.js` — and the gate was run red: **9 failing cases**, each with the message the
+specification predicts. The two loudest: the nested template literal answered ``${ `a2b` }``, the
+inner placeholder substituted while the expression around it stood, and the escape cases answered
+`resolved resolved` and `resolved \resolved`.
+
+`EXPRESSION`, the four `MATCH_` constants, `resolveMatch` and the `split`/`join` loop are gone.
+`scan` walks a text with `indexOf("${")` and hands each expression to `scanExpression`, which
+counts braces through a five-state stack — code, single- and double-quoted, template, regular
+expression, with a class inside it. `resolveText` builds its answer by position. `npm test` green:
+**388 passed and 30 expected fail (418)**.
+
+**Five tests were added for the three rules settled on 2026-08-29** — the restart, regex literals,
+the parity of the backslash run — because nothing pinned them. Run against the source from before
+the scanner, only **two** of the five go red: the brace inside a regular expression literal, and
+the even backslash run. The other three answer the same on both implementations, which is written
+into the test file rather than implied away: the old regular expression could not cross an inner
+brace either and advanced to the second delimiter by itself, and it captured a single backslash and
+replaced as text, which happens to leave an odd run of three looking correct. They state the rule
+and guard the scanner; they do not prove a fix.
+
+`npm run bench`, three runs per variant. Against stage 1, `mean` in milliseconds:
+
+| case | stage 1 | stage 2 |
+|---|---|---|
+| 20 distinct expressions | 0.0453–0.0464 | 0.0265–0.0280 |
+| one expression 20 times | 0.0034–0.0036 | 0.0258–0.0266 |
+| no expression at all | 0.0005 | 0.0002 |
+| expressions carrying literals | 0.0094–0.0095 | 0.0258–0.0334 |
+| WarmResolve depth 10 (drift indicator) | 0.0015 | 0.0015 |
+
+Read in order: the **distinct** case is 40 % faster, which is the `split`/`join` gone. The
+**repeated** case is 7.5 times slower and that is the rule, not a regression — twenty evaluations
+where there was one, each of them served by the code cache. **No expression at all** is 2.4 times
+faster: `indexOf` beats the old `RegExp.exec`, so the case a template engine hits most often gained
+rather than lost, which was the open risk of this stage. The **literals** case is not comparable,
+as its bench file says: it now evaluates expressions the regular expression could not see. And
+`WarmResolve`, which stage 2 cannot reach, did not move at all — so unlike stage 1 there was no
+batch drift and these numbers can be read as they stand.
+
+**The regex-literal branch costs nothing measurable** and is kept; the numbers, the reasoning and
+the blind spot of the division heuristic are in `DECISIONS.md`.
+
+**One rule was sharpened after the stage was green,** on a case Frank brought: what an odd
+backslash run escapes is the **delimiter**, not a region. The first implementation scanned an
+escaped expression to its matching brace and copied the whole of it out, so
+`Test \${"${test}"} Test` answered itself minus the backslash. It answers
+`Test ${"resolved"} Test` now: the escaped `${` opens nothing, only those two characters are taken
+out of the text, and the delimiter that stood inside what would have been its statement is an
+expression like any other. The expectation was changed first and seen red, then the scanner. The
+change makes `scan` shorter - an escaped delimiter needs no brace matching at all - and it removes
+a question that had no good answer before, what an escaped delimiter without a matching brace would
+mean. `SPECIFICATION.md` 3.2 carries the rule and the example.
 
 **Stage 3 — `resolve` (4.3, 3.2, 3.4).** The `startsWith`/`endsWith` pair keeps its shape — it is
 the correct rule for an input that is one expression in full — and gains three things: the

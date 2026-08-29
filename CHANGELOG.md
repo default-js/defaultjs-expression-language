@@ -34,6 +34,23 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   context value is the executer's own — `ContextObjectExecuter` requires `ctx.value` where the
   other three take `value`, so switching executer can mean rewriting expressions.
 
+### Changed
+
+- **Every occurrence of an expression in a text is evaluated on its own.** `resolveText` used to
+  scan a text once per *distinct* expression and replace all identical occurrences with that one
+  result, so a statement with a side effect ran once however often it stood in the text. Each
+  occurrence is now parsed, evaluated and replaced by position. Visible where a statement is not
+  pure: a text carrying `${counter++}` twice now increments twice. See `SPECIFICATION.md` 4.3.
+
+- **What escapes is the delimiter, and the parity of the backslash run decides.** An odd number of
+  backslashes before the `$` escapes the `${` and exactly one backslash is consumed; an even number
+  does not escape, and no backslash is consumed. Before, a single backslash was recognized and
+  nothing else was defined. No backslash is removed except the one that does the escaping.
+
+  An escaped `${` **opens nothing**, so the text behind it is scanned like any other: a delimiter
+  that would have stood inside its statement is an expression of its own and resolves. See
+  `SPECIFICATION.md` 3.2.
+
 ### Removed
 
 - **`esprima` is no longer a declared runtime dependency.** It was never imported — the two
@@ -42,6 +59,23 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   it in.
 
 ### Fixed
+
+- **An expression carrying a brace of its own was not recognized.** The delimiters were matched by
+  a regular expression that could not see past an inner brace, so an object literal, an arrow
+  function body or a nested template literal inside a statement either left the text untouched or
+  cut the expression at the first inner brace. The worst of the three was the nested template
+  literal: the inner placeholder was matched and substituted while the expression around it stood,
+  which corrupted the text instead of leaving it alone. An expression now ends at its **matching**
+  closing brace, counted by a scanner that knows string, template and regular expression literals;
+  a brace inside one of them does not count. Comments are not examined — a documented limit. An
+  opening delimiter that never finds its matching brace is not an expression, and the text stands
+  as written. See `SPECIFICATION.md` 3.1.
+
+- **An escaped expression was resolved anyway where the same expression also stood unescaped.**
+  Replacement went through `split`/`join` over the whole text, which cannot tell one occurrence
+  from another: an escaped occurrence was replaced by the plain expression and evaluated on the
+  next round, and an unescaped one left its backslash standing in front of the result. Escaping is
+  decided per occurrence now. See `SPECIFICATION.md` 3.2.
 
 - **`${scope::statement}` never reached an ancestor of the chain.** The internal walk was
   declared as `(aExecuter, aResolver, aExpression, aFilter, aDefault)` but recursed with its five

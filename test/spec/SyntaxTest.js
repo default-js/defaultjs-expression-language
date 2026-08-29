@@ -11,26 +11,22 @@ import { ExpressionResolver } from "../../index.js";
 
 describe("Specification 3.1 - an expression ends at the matching closing brace", () => {
 
-	// not implemented, waits for BACKLOG.md "An expression that contains braces is not recognized"
-	it.fails("resolveText evaluates an object literal inside the expression", async () => {
+	it("resolveText evaluates an object literal inside the expression", async () => {
 		const result = await ExpressionResolver.resolveText("${ {a: 1}.a }", {});
 		expect(result).toBe("1");
 	});
 
-	// not implemented, waits for BACKLOG.md "An expression that contains braces is not recognized"
-	it.fails("resolveText ends the expression at the matching brace, not at the last one", async () => {
+	it("resolveText ends the expression at the matching brace, not at the last one", async () => {
 		const result = await ExpressionResolver.resolveText("a ${ {v: 2}.v } b", {});
 		expect(result).toBe("a 2 b");
 	});
 
-	// not implemented, waits for BACKLOG.md "An expression that contains braces is not recognized"
-	it.fails("resolveText evaluates an arrow function body inside the expression", async () => {
+	it("resolveText evaluates an arrow function body inside the expression", async () => {
 		const result = await ExpressionResolver.resolveText("${ (() => { return 3; })() }", {});
 		expect(result).toBe("3");
 	});
 
-	// not implemented, waits for BACKLOG.md "An expression that contains braces is not recognized"
-	it.fails("resolveText evaluates a nested template literal", async () => {
+	it("resolveText evaluates a nested template literal", async () => {
 		const result = await ExpressionResolver.resolveText("${ `a${1 + 1}b` }", {});
 		expect(result).toBe("a2b");
 	});
@@ -40,14 +36,12 @@ describe("Specification 3.1 - an expression ends at the matching closing brace",
 		expect(result).toBe(4);
 	});
 
-	// not implemented, waits for BACKLOG.md "An expression that contains braces is not recognized"
-	it.fails("does not count a closing brace inside a double quoted string", async () => {
+	it("does not count a closing brace inside a double quoted string", async () => {
 		const result = await ExpressionResolver.resolveText("a ${ \"}\" } b", {});
 		expect(result).toBe("a } b");
 	});
 
-	// not implemented, waits for BACKLOG.md "An expression that contains braces is not recognized"
-	it.fails("does not count an opening brace inside a single quoted string", async () => {
+	it("does not count an opening brace inside a single quoted string", async () => {
 		const result = await ExpressionResolver.resolveText("a ${ '{' } b", {});
 		expect(result).toBe("a { b");
 	});
@@ -55,6 +49,32 @@ describe("Specification 3.1 - an expression ends at the matching closing brace",
 	it("leaves the text standing where an opening delimiter has no matching brace", async () => {
 		const result = await ExpressionResolver.resolveText("a ${ value b", { value: "resolved" });
 		expect(result).toBe("a ${ value b");
+	});
+
+	// A "${" met while a statement is open is the start of a new expression, not part of the open
+	// one - so the abandoned start stays text and the second expression resolves.
+	//
+	// This one cannot tell the implementations apart, verified 2026-08-29 against the source from
+	// before the scanner: the old regular expression could not cross the inner brace either and
+	// advanced to the second delimiter by itself, answering the same text. It states the rule and
+	// guards the scanner against a regression; it does not prove the rule was broken before.
+	it("starts a new expression where a delimiter opens inside an open statement", async () => {
+		const result = await ExpressionResolver.resolveText("a ${ x b ${value}", { value: "resolved" });
+		expect(result).toBe("a ${ x b resolved");
+	});
+
+	it("does not count a brace inside a regular expression literal", async () => {
+		const result = await ExpressionResolver.resolveText("a ${ /}/.source } b", {});
+		expect(result).toBe("a } b");
+	});
+
+	// The counterpart of the test above: a slash is only a literal where one can stand. Getting
+	// this wrong would swallow the rest of the statement into a literal that never ends. Nothing
+	// in the implementation before the scanner read literals at all, so this passed there as well
+	// - it guards the division-or-regex heuristic, it does not pin a fix.
+	it("reads a slash between two operands as division", async () => {
+		const result = await ExpressionResolver.resolveText("${ a / b }", { a: 6, b: 3 });
+		expect(result).toBe("2");
 	});
 });
 
@@ -65,16 +85,37 @@ describe("Specification 3.2 - a backslash before the $ escapes the expression", 
 		expect(result).toBe("${value}");
 	});
 
-	// not implemented, waits for BACKLOG.md "An escaped expression is resolved anyway"
-	it.fails("resolveText escapes only the occurrence that carries the backslash", async () => {
+	it("resolveText escapes only the occurrence that carries the backslash", async () => {
 		const result = await ExpressionResolver.resolveText("\\${value} ${value}", { value: "resolved" });
 		expect(result).toBe("${value} resolved");
 	});
 
-	// not implemented, waits for BACKLOG.md "An escaped expression is resolved anyway"
-	it.fails("escapes the occurrence carrying the backslash even when an unescaped one comes first", async () => {
+	it("escapes the occurrence carrying the backslash even when an unescaped one comes first", async () => {
 		const result = await ExpressionResolver.resolveText("${value} \\${value}", { value: "resolved" });
 		expect(result).toBe("resolved ${value}");
+	});
+
+	// What escapes is an odd number of backslashes before the "$", and exactly one of them is
+	// consumed - there is no general unescaping of the text around an expression.
+	it("evaluates the expression where an even number of backslashes stands before it", async () => {
+		const result = await ExpressionResolver.resolveText("\\\\${value}", { value: "resolved" });
+		expect(result).toBe("\\\\resolved");
+	});
+
+	// Also passes on the source from before the scanner, verified 2026-08-29: it captured a single
+	// backslash and replaced the occurrence as text, which happens to leave the other two standing.
+	// Here to state the rule, not to prove a fix.
+	it("consumes exactly one backslash of an odd run and leaves the rest standing", async () => {
+		const result = await ExpressionResolver.resolveText("\\\\\\${value}", { value: "resolved" });
+		expect(result).toBe("\\\\${value}");
+	});
+
+	// What carries the escape is the delimiter, not a region: the escaped "${" opens nothing, so
+	// the text behind it is scanned like any other and the delimiter inside what would have been
+	// its statement is an expression of its own.
+	it("escapes the delimiter alone, so an expression behind it still resolves", async () => {
+		const result = await ExpressionResolver.resolveText("Test \\${\"${test}\"} Test", { test: "resolved" });
+		expect(result).toBe("Test ${\"resolved\"} Test");
 	});
 
 	it("resolve leaves an escaped expression standing, without the backslash", async () => {

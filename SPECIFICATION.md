@@ -54,28 +54,44 @@ An expression begins with `${` and ends at the **matching** closing brace. Brace
 statement — an object literal, an arrow function body, a nested template literal — are part of
 the statement and must be counted, not terminated on.
 
-Two rules bound that counting.
+Three rules bound that counting.
 
-**A brace inside a string literal does not count.** `${ "}" }` is one expression whose statement
-is `"}"`, and the expression ends at the brace that follows it. The same holds for `'` and for a
-template literal, and it holds in both directions: neither an opening nor a closing brace inside a
-literal changes the count.
+**A brace inside a literal does not count.** `${ "}" }` is one expression whose statement is
+`"}"`, and the expression ends at the brace that follows it. The same holds for `'`, for a
+template literal and for a regular expression literal, and it holds in both directions: neither an
+opening nor a closing brace inside a literal changes the count.
+
+Two limits of that rule are known and deliberate. **Comments are not examined** — a brace inside
+`/* … */` or behind `//` counts like any other. And whether a `/` opens a regular expression
+literal or divides is decided by the character before it, so a literal that legitimately follows
+`)` or `]` — `${ (() => { if (a) /x/.test(b) })() }` is the shape — is read as division. Neither
+matters unless the comment or the literal also carries a brace.
 
 **An opening `${` without a matching closing brace is not an expression.** The text stands as
 written, unchanged, and nothing is evaluated. There is no error and no partial replacement.
 
-*Not yet implemented* — the current regular expression cannot nest; see `BACKLOG.md`, "An
-expression that contains braces is not recognized".
+**A `${` met outside a literal while a statement is still open starts a new expression.** The open
+one is abandoned and the text it covered stands as written. So `"a ${ x b ${value}"` answers
+`"a ${ x b "` with the second expression resolved behind it. Everything between the delimiters is
+meant to be JavaScript, and a second opening delimiter cannot be part of it.
 
 ### 3.2 Escaping
 
-A backslash directly before the `$` escapes the expression. It is not evaluated, and the text
-stands as written without the backslash. This holds per occurrence: an escaped one stands even
-where the same expression appears unescaped elsewhere in the text, and the other way round.
+The backslashes directly before the `$` are counted. An **odd** number escapes the delimiter: it
+opens nothing, and exactly **one** backslash is consumed. An **even** number does not escape: the
+expression is evaluated and no backslash is consumed. So `\${value}` answers `${value}`,
+`\\${value}` answers two backslashes followed by the value, and `\\\${value}` answers
+`\\${value}`. No backslash is ever removed except the one that does the escaping — this is not a
+general unescaping of the text.
 
-*Not yet implemented* — where both forms appear in one text, the escape is lost or the backslash
-is left in front of the resolved value; see `BACKLOG.md`, "An escaped expression is resolved
-anyway".
+**What carries the escape is the delimiter, not a region.** An escaped `${` opens nothing, so the
+text behind it is scanned like any other — a delimiter that would have stood inside its statement
+is an expression of its own and resolves. `Test \${"${test}"} Test` therefore answers
+`Test ${"resolved"} Test`, not the text unchanged: the outer delimiter is escaped and stands, the
+inner one is not and is evaluated.
+
+This holds per occurrence: an escaped one stands even where the same expression appears unescaped
+elsewhere in the text, and the other way round.
 
 ### 3.3 Scope prefix
 
@@ -161,9 +177,6 @@ object, a promise's fulfilment value.
 expression replaced by its value, cast towards string. **Every occurrence is evaluated on its
 own**, so an expression with a side effect means what it says: `${counter++}` twice in one text
 increments twice.
-
-*Not yet implemented* — today a text is scanned per distinct expression and all identical
-occurrences share one evaluation; see `BACKLOG.md`.
 
 `resolve` additionally accepts a **bare statement** without the `${…}` delimiters. The scope
 prefix is recognized only in the delimited form: `resolve("${scope::statement}")` addresses the
@@ -539,10 +552,7 @@ Every rule above that the code does not keep today, in one place:
 
 | Rule | `BACKLOG.md` entry |
 |---|---|
-| 3.1 matching closing brace, string literals, an unterminated `${` | An expression that contains braces is not recognized |
-| 3.2 escaping one occurrence while another stands unescaped | An escaped expression is resolved anyway |
 | 4.1 the configuration form of the static calls | The static entry points take no configuration object |
-| 4.3 one evaluation per occurrence | An expression that contains braces is not recognized, decision C |
 | 4.3 `resolve` and the scope prefix | The instance `resolve()` does not understand the scope syntax at all |
 | 5.1 a generated name where none was passed | `effectiveChain` is a copy of `chain`, and a resolver without a name |
 | 5.5 `effectiveChain` and `contextChain` skip links without a context | `effectiveChain` is a copy of `chain`, and a resolver without a name |

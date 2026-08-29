@@ -22,8 +22,9 @@ Entries here are independent of each other. An undertaking whose steps depend on
 > `resolve` and its scope syntax, the matching-brace parser, and the escape that reaches the
 > wrong occurrence. They share three functions of one file, so they are ordered in
 > `plans/expression-parsing.md` rather than picked up one by one. Read it before touching
-> `src/ExpressionResolver.js`. The scope walk landed on 2026-08-29 in stage 1 and its entry
-> is gone; the other three are still open below.
+> `src/ExpressionResolver.js`. Three of the four landed on 2026-08-29 — the scope walk in stage 1,
+> the matching-brace parser and the escape in stage 2 — and their entries are gone. What is left
+> of the plan is the instance `resolve`, the empty statement `${}`, and the error policy.
 
 - [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
   `defaultjs-common-utils` already went this way, so the two packages diverge today. The
@@ -320,54 +321,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `deleteDataData` raises a `TypeError`, not because an unknown scope is rejected on purpose. It
   carries no `fails` marker, since it does pass; it starts proving its rule the moment the typo
   is gone. Re-read it with this fix and make sure it still passes for the right reason.
-
-- [ ] **An expression that contains braces is not recognized — there is no matching-brace parsing.**
-  Target: `SPECIFICATION.md` 3.1 — an expression is `${`, everything up to the **matching**
-  closing brace, and that brace.
-  `EXPRESSION` (`src/ExpressionResolver.js:13`) matches `[^\{\}]+` between the delimiters, so
-  anything carrying a brace of its own is missed: an object literal `${ {a:1} }`, an arrow
-  function body, a nested template literal. `resolveText` then either leaves the text alone or
-  cuts the expression at the first inner brace. `resolve()` is only half affected — it strips
-  `${`/`}` by `startsWith`/`endsWith` instead of by the regex — which is a second, independent
-  parsing rule for the same syntax. Named by Frank on 2026-08-22 during the specification
-  interview as behaviour that has to be implemented, not as an open question. **Decided
-  2026-08-22** (`SPECIFICATION.md` 4.3): the same single-pass parser also replaces the `split`/`join`
-  replacement in `resolveText`, so every occurrence of an expression is evaluated on its own
-  instead of once per distinct expression, and the quadratic behaviour over the text goes away.
-  Consumer-visible, so the outcome belongs in `CHANGELOG.md`. Expect further findings here once
-  tests exist. **What the parser has to do, decided 2026-08-24** (`DECISIONS.md`, `SPECIFICATION.md`
-  3.1) and pinned by tests marked `fails`: a brace inside a string literal — `'`, `"` or a template
-  literal — does not count, in neither direction, so `${ "}" }` is one expression with the
-  statement `"}"`; and an opening `${` that never finds its matching brace is not an expression at
-  all, the text stands unchanged with nothing evaluated and no error. Counting characters is
-  therefore not enough — the parser has to know literals. **Two questions this fix still has to
-  answer**, both found while probing the edge cases on 2026-08-24 and neither decided: what an
-  escaped backslash before an expression means — today `"\\${value}"` leaves both backslashes and
-  resolves nothing, while 3.2 only regulates a single backslash — and what an empty statement
-  `${}` evaluates to; today the two entry points disagree, `resolve` answers the default and
-  `resolveText` leaves `${}` standing.
-  **A third symptom, verified 2026-08-24** by the conformance test of 3.1: where the
-  statement carries a nested template literal, the regex matches the *inner* placeholder of that
-  literal, so a fragment of the statement is evaluated and substituted while the expression around
-  it stands — `"${ `a${1 + 1}b` }"` answers ``"${ `a2b` }"``. The text is corrupted rather than
-  left alone, which makes this the loudest of the three symptoms.
-
-- [ ] **An escaped expression is resolved anyway when the same expression also stands unescaped in
-  the text.**
-  Target: `SPECIFICATION.md` 3.2 — a backslash before the `$` escapes that occurrence: it is not
-  evaluated and the text stands as written, without the backslash.
-  `resolveText` replaces by `text.split(match[0]).join(result)`
-  (`src/ExpressionResolver.js:281`), and the escaped occurrence differs from the unescaped one by
-  nothing but that backslash, so one `split` reaches both. Two symptoms, each verified 2026-08-24
-  by a conformance test of section 3.2: `"\${value} ${value}"` answers `"resolved resolved"` —
-  the escaped match is replaced by `${value}` first, and the next round finds that replacement
-  again and evaluates it; `"${value} \${value}"` answers `"resolved \resolved"` — the unescaped
-  match is replaced everywhere it occurs, and the backslash is left standing in front of the
-  result. A text carrying only escaped occurrences is correct, which is why this survived
-  unnoticed. Same root as the entry above and covered by the same fix: a single-pass parser knows
-  which occurrence it stands on and replaces by position instead of by `split`/`join`.
-  Consumer-visible, so the outcome belongs in `CHANGELOG.md`. Found 2026-08-24 in stage 1 of
-  `plans/specification-conformance-tests.md`.
 
 - [ ] **A resolver built on the global object throws on every lookup.**
   Target: `SPECIFICATION.md` 6.4 — the global object stays a supported context object.

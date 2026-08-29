@@ -125,8 +125,7 @@ describe("Specification 4.3 - resolve answers a value, resolveText answers a tex
 		expect(result).toBe("one and two");
 	});
 
-	// not implemented, waits for BACKLOG.md "An expression that contains braces is not recognized", decision C
-	it.fails("resolveText evaluates every occurrence on its own", async () => {
+	it("resolveText evaluates every occurrence on its own", async () => {
 		const result = await ExpressionResolver.resolveText("${counter++} ${counter++}", { counter: 0 });
 		expect(result).toBe("0 1");
 	});

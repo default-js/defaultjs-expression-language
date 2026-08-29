@@ -10,11 +10,23 @@ import Executer from "./Executer.js";
 let DEFAULT_EXECUTER = DefaultExecuter;
 
 const EXECUTION_WARN_TIMEOUT = 1000;
-const EXPRESSION = /(\\?)(\$\{(([a-zA-Z0-9\-_\s]+)::)?([^\{\}]+)\})/;
-const MATCH_ESCAPED = 1;
-const MATCH_FULL_EXPRESSION = 2;
-const MATCH_EXPRESSION_SCOPE = 4;
-const MATCH_EXPRESSION_STATEMENT = 5;
+const EXPRESSION_START = "${";
+const EXPRESSION_SCOPE = /^([a-zA-Z0-9\-_\s]+)::/;
+
+// the scanner states - everything that is not code hides the braces inside it, see
+// SPECIFICATION.md 3.1
+const CODE = 0;
+const SINGLE_QUOTED = 1;
+const DOUBLE_QUOTED = 2;
+const TEMPLATE = 3;
+const REGEX = 4;
+const REGEX_CLASS = 5;
+
+// a "/" continues an expression instead of opening a regular expression when it follows one of
+// these - the classic division-or-regex question, decided on the last character that is not
+// whitespace
+const BEFORE_DIVISION = /[a-zA-Z0-9_$)\]]/;
+const WHITESPACE = /\s/;
 
 const DEFAULT_NOT_DEFINED = new DefaultValue();
 const toDefaultValue = (value) => {
@@ -76,18 +88,133 @@ const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpres
 	return withDefault(await execute(aExecuter, aExpression, aResolver.context), aDefault);
 };
 
-const resolveMatch = async (aExecuter, resolver, match, defaultValue) => {
-	if (match[MATCH_ESCAPED]) return match[MATCH_FULL_EXPRESSION];
-
-	return resolve(aExecuter, resolver, match[MATCH_EXPRESSION_STATEMENT], normalize(match[MATCH_EXPRESSION_SCOPE]), defaultValue);
-};
-
 const normalize = (value) => {
 	if (value) {
 		value = value.trim();
 		return value.length == 0 ? null : value;
 	}
 	return null;
+};
+
+const toText = (aValue) => (typeof aValue === "undefined" ? "undefined" : aValue === null ? "null" : aValue);
+
+const startsRegex = (aText, aIndex) => {
+	let index = aIndex - 1;
+	while (index >= 0 && WHITESPACE.test(aText[index])) index--;
+
+	return index < 0 || !BEFORE_DIVISION.test(aText[index]);
+};
+
+const countBackslashes = (aText, aIndex) => {
+	let count = 0;
+	while (aIndex - count > 0 && aText[aIndex - count - 1] === "\\") count++;
+
+	return count;
+};
+
+/**
+ * Scans the one expression that opens with the "${" at aStart, counting braces but not the ones
+ * hidden inside a literal.
+ *
+ * Answers a positive index directly after the matching closing brace; 0 where the text ends
+ * before that brace, which per SPECIFICATION.md 3.1 means there is no expression here at all;
+ * and the negated index of another "${" met outside a literal, which starts an expression of its
+ * own and abandons this one.
+ */
+const scanExpression = (aText, aStart) => {
+	const length = aText.length;
+	const stack = [CODE];
+	let index = aStart + 2;
+
+	while (index < length) {
+		const char = aText[index];
+		switch (stack[stack.length - 1]) {
+			case CODE:
+				if (char === "{") stack.push(CODE);
+				else if (char === "}") {
+					stack.pop();
+					if (stack.length === 0) return index + 1;
+				} else if (char === "'") stack.push(SINGLE_QUOTED);
+				else if (char === '"') stack.push(DOUBLE_QUOTED);
+				else if (char === "`") stack.push(TEMPLATE);
+				else if (char === "$" && aText[index + 1] === "{") return -index;
+				else if (char === "/" && startsRegex(aText, index)) stack.push(REGEX);
+				break;
+			case SINGLE_QUOTED:
+				if (char === "\\") index++;
+				else if (char === "'") stack.pop();
+				break;
+			case DOUBLE_QUOTED:
+				if (char === "\\") index++;
+				else if (char === '"') stack.pop();
+				break;
+			case TEMPLATE:
+				if (char === "\\") index++;
+				else if (char === "`") stack.pop();
+				else if (char === "$" && aText[index + 1] === "{") {
+					stack.push(CODE);
+					index++;
+				}
+				break;
+			case REGEX:
+				if (char === "\\") index++;
+				else if (char === "[") stack.push(REGEX_CLASS);
+				else if (char === "/") stack.pop();
+				break;
+			case REGEX_CLASS:
+				if (char === "\\") index++;
+				else if (char === "]") stack.pop();
+				break;
+		}
+		index++;
+	}
+
+	return 0;
+};
+
+/**
+ * Answers every expression of a text, in the order they stand, or null where the text carries
+ * none. `start` is the index of the "$", `end` the index after the matching closing brace, so a
+ * caller replaces by position and never touches an occurrence twice.
+ */
+const scan = (aText) => {
+	let occurrences = null;
+	let index = aText.indexOf(EXPRESSION_START);
+
+	while (index >= 0) {
+		// 3.2: an odd run of backslashes escapes the delimiter itself. It opens nothing, so only
+		// those two characters are taken out of the text and the scan carries on behind them -
+		// what would have been the statement is ordinary text and may hold expressions of its own.
+		if (countBackslashes(aText, index) % 2 === 1) {
+			if (!occurrences) occurrences = [];
+			occurrences.push({ start: index, end: index + 2, escaped: true, scope: null, statement: null });
+			index = aText.indexOf(EXPRESSION_START, index + 2);
+			continue;
+		}
+
+		const end = scanExpression(aText, index);
+		// no matching brace: the text stands as written, and nothing behind it can be an
+		// expression either - a "${" outside a literal would have restarted the scan instead
+		if (end === 0) break;
+		if (end < 0) {
+			index = -end;
+			continue;
+		}
+
+		const content = aText.substring(index + 2, end - 1);
+		const scope = EXPRESSION_SCOPE.exec(content);
+		if (!occurrences) occurrences = [];
+		occurrences.push({
+			start: index,
+			end: end,
+			escaped: false,
+			scope: scope ? normalize(scope[1]) : null,
+			statement: normalize(scope ? content.substring(scope[0].length) : content)
+		});
+		index = aText.indexOf(EXPRESSION_START, end);
+	}
+
+	return occurrences;
 };
 
 /**
@@ -277,17 +404,26 @@ export default class ExpressionResolver {
 	 * @returns {Promise<*>}
 	 */
 	async resolveText(aText, aDefault) {
-		let text = aText;
-		let temp = aText; // required to prevent infinity loop
-		let match = EXPRESSION.exec(text);
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
-		while (match != null) {
-			const result = await resolveMatch(this.#executer, this, match, defaultValue);
-			temp = temp.split(match[0]).join(); // remove current match for next loop
-			text = text.split(match[0]).join(typeof result === "undefined" ? "undefined" : result == null ? "null" : result);
-			match = EXPRESSION.exec(temp);
+		if (typeof aText !== "string") return aText;
+
+		const occurrences = scan(aText);
+		if (!occurrences) return aText;
+
+		let text = "";
+		let position = 0;
+		for (const occurrence of occurrences) {
+			if (occurrence.escaped)
+				// 3.2: the escaping backslash is consumed, the expression itself stands as written
+				text += aText.substring(position, occurrence.start - 1) + aText.substring(occurrence.start, occurrence.end);
+			else {
+				const result = await resolve(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue);
+				text += aText.substring(position, occurrence.start) + toText(result);
+			}
+			position = occurrence.end;
 		}
-		return text;
+
+		return text + aText.substring(position);
 	}
 
 	/**

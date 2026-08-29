@@ -19,6 +19,47 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-29 — Does the expression scanner recognize regular expression literals?
+
+**Decision:** Yes. Inside a statement a `/` opens a regular expression literal unless the last
+character that is not whitespace is an identifier character, a digit, `)` or `]` — then it is
+division. Braces inside such a literal do not count towards the matching closing brace, and a
+character class hides a `/`. Comments stay out: a brace inside `/* … */` or behind `//` counts like
+any other, which `SPECIFICATION.md` 3.1 names as a limit.
+
+**Reasoning:** Frank made the branch conditional on its cost, so it was measured both ways on
+2026-08-29, three runs each, immediately after the scanner replaced the regular expression. The two
+variants are indistinguishable — `mean` in milliseconds, over the four cases of
+`ResolveText.bench.js`:
+
+| case | with the branch | without it |
+|---|---|---|
+| 20 distinct expressions | 0.0265–0.0280 | 0.0267–0.0295 |
+| one expression 20 times | 0.0258–0.0266 | 0.0251–0.0270 |
+| no expression at all | 0.0002 | 0.0002 |
+| expressions carrying literals | 0.0258–0.0334 | 0.0253–0.0259 |
+
+Every difference is inside the run-to-run spread, and `WarmResolve`, which no variant touches,
+answered identically in all six runs (0.0015 ms at depth 10), so the machine did not drift between
+the two halves of the comparison. The reason the branch is free is that the per-character work only
+runs **inside** an expression: a text is walked by `indexOf("${")`, so a document with little
+expression in it never enters the state machine at all.
+
+With no cost to weigh, correctness decides alone: without the branch `${ /}/.test(x) }` ends at the
+brace inside the literal, and the statement is cut in the middle.
+
+**Alternatives:** Leaving regular expression literals out and documenting them as a limit next to
+comments, which is what the specification would have said had the measurement gone the other way.
+A full JavaScript lexer instead of the heuristic — rejected as far more than 3.1 asks for, and it
+would have to be maintained against the language.
+
+**Consequences:** The scanner carries five states instead of three, and one heuristic that can be
+wrong: where a regular expression legitimately follows `)` or `]` — `${ (() => { if (a) /x/.test(b)
+})() }` is the shape — the `/` is read as division. Nothing is cut unless that literal also carries
+a brace. The everyday cases are safe in both directions, because division follows a value and a
+literal does not. `test/spec/SyntaxTest.js` pins both directions, and the division test is there to
+keep the heuristic honest rather than to prove a fix.
+
 ## 2026-08-24 — How does a test state a rule the code does not keep yet?
 
 **Decision:** It is written as a normal test and marked `it.fails`. Vitest then counts it as passing
