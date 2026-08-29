@@ -36,9 +36,11 @@ const toDefaultValue = (value) => {
 };
 
 const execute = async function (anExecuter, aStatement, aContext) {
+	// 3.4: an empty statement answers undefined, the same as `return;` in JavaScript
+	if (aStatement == null) return undefined;
 	if (typeof aStatement !== "string") return aStatement;
 	aStatement = normalize(aStatement);
-	if (aStatement == null) return aStatement;
+	if (aStatement == null) return undefined;
 
 	try {
 		return await new Promise((resolve) => {
@@ -103,6 +105,17 @@ const startsRegex = (aText, aIndex) => {
 	while (index >= 0 && WHITESPACE.test(aText[index])) index--;
 
 	return index < 0 || !BEFORE_DIVISION.test(aText[index]);
+};
+
+/**
+ * Splits the text between the delimiters into the scope prefix of 3.3 and the statement. Both
+ * entry points parse the prefix through this, so there is one rule for it and not two.
+ */
+const parseScope = (aContent) => {
+	const scope = EXPRESSION_SCOPE.exec(aContent);
+	if (!scope) return { scope: null, statement: normalize(aContent) };
+
+	return { scope: normalize(scope[1]), statement: normalize(aContent.substring(scope[0].length)) };
 };
 
 const countBackslashes = (aText, aIndex) => {
@@ -201,16 +214,9 @@ const scan = (aText) => {
 			continue;
 		}
 
-		const content = aText.substring(index + 2, end - 1);
-		const scope = EXPRESSION_SCOPE.exec(content);
+		const { scope, statement } = parseScope(aText.substring(index + 2, end - 1));
 		if (!occurrences) occurrences = [];
-		occurrences.push({
-			start: index,
-			end: end,
-			escaped: false,
-			scope: scope ? normalize(scope[1]) : null,
-			statement: normalize(scope ? content.substring(scope[0].length) : content)
-		});
+		occurrences.push({ start: index, end: end, escaped: false, scope: scope, statement: statement });
 		index = aText.indexOf(EXPRESSION_START, end);
 	}
 
@@ -387,10 +393,26 @@ export default class ExpressionResolver {
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		try {
 			aExpression = aExpression.trim();
-			if (aExpression.startsWith("\\${")) return aExpression.substring(1);
-			else if (aExpression.startsWith("${") && aExpression.endsWith("}")) return await resolve(this.#executer, this, normalize(aExpression.substring(2, aExpression.length - 1)), null, defaultValue);
-			else return await resolve(this.#executer, this, normalize(aExpression), null, defaultValue);
+			const delimiter = aExpression.indexOf(EXPRESSION_START);
+			const backslashes = delimiter > 0 ? countBackslashes(aExpression, delimiter) : 0;
+
+			// 3.2: an odd run escapes the delimiter, so the input is no expression at all and
+			// stands as written, one backslash less
+			if (backslashes === delimiter && backslashes % 2 === 1) return aExpression.substring(1);
+
+			// 4.3: the whole input is one expression, so its end is the end of the input
+			if (delimiter === 0) {
+				if (!aExpression.endsWith("}")) throw new SyntaxError(`Expression does not end with "}": ${aExpression}`);
+
+				const { scope, statement } = parseScope(aExpression.substring(2, aExpression.length - 1));
+				return await resolve(this.#executer, this, statement, scope, defaultValue);
+			}
+
+			// 4.3: anything else is a statement in full, and carries no scope prefix
+			return await resolve(this.#executer, this, normalize(aExpression), null, defaultValue);
 		} catch (e) {
+			// a form this method rejects itself is not an execution error - see SPECIFICATION.md 7
+			if (e instanceof SyntaxError) throw e;
 			console.error('error at executing statment"', aExpression, '":', e);
 			return defaultValue.hasValue ? defaultValue.value : aExpression;
 		}

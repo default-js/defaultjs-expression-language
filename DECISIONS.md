@@ -19,6 +19,52 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-29 — What do the open edges of the expression syntax do?
+
+**Decision:** Four rules, all now in `SPECIFICATION.md`, settled with Frank before the parser was
+written.
+
+**Escaping is about the delimiter, and parity decides.** The backslashes before the `$` are
+counted: an odd number escapes the `${`, an even number does not, and exactly one backslash is
+consumed by an escape. What is escaped is the **delimiter, not a region** — an escaped `${` opens
+nothing, so the text behind it is scanned like any other and a delimiter inside what would have
+been its statement is an expression of its own. `Test \${"${test}"} Test` answers
+`Test ${"resolved"} Test`.
+
+**An empty statement answers `undefined`**, the same as `return;` in JavaScript.
+
+**A second `${` outside a literal starts a new expression.** Everything between the delimiters is
+meant to be JavaScript, and a second opening delimiter cannot be part of it, so the open one is
+abandoned and its text stands.
+
+**`resolve` decides the form on the first characters alone.** An input that starts with `${` is
+the delimited form and must end with `}` — otherwise it is rejected with a `SyntaxError`, which is
+thrown rather than caught. Anything else is a statement in full and carries no scope prefix.
+
+**Reasoning:** These are the edges that had no answer when the specification was written, and the
+parser had to be told what to do at each of them. Parity is the rule every language with an escape
+character uses, and it is the only one under which an escaped backslash can be written down at all.
+The delimiter reading of the escape follows from there: the syntax has no concept of a region, so
+escaping cannot open one, and the alternative — skipping the whole would-be statement — would make
+one backslash silently disable expressions the author cannot see. `undefined` for the empty
+statement is what the language itself answers, and 3.4 promises arbitrary JavaScript, so the
+resolver has no business inventing something else. For `resolve`, the input is one expression by
+definition, so its end is the end of the input and no brace matching is needed at all — which is
+also why the scanner stayed a private helper of `resolveText` instead of becoming its own module.
+
+**Alternatives:** For `resolve`, checking more than the two delimiters — rejected, because whether
+the statement is valid JavaScript is the executer's business and it reports it. For the escape,
+treating an escaped expression as a region that stands verbatim — that was the first
+implementation, and Frank rejected it: it hides expressions behind a single backslash. For the
+empty statement, answering `null` — that was the accident the code had, and nothing argued for it.
+
+**Consequences:** `resolve` can now throw, which section 7 had to be extended for: a rejected form
+is not an execution error, and nothing has run at that point. That is the smaller half of the
+error-policy question; the larger one — whether a statement that does not compile propagates out of
+`resolve` — is still open and carried in `plans/expression-parsing.md`. The escape rule makes an
+escaped delimiter cheaper to scan than an unescaped one, since no brace matching is needed. And
+`${}` becomes an expression where it used to be text, so a text carrying it changes its answer.
+
 ## 2026-08-29 — Does the expression scanner recognize regular expression literals?
 
 **Decision:** Yes. Inside a statement a `/` opens a regular expression literal unless the last

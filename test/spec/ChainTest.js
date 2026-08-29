@@ -10,8 +10,9 @@ import { EXECUTERS } from "../TestUtils.js";
  * 5.1 and 5.5 never execute a statement - they read name, parent and the three chain getters off
  * ExpressionResolver - so they run once.
  *
- * Section 5.3 and 5.4 are reachable through resolveText only: the instance resolve() does not
- * parse a scope prefix at all, which is a rule of 4.3 and pinned there.
+ * Section 5.3 and 5.4 are written against resolveText here. Since 2026-08-29 the instance
+ * resolve() parses a scope prefix as well - that it does, and that the walk carries through it,
+ * is pinned in EntryPointTest.js where the rule belongs (4.3).
  *
  * The `variableName` function of the EXECUTERS table (test/TestUtils.js) is what makes the loop
  * honest: it answers the name a statement has to use to reach a given property of the context

@@ -135,11 +135,39 @@ describe("Specification 4.3 - resolve answers a value, resolveText answers a tex
 		expect(result).toBe(3);
 	});
 
-	// not implemented, waits for BACKLOG.md "The instance `resolve()` does not understand the scope syntax"
-	it.fails("resolve recognizes the scope prefix in the delimited form", async () => {
+	it("resolve recognizes the scope prefix in the delimited form", async () => {
 		const resolver = new ExpressionResolver({ name: "scope", context: { value: "from scope" } });
 		const result = await resolver.resolve("${scope::value}");
 		expect(result).toBe("from scope");
+	});
+
+	it("resolve reaches an ancestor through the scope prefix", async () => {
+		const root = new ExpressionResolver({ name: "root", context: { value: "from root" } });
+		const leaf = new ExpressionResolver({ name: "leaf", context: { value: "from leaf" }, parent: root });
+		const result = await leaf.resolve("${root::value}");
+		expect(result).toBe("from root");
+	});
+
+	// Cannot tell the implementations apart, verified 2026-08-29: before the prefix was parsed at
+	// all, "nowhere::value" reached the executer as a statement, failed to compile and the default
+	// applied through the error path instead of through 5.4. Same answer, different reason.
+	it("resolve answers the default value where no link carries the prefix", async () => {
+		const resolver = new ExpressionResolver({ name: "scope", context: { value: "from scope" } });
+		const result = await resolver.resolve("${nowhere::value}", "fallback");
+		expect(result).toBe("fallback");
+	});
+
+	// A form the method rejects itself is not an execution error: it is thrown rather than answered
+	// with the default value. The narrow matcher surface of this suite is kept by catching by hand.
+	it("resolve throws where a delimited expression does not end with a closing brace", async () => {
+		const resolver = new ExpressionResolver({ context: { value: "resolved" } });
+		let error = null;
+		try {
+			await resolver.resolve("${ value", "fallback");
+		} catch (e) {
+			error = e;
+		}
+		expect(error instanceof SyntaxError).toBe(true);
 	});
 
 	it("resolve does not recognize a scope prefix without the delimiters", async () => {

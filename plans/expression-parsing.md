@@ -320,6 +320,43 @@ carries falling back to the default — the combination of stage 1 and stage 3 t
 today. The header comment of `ChainTest.js` says 5.3 and 5.4 are reachable through `resolveText`
 only; that stops being true here.
 
+**Done 2026-08-29.** The marker came off and five tests were added; the gate ran red with **six**
+failing cases, each for its own reason — the prefix answering `undefined` because the filter was
+hardcoded to `null`, the ancestor case the same, no throw where one is required, an odd run of
+three backslashes answering `undefined`, and the empty statement answering `null` in both entry
+points.
+
+`resolve` decides on `indexOf("${")` now: an odd backslash run before it means the input is no
+expression and stands one backslash lighter, a delimiter at position 0 means the delimited form,
+and anything else is a statement in full. The delimited form must end with `}` or it is rejected
+with a `SyntaxError`, which the method's own `catch` re-throws by an `instanceof` check while it
+keeps answering the default for everything else. `parseScope` was lifted out of the scanner in the
+same change, so both entry points carry one rule for 3.3. The empty statement is two lines in
+`execute`. `npm test` green: **398 passed and 29 expected fail (427)**.
+
+**Three of the five new tests were green before the change**, verified and written into the test
+files: `resolve("${nowhere::value}", "fallback")` answered the default through the error path
+because `nowhere::value` did not compile; the default applies to `null` as it does to `undefined`,
+so the empty-statement default case could not tell the two apart; and an even backslash run goes to
+the executer as a statement either way. They state the rules; they do not pin the fix.
+
+`npm run bench`, three runs. Nothing moved — `mean` in milliseconds, stage 2 against stage 3:
+
+| case | stage 2 | stage 3 |
+|---|---|---|
+| 20 distinct expressions | 0.0265–0.0280 | 0.0260–0.0283 |
+| one expression 20 times | 0.0258–0.0266 | 0.0245–0.0265 |
+| no expression at all | 0.0002 | 0.0002 |
+| expressions carrying literals | 0.0258–0.0334 | 0.0264–0.0295 |
+| WarmResolve depth 10 | 0.0015 | 0.0015–0.0016 |
+| WarmResolve depth 1 000 | 0.0168–0.0184 | 0.0169–0.0171 |
+
+`WarmResolve` is the case to read here, because stage 3 changes `resolve` and that is what it
+calls: one `indexOf`, a backslash count and a `parseScope` per call, none of it measurable. One run
+answered 0.0032 ms at depth 10 against 0.0015 in the other two — the same single-run outlier the
+stage 0 baseline recorded, not a mode. The object `parseScope` allocates per occurrence does not
+show in the text cases either.
+
 **Stage 4 — the error policy (7).** Pending the decision below. Whatever it turns out to be,
 `resolveText` must not abort because one expression is broken: the per-occurrence loop of stage 2
 catches around each occurrence and renders `undefined`, which is what section 7 already promises.

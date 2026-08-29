@@ -118,6 +118,23 @@ describe("Specification 3.2 - a backslash before the $ escapes the expression", 
 		expect(result).toBe("Test ${\"resolved\"} Test");
 	});
 
+	// The parity rule holds in resolve as well: three backslashes are an odd run, so one is
+	// consumed and the rest stands. An even run does not escape, and an input that does not begin
+	// with the delimiter is a statement in full - here one that is not valid JavaScript, so the
+	// default value applies (7).
+	it("resolve consumes one backslash of an odd run before the delimiter", async () => {
+		const result = await ExpressionResolver.resolve("\\\\\\${value}", { value: "resolved" });
+		expect(result).toBe("\\\\${value}");
+	});
+
+	// Green before the parity rule as well, for the same reason it is green now: an input that does
+	// not begin with the delimiter goes to the executer as a statement, and that one does not
+	// compile either way.
+	it("resolve does not escape on an even run before the delimiter", async () => {
+		const result = await ExpressionResolver.resolve("\\\\${value}", { value: "resolved" }, "fallback");
+		expect(result).toBe("fallback");
+	});
+
 	it("resolve leaves an escaped expression standing, without the backslash", async () => {
 		const result = await ExpressionResolver.resolve("\\${value}", { value: "resolved" });
 		expect(result).toBe("${value}");
@@ -171,6 +188,24 @@ describe("Specification 3.4 - a statement is arbitrary JavaScript", () => {
 	it("evaluates a call on a context member", async () => {
 		const result = await ExpressionResolver.resolve("${ value.toUpperCase() }", { value: "text" });
 		expect(result).toBe("TEXT");
+	});
+
+	// 3.4 by way of JavaScript: an empty statement is what `return;` answers.
+	it("answers undefined for an empty statement", async () => {
+		const result = await ExpressionResolver.resolve("${}", {});
+		expect(result).toBeUndefined();
+	});
+
+	// Also green before the rule, where an empty statement answered null: the default applies to
+	// null and to undefined alike (4.4), so this one states the rule rather than pinning the fix.
+	it("lets the default value apply to an empty statement", async () => {
+		const result = await ExpressionResolver.resolve("${}", {}, "fallback");
+		expect(result).toBe("fallback");
+	});
+
+	it("renders an empty statement in a text as undefined", async () => {
+		const result = await ExpressionResolver.resolveText("a ${} b", {});
+		expect(result).toBe("a undefined b");
 	});
 
 	it("evaluates an await inside the statement", async () => {

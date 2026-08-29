@@ -22,9 +22,9 @@ Entries here are independent of each other. An undertaking whose steps depend on
 > `resolve` and its scope syntax, the matching-brace parser, and the escape that reaches the
 > wrong occurrence. They share three functions of one file, so they are ordered in
 > `plans/expression-parsing.md` rather than picked up one by one. Read it before touching
-> `src/ExpressionResolver.js`. Three of the four landed on 2026-08-29 — the scope walk in stage 1,
-> the matching-brace parser and the escape in stage 2 — and their entries are gone. What is left
-> of the plan is the instance `resolve`, the empty statement `${}`, and the error policy.
+> `src/ExpressionResolver.js`. All four landed on 2026-08-29 — the scope walk in stage 1, the
+> matching-brace parser and the escape in stage 2, the instance `resolve` in stage 3 — and their
+> entries are gone. What is left of the plan is the error policy of section 7.
 
 - [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
   `defaultjs-common-utils` already went this way, so the two packages diverge today. The
@@ -284,22 +284,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   and what the constructor does when it is handed an instance anyway: falling back to the default
   without a word is the one answer that is now ruled out. Consumer-visible, so the outcome belongs
   in `DECISIONS.md`. Found 2026-08-21 while covering `setupExecuter`.
-
-- [ ] **The instance `resolve()` does not understand the scope syntax at all.**
-  Target: `SPECIFICATION.md` 4.3 — `resolve` recognizes the scope prefix in the delimited form,
-  and only there.
-  `resolveText()` parses an expression with the `EXPRESSION` regex and hands
-  `MATCH_EXPRESSION_SCOPE` on as the filter (`src/ExpressionResolver.js:76`), but
-  `resolve(aExpression, aDefault)` merely strips `${` and `}` and passes everything in between
-  as the statement, with the filter hardcoded to `null` (`:258`). So `${root::value}` becomes
-  the statement `root::value`, which is not valid JavaScript: the executer throws, the error is
-  swallowed, and the caller gets `undefined`. Verified 2026-08-21 — `resolveText` returns
-  `from leaf` for `${leaf::value}` while `resolve` returns `undefined` for the same input on the
-  same resolver. Two entry points, one syntax, different answers; the readme documents neither.
-  The argument-order defect of the walk, which this one shares the syntax with, was fixed on
-  2026-08-29 in stage 1 of `plans/expression-parsing.md` — so `resolveText` reaches a named
-  link now, while `resolve` still cannot reach a scope at all. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
-  Found 2026-08-21.
 
 - [ ] **`getData` and `deleteData` are broken on the filter path.**
   Target: `SPECIFICATION.md` 6.6, which specifies all four data methods along the chain — note

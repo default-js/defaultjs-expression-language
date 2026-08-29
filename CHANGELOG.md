@@ -36,6 +36,17 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Changed
 
+- **An empty statement answers `undefined`.** `${}` used to answer `null`, and before the parser
+  landed it was not recognized as an expression at all. It is one now, and it answers what
+  `return;` answers in JavaScript. A default value applies to it like to any other result, and in
+  a text it renders as `undefined`. See `SPECIFICATION.md` 3.4.
+
+- **`resolve` rejects a delimited expression that does not end with `}`.** It throws a
+  `SyntaxError` instead of answering the default value: nothing has been executed at that point,
+  so it is a rejection of the form rather than an execution error, and section 7 does not cover
+  it. Whether the statement between the delimiters is valid JavaScript is still the executer's
+  business and an error there is caught as before. See `SPECIFICATION.md` 4.3 and 7.
+
 - **Every occurrence of an expression in a text is evaluated on its own.** `resolveText` used to
   scan a text once per *distinct* expression and replace all identical occurrences with that one
   result, so a statement with a side effect ran once however often it stood in the text. Each
@@ -59,6 +70,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   it in.
 
 ### Fixed
+
+- **The instance `resolve` did not understand the scope syntax.** It stripped the delimiters and
+  passed everything between them to the executer with the scope filter hardcoded to `null`, so
+  `resolver.resolve("${scope::statement}")` handed `scope::statement` to the executer, which could
+  not compile it: the error was swallowed and the caller got `undefined`. The two entry points
+  answered differently for one syntax. Both parse the prefix by the same rule now, and `resolve`
+  reaches a named link of the chain like `resolveText` does. See `SPECIFICATION.md` 4.3.
 
 - **An expression carrying a brace of its own was not recognized.** The delimiters were matched by
   a regular expression that could not see past an inner brace, so an object literal, an arrow

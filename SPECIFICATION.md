@@ -109,6 +109,9 @@ for a prefix.
 Arbitrary JavaScript, evaluated as such, `await` and asynchronous code included. There is no
 restricted grammar and none is intended.
 
+An **empty statement** answers `undefined`, the same as `return;` does in JavaScript. `${}` is
+therefore a valid expression, and a default value applies to it like to any other result.
+
 ## 4. Entry points
 
 ### 4.1 Static
@@ -178,12 +181,19 @@ expression replaced by its value, cast towards string. **Every occurrence is eva
 own**, so an expression with a side effect means what it says: `${counter++}` twice in one text
 increments twice.
 
-`resolve` additionally accepts a **bare statement** without the `${…}` delimiters. The scope
-prefix is recognized only in the delimited form: `resolve("${scope::statement}")` addresses the
-scope, `resolve("scope::statement")` does not and is passed to the executer as it stands.
+`resolve` additionally accepts a **bare statement** without the `${…}` delimiters. Which of the two
+forms is in hand is decided by the first characters of the trimmed input alone: an input that
+starts with `${` is the delimited form and **must** end with `}`; anything else is a statement in
+full and is passed to the executer as it stands.
 
-*Not yet implemented* — the instance `resolve` strips the delimiters but never parses a scope;
-see `BACKLOG.md`.
+The scope prefix is recognized only in the delimited form: `resolve("${scope::statement}")`
+addresses the scope, `resolve("scope::statement")` does not. Both entry points parse the prefix by
+the same rule (3.3).
+
+A delimited input that does not end with `}` is **rejected with a `SyntaxError`**, and that error
+is thrown rather than answered with the default value: it is a rejection of the form, not an
+execution error (7). Nothing beyond that is checked — whether the statement between the delimiters
+is valid JavaScript is the executer's business, and an error there is caught like any other.
 
 ### 4.4 Default value
 
@@ -466,6 +476,11 @@ An error raised while a statement executes is **caught**. A warning names the st
 failed, and the call answers `undefined` — where a default value was passed, that default. One
 failing expression never stops the rest: a text keeps rendering, a template keeps building.
 
+A **form that an entry point rejects itself** is not an execution error and is not caught: nothing
+has been executed yet. `resolve` throws a `SyntaxError` for a delimited input that does not end
+with `}` (4.3). `resolveText` throws nothing at all — in a text, anything that is not an expression
+is text (3.1).
+
 A statement that takes longer than one second produces a warning naming it. The resolution is
 not affected.
 
@@ -553,7 +568,6 @@ Every rule above that the code does not keep today, in one place:
 | Rule | `BACKLOG.md` entry |
 |---|---|
 | 4.1 the configuration form of the static calls | The static entry points take no configuration object |
-| 4.3 `resolve` and the scope prefix | The instance `resolve()` does not understand the scope syntax at all |
 | 5.1 a generated name where none was passed | `effectiveChain` is a copy of `chain`, and a resolver without a name |
 | 5.5 `effectiveChain` and `contextChain` skip links without a context | `effectiveChain` is a copy of `chain`, and a resolver without a name |
 | 6.4 the global object as a context | A resolver built on the global object throws on every lookup |
