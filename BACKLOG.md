@@ -196,6 +196,11 @@ Entries here are independent of each other. An undertaking whose steps depend on
   benchmarks cannot be compared against a single earlier run — repeat, or compare only within
   one run. Whoever picks this up should check whether it also happens outside the browser
   runner.
+  **Sharpened 2026-08-29** in stage 0 of `plans/expression-parsing.md`: the mode is decided per
+  bench **file**, not per run. Across three runs `ColdResolve` landed in the fast mode once and in
+  the slow mode twice, while `WarmResolve` stayed fast in all three — and the two `describe`s
+  inside `ColdResolve` always moved together. So two files of the *same* run cannot be compared
+  against each other either, and a recorded number has to name the mode it was taken in.
 
 - [ ] **No benchmark exercises the cache eviction, the one thing `CodeCache` now does differently.**
   All four bench files stay far below the configured 5000 entries — `ColdResolve` and

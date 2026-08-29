@@ -126,6 +126,56 @@ is added **before** anything changes: a text with several distinct expressions, 
 one expression, and a text carrying literals and braces. Its numbers on the current implementation
 are the "before".
 
+**Done 2026-08-29.** `npm test` green: **21 files, 350 passed and 63 expected fail (413 tests)**,
+9.3 s. `test/PerformanceTests/ResolveText.bench.js` added; the gate is unchanged by it, because
+`include` collects only `test/**/*Test.js`.
+
+`npm run bench`, three runs each, headless chromium through playwright. Ranges across the three
+runs, `mean` in milliseconds per operation. The four chain benchmarks were measured before the new
+file existed, the four text cases with it in place:
+
+| Bench | case | mean | hz |
+|---|---|---|---|
+| ColdResolve — links carry a non-matching context | 10 | 0.0019–0.0026 | 381 k – 523 k |
+| | 1 000 | 0.0189–0.0245 | 40.8 k – 52.9 k |
+| | 100 000 | 6.86–14.33 | 69.8–146 |
+| | 1 000 000 | 63.1–133.7 | 7.5–15.9 |
+| ColdResolve — links carry no context | 10 | 0.0019–0.0022 | 450 k – 534 k |
+| | 1 000 | 0.0150–0.0198 | 50.4 k – 66.5 k |
+| | 100 000 | 5.86–13.74 | 72.8–171 |
+| | 1 000 000 | 72.5–150.1 | 6.7–13.8 |
+| WarmResolve — expression served from the cache | 10 | 0.0016–0.0017 | 577 k – 600 k |
+| | 1 000 | 0.0176–0.0189 | 52.9 k – 56.7 k |
+| | 100 000 | 6.73–7.06 | 142–149 |
+| | 1 000 000 | 66.9–68.9 | 14.5–15.0 |
+| RandomScope — random scope lookup | 1 000 | 0.0119–0.0131 | 76.2 k – 84.2 k |
+| | 100 000 | 5.66–6.31 | 159–177 |
+| **ResolveText** — 20 distinct expressions | 1 510 chars | 0.0604–0.0718 | 13.9 k – 16.6 k |
+| | one expression 20 times, 1 400 chars | 0.0042–0.0049 | 202 k – 236 k |
+| | no expression at all, 1 530 chars | 0.0006–0.0007 | 1.53 M – 1.67 M |
+| | expressions carrying literals, 1 616 chars | 0.0124–0.0129 | 77.7 k – 80.4 k |
+
+Five things to carry forward when this is compared against:
+
+- **The bimodality of `BACKLOG.md` is decided per file and per run, not per machine.** Within one
+  batch of three runs `ColdResolve` landed in the fast mode once and in the slow mode twice —
+  6.9 ms against 13–14 ms at depth 100 000, 63 ms against 132–134 ms at depth 1 000 000 — while
+  `WarmResolve` stayed in the fast mode all three times. Both describes of `ColdResolve` always
+  moved together. So the two deep sizes cannot be compared across runs at all, and a comparison
+  has to name which mode each run landed in.
+- **Only depths 10 and 1 000 and the four text cases are stable enough to judge a small change.**
+  Their spread is under 8 %, against a factor of two at the deep sizes.
+- **One warm run at depth 10 reported an rme of ±106 %** with a maximum of 428 ms against a mean
+  of 0.0046 ms, where the other two runs sat at 0.0016 ms with ±3 %. A single outlier — first
+  compilation or a collection — not a mode. Discard such a run rather than average it in.
+- **`resolveText` is 13 times slower over 20 distinct expressions than over one expression
+  standing 20 times**, which is exactly the shared evaluation 4.3 removes. The repeated case is
+  therefore *expected* to get slower in stage 2, and it is not a regression: it will do twenty
+  evaluations where it does one today. What must not get slower is the distinct case.
+- **Text carrying no expression runs at 1.5–1.7 M hz today**, one native `RegExp.exec` over
+  1 530 characters. That is the number the hand-written scanner has to defend, and the case a
+  template engine hits most often.
+
 **Stage 1 — the walk over the chain (5.3, 5.4).** The smallest of the three, and the only one that
 is not parsing: the internal `resolve` (`:64-71`) recurses with its arguments in the wrong order,
 and ends the walk with a bare `null` that skips the default value. The default handling moves into
@@ -235,7 +285,12 @@ Several runs each; only depths 10 and 1 000 are stable enough to judge a small c
 - `SPECIFICATION.md` — the five new rules into 3.1, 3.2, 3.4, 4.3 and 7; the *not yet implemented*
   notes in 3.1, 3.2, 4.3, 5.3 and 5.4 removed; six rows out of section 10.
 - `DECISIONS.md` — one entry for the batch of rules settled on 2026-08-29, one for the regex
-  literal measurement, one for the error policy.
+  literal measurement, one for the error policy. **The measurement entry carries the numbers**,
+  not only the verdict: the stage 0 baseline of the four text cases and of depths 10 and 1 000,
+  and what they became. This plan is deleted when it is finished, so anything left only here
+  survives as git history and nothing else — and goal 5 asks whether the resolver came out of the
+  whole v3 cycle faster, which is a question no single plan can answer. The deep depths stay out
+  of that entry: they are bimodal by a factor of two and prove nothing across runs.
 - `CHANGELOG.md` — under `## [Unreleased]`, one *Fixed* entry per defect and one *Changed* entry
   for the empty statement and the error policy, which alter behaviour a consumer can see.
 - `BACKLOG.md` — the four entries this plan owns are deleted, and the coverage entry is updated
