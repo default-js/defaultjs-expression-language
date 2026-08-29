@@ -25,8 +25,8 @@ A decision that is only a step inside a running undertaking stays in that undert
 times costs about seven times what it did, because it is now evaluated twenty times instead of
 once. Everything else the rework touched came out faster.
 
-**Reasoning:** Measured when `plans/expression-parsing.md` closed, with the source from before the
-plan (`900a454`) and the finished one **alternating inside one batch** — the only comparison that
+**Reasoning:** Measured when the expression parsing rework closed, with the source from before it
+(`900a454`) and the finished one **alternating inside one batch** — the only comparison that
 holds, because the machine drifts by more between batches than these changes are worth. Two runs
 each, `mean` in milliseconds:
 
@@ -148,9 +148,10 @@ implementation, and Frank rejected it: it hides expressions behind a single back
 empty statement, answering `null` — that was the accident the code had, and nothing argued for it.
 
 **Consequences:** `resolve` can now throw, which section 7 had to be extended for: a rejected form
-is not an execution error, and nothing has run at that point. That is the smaller half of the
+is not an execution error, and nothing has run at that point. That was the smaller half of the
 error-policy question; the larger one — whether a statement that does not compile propagates out of
-`resolve` — is still open and carried in `plans/expression-parsing.md`. The escape rule makes an
+`resolve` — was decided the same day, and it does: see "Does `resolve` catch the errors of a
+statement?" above. The escape rule makes an
 escaped delimiter cheaper to scan than an unescaped one, since no brace matching is needed. And
 `${}` becomes an expression where it used to be text, so a text carrying it changes its answer.
 

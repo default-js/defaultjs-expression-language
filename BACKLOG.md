@@ -18,13 +18,10 @@ Entries here are independent of each other. An undertaking whose steps depend on
 > today. Every one of them is already pinned by a test in `test/spec/`, marked `it.fails` until
 > the fix lands.
 >
-> **Four of them are owned by a running plan (2026-08-29):** the scope walk, the instance
-> `resolve` and its scope syntax, the matching-brace parser, and the escape that reaches the
-> wrong occurrence. They share three functions of one file, so they are ordered in
-> `plans/expression-parsing.md` rather than picked up one by one. Read it before touching
-> `src/ExpressionResolver.js`. All four landed on 2026-08-29 — the scope walk in stage 1, the
-> matching-brace parser and the escape in stage 2, the instance `resolve` in stage 3 — and their
-> entries are gone. What is left of the plan is the error policy of section 7.
+> **Four of them were closed on 2026-08-29** by the expression parsing rework: the scope walk, the
+> instance `resolve` and its scope syntax, the matching-brace parser, and the escape that reached
+> the wrong occurrence. They shared three functions of one file and were done in one ordered
+> undertaking; `DECISIONS.md` carries what outlived it, git history the rest.
 
 - [ ] **Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path.**
   `defaultjs-common-utils` already went this way, so the two packages diverge today. The
@@ -198,7 +195,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   benchmarks cannot be compared against a single earlier run — repeat, or compare only within
   one run. Whoever picks this up should check whether it also happens outside the browser
   runner.
-  **Sharpened 2026-08-29** in stage 0 of `plans/expression-parsing.md`: the mode is decided per
+  **Sharpened 2026-08-29** while the expression parsing rework was measured: the mode is decided per
   bench **file**, not per run. Across three runs `ColdResolve` landed in the fast mode once and in
   the slow mode twice, while `WarmResolve` stayed fast in all three — and the two `describe`s
   inside `ColdResolve` always moved together. So two files of the *same* run cannot be compared
@@ -267,7 +264,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
 
 - [ ] **Coverage as of 2026-08-29, and the four things still uncovered.**
   Statements **93.28 %** (472/506), branches **91.85 %** (248/270), functions **90.81 %** (89/98),
-  lines **95.69 %** (422/441). Measured after `plans/expression-parsing.md` closed, and every axis
+  lines **95.69 %** (422/441). Measured after the expression parsing rework, and every axis
   is above the 2026-08-24 baseline it replaces — 92.51 % / 90.76 % / 90.32 % / 94.45 % — although
   the package grew by about a hundred statements in the same work.
   **`src/ExpressionResolver.js` is at 100 % of lines and functions**, the file that carried more
