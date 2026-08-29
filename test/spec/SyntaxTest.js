@@ -69,6 +69,14 @@ describe("Specification 3.1 - an expression ends at the matching closing brace",
 		expect(result).toBe("a } b");
 	});
 
+	// A character class hides a slash, so the literal does not end inside it - and the brace in
+	// there does not count either. Without that state the expression would end at the brace and the
+	// statement would be cut in the middle of the literal.
+	it("does not end a regular expression literal at a slash inside a character class", async () => {
+		const result = await ExpressionResolver.resolveText("a ${ /[/}]/.source } b", {});
+		expect(result).toBe("a [/}] b");
+	});
+
 	// The counterpart of the test above: a slash is only a literal where one can stand. Getting
 	// this wrong would swallow the rest of the statement into a literal that never ends. Nothing
 	// in the implementation before the scanner read literals at all, so this passed there as well

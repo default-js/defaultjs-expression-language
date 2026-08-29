@@ -239,14 +239,40 @@ Entries here are independent of each other. An undertaking whose steps depend on
   helper `createResolverWithExecuterFactory` was fixed on 2026-08-21 and is fine.
   Found 2026-08-21 while covering `setupExecuter`.
 
-- [ ] **Coverage as of 2026-08-24, and the five things still uncovered.**
-  After the conformance suite: statements **92.51 %** (371/401), branches **90.76 %** (177/195),
-  functions **90.32 %** (84/93), lines **94.45 %** (341/361). The baseline this replaces, measured
-  2026-08-21 after the `setupExecuter` tests, was 85.28 % / 72.82 % / 83.87 % / 88.91 % — branches
-  were the weak axis at 72.82 % and are now the second strongest. `ExpressionResolver.js`, which
-  carried more than half of everything uncovered in the package, is at 99.1 % of lines and 100 %
-  of functions.
-  What is left is five items, and none of them is "write more tests for a rule":
+- [ ] **`WarmResolve` and `ColdResolve` can report a mean two to four times too high at depth 10,
+  and the cause is the chain they hold live.**
+  Signature: `hz` collapses, `mean` jumps from 0.0016 ms to somewhere between 0.0032 and 0.0064,
+  `rme` goes past 100 %, and `max` sits at 340–430 ms — while `p75` and `p99` do not move at all
+  (0.0000 and 0.1000 in every single run measured). So it is never a slower operation, always one
+  long pause inside 100 000 to 300 000 iterations.
+  **What it is, verified 2026-08-29.** `ChainBuilder.js` builds a chain of **1 000 000** resolvers in
+  the module body, and it stays live for the whole file — a million `ExpressionResolver`, each with
+  a `ResolverContextHandle` and a `Proxy`. Any collection that has to walk that live set costs
+  hundreds of milliseconds, and depth 10 is where it shows because it is the fastest case and
+  therefore allocates the most per second. Cut `DEPTHS` to `[10, 1000]` and the pause disappears
+  completely: four runs at 0.0015–0.0016 ms, ±3.3 %, `max` 3.3–3.8 ms.
+  **How often it strikes depends on how much the resolver allocates**, which is what made it look
+  like a defect: across 19 runs of this session it appeared in **5 of 9** runs of sources where the
+  instance `resolve` allocates one `{ scope, statement }` object per call through `parseScope`, and
+  in **1 of 10** runs of sources that do not. Inlining those two lines in `resolve` removes the
+  allocation and the pause did not appear in two runs afterwards — but the base rate says two runs
+  prove little, and the small-chain measurement above says the allocation is not the cost, only the
+  trigger. Per operation it is not measurable at all.
+  So this is a property of the benchmark, not of the library, and `parseScope` stays as it is. What
+  to do with it: either accept the signature and discard such a run — `rme` past 100 % with a `max`
+  in the hundreds of milliseconds is the tell — or stop holding the deep chain live while the
+  shallow depths are measured, for instance by building one chain per depth instead of reusing the
+  tail of the deepest. Note that the same file's own comment explains why the tail is reused: a
+  bench file has nowhere to put setup. Found 2026-08-29 while measuring the whole cycle for goal 5.
+
+- [ ] **Coverage as of 2026-08-29, and the four things still uncovered.**
+  Statements **93.28 %** (472/506), branches **91.85 %** (248/270), functions **90.81 %** (89/98),
+  lines **95.69 %** (422/441). Measured after `plans/expression-parsing.md` closed, and every axis
+  is above the 2026-08-24 baseline it replaces — 92.51 % / 90.76 % / 90.32 % / 94.45 % — although
+  the package grew by about a hundred statements in the same work.
+  **`src/ExpressionResolver.js` is at 100 % of lines and functions**, the file that carried more
+  than half of everything uncovered a week earlier.
+  What is left is four items, and none of them is "write more tests for a rule":
   1. `src/Utils.js`, 0 %, all nine lines — dead code, its own entry above. Deleting it is what
      closes this, not a test.
   2. The `setDebug` bodies of `ContextDeconstructorExecuter.js:13` and `EsprimaExecuter.js:13`,
@@ -261,12 +287,10 @@ Entries here are independent of each other. An undertaking whose steps depend on
   4. `ResolverContextHandle.js:118` (`get parent`) and `:122-123` (`updateData` on the handle,
      not the one on the resolver). Both are public on a class that section 9 does not list, so
      decide whether they are surface at all before covering them — see the `Context` export entry.
-  5. ~~`ExpressionResolver.js:60`, the outer `catch` of `execute`~~ — **gone 2026-08-29** with the
-     error policy of section 7: `execute` no longer catches at all, so neither the unreachable
-     `catch` nor the swallowing one is there any more. The four numbers above predate the whole of
-     `plans/expression-parsing.md` and are stale; they are re-measured when that plan closes.
-  `src/version.js` is generated, so its 0 % stays noise. Update these numbers when the picture
-  changes rather than adding a third baseline.
+  `src/version.js` is generated, so its 0 % stays noise. The 22 branches still open are spread over
+  the scanner's state machine and `EsprimaExecuter`; they are combinations of literal states, not
+  rules without a test. Update these numbers when the picture changes rather than adding a fourth
+  baseline.
 
 - [ ] **The constructor option `executer` is undocumented and silently ignores an `Executer` instance.**
   Target: `SPECIFICATION.md` 4.2 — the option takes a registered name and nothing else.

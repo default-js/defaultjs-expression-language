@@ -19,6 +19,52 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-29 — Is the price of evaluating every occurrence on its own acceptable?
+
+**Decision:** Yes, and it is the only case that got slower. A text repeating one expression twenty
+times costs about seven times what it did, because it is now evaluated twenty times instead of
+once. Everything else the rework touched came out faster.
+
+**Reasoning:** Measured when `plans/expression-parsing.md` closed, with the source from before the
+plan (`900a454`) and the finished one **alternating inside one batch** — the only comparison that
+holds, because the machine drifts by more between batches than these changes are worth. Two runs
+each, `mean` in milliseconds:
+
+| case | before | after |
+|---|---|---|
+| resolveText, 20 distinct expressions | 0.0479 / 0.0534 | 0.0259 / 0.0275 |
+| resolveText, one expression 20 times | 0.0037 / 0.0038 | 0.0249 / 0.0268 |
+| resolveText, no expression at all | 0.0005 / 0.0006 | 0.0002 / 0.0003 |
+| ColdResolve, depth 10 | 0.0020 / 0.0023 | 0.0018 / 0.0019 |
+| ColdResolve, depth 1 000 | 0.0197 / 0.0234 | 0.0180 / 0.0192 |
+| WarmResolve, depth 1 000 | 0.0186 / 0.0196 | 0.0193 / 0.0214 |
+
+The distinct case is **45 % faster**: the `split`/`join` over the whole text per distinct
+expression is gone, and with it the quadratic behaviour. Text carrying no expression at all is
+**twice as fast**, because `indexOf("${")` beats the old regular expression — and that is the case a
+template engine hits most often, by far. The chain benchmarks did not move beyond their spread,
+which is what was wanted: `resolve` was rewritten twice in this plan and neither rewrite cost
+anything. The repeated case is the one that pays, and it pays for `SPECIFICATION.md` 4.3: an
+expression with a side effect now means what it says, and `${counter++}` twice increments twice.
+The seventh of a millisecond it costs over twenty occurrences buys a rule that used to be silently
+broken.
+
+`ResolveText.bench.js`'s fourth case, expressions carrying literals, is **not** in the table: it is
+not comparable across the change, because the old regular expression could not see most of those
+expressions and so did far less work than it should have.
+
+**Alternatives:** Caching the value of an expression per text and reusing it for identical
+occurrences, which is what the old code did by accident. Rejected with 4.3 itself: it is the defect,
+not an optimisation.
+
+**Consequences:** A consumer rendering a text that repeats one expression many times pays for each
+occurrence. Nothing in the family does that today. The measurement also turned up a property of the
+benchmarks themselves: they hold a chain of a million resolvers live, so a collection during a run
+costs hundreds of milliseconds and can inflate the mean at depth 10 two- to fourfold — `BACKLOG.md`,
+"`WarmResolve` and `ColdResolve` can report a mean two to four times too high". And the method is
+worth keeping: where the drift indicator has moved, alternate the two versions inside one batch
+instead of comparing against a recorded baseline.
+
 ## 2026-08-29 — Does `resolve` catch the errors of a statement?
 
 **Decision:** No. `resolve` logs the statement and the error and then raises it to the caller.
