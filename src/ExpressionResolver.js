@@ -265,12 +265,10 @@ export default class ExpressionResolver {
 	 * @param {ExpressionResolver} [options.parent=null]
 	 * @param {?string} [options.name=null] where none is passed, one is generated - 5.1
 	 */
-	constructor({ context, parent = null, name = null, executer }) {
+	constructor({ context, parent = null, name = null, executer } = {}) {
 		this.#executer = typeof executer === "string" ? getExecuterType(executer) : ExpressionResolver.defaultExecuter;
 		this.#parent = parent instanceof ExpressionResolver ? parent : null;
-		this.#name = name || generateName();
-
-		context = typeof context === "undefined" ? this.#executer.defaultContext : context;
+		this.#name = name || generateName();		
 		this.#contextHandle = new ResolverContextHandle(context , this.#parent ? this.#parent.contextHandle : null);
 		this.#context = this.#contextHandle.proxy;
 	}

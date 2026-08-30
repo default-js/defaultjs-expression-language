@@ -514,3 +514,81 @@ Entries here are independent of each other. An undertaking whose steps depend on
   is why the gate stayed green through the change, and unlike the other entries of section 10 this
   one carries no `fails` marker yet. Consumer-visible, so the outcome belongs in `DECISIONS.md`
   and in `CHANGELOG.md`. Found 2026-08-30 while rebuilding `dist/` after the commit `some fixes`.
+
+- [ ] **The executer's `defaultContext` is one shared object, so every resolver built without a
+  context writes into every other one.**
+  Since 2026-08-30 the constructor takes `this.#executer.defaultContext` where the `context` option
+  is left out (`src/ExpressionResolver.js:274`), which implements 4.2 and 6.3 — but that default is
+  a single object created once per executer module (`src/executer/ContextDeconstructorExecuter.js:63`
+  and the three others), and `ResolverContextHandle` keeps it by identity (`data || {}`). Verified
+  2026-08-30 under node 24 with the new default executer: `a.mergeContext({ leak: 1 })` on a
+  resolver built without a context puts `leak` into `ContextDeconstructorExecuter.defaultContext`
+  itself, and every resolver built afterwards — anywhere in the application — answers `1` for it.
+  `updateData` and a write from an expression do the same. So the isolation 6.1 promises is gone for
+  the whole class of context-less resolvers, and the value survives for the lifetime of the page.
+  Two more consequences to weigh with the fix: under `esprima-executer` that default context **is**
+  the global object, so a context-less resolver writes straight to `globalThis` and 6.5's negative
+  guarantee cannot hold there at all; and the executer's default is shared across resolvers that
+  have nothing to do with each other, which is what makes this different from two resolvers being
+  handed the same object on purpose. To decide: copy the default per resolver (wrong for the global
+  object of the esprima executer), have the handle treat a defaulted context as read-only, or let
+  the executer answer a fresh default on every call. `SPECIFICATION.md` 4.2 and 6.3 say nothing
+  about identity. Consumer-visible, so the outcome belongs in `DECISIONS.md` and in `CHANGELOG.md`.
+  Found 2026-08-30 while working out why the spec suite fails under the new default executer.
+  **The interim removes it** - the constructor no longer reads `defaultContext` for a missing
+  option (see the entry below) - but the question does not go away: it returns the moment the
+  redefined default context is handed to a resolver, because a single object shared by every
+  resolver that has one behaves exactly like this. Keep it on record until that definition is
+  written.
+
+- [ ] **5.5 and 4.2 now contradict each other over a resolver built without the `context` option.**
+  5.5 says a resolver provides a context when the caller *handed one to the constructor* — "any
+  value that is neither `null` nor `undefined`" — and names three cases that provide none:
+  `context: null`, `context: undefined`, and *the option left out*. 4.2 and 6.3 say the option left
+  out takes the **executer's default context**, and since that is implemented (2026-08-30) the
+  default is `{}` under three executers and the global object under `esprima-executer` — never
+  `null`, so `effectiveChain` and `contextChain` now count a resolver that 5.5 says they must skip.
+  `test/spec/ChainTest.js:229` fails on exactly that and is the only test that catches it. Both
+  rules were written on 2026-08-22 and neither knew the other would land. To decide which one moves:
+  either 5.5 drops "the option left out" from its list, and then a resolver built without a context
+  joins the chain carrying whatever its executer defaults to — under `esprima-executer` the whole
+  global object, which 6.4 then has to be read against; or 4.2 keeps the default only as the
+  *content* of the context while "was one handed over?" stays a question about the option, which
+  means the handle has to tell a defaulted context from a handed one. Read together with the entry
+  above: the same distinction would fix both. Consumer-visible, so the outcome belongs in
+  `DECISIONS.md`; `SPECIFICATION.md` moves with it either way. Found 2026-08-30.
+  **Decided the same day, by Frank: a resolver without a context has no context.** 5.5 stands as
+  written and does not move. What moves is the other end: 4.2 and 6.3 lose the rule that a missing
+  option takes the executer's default context, and **`defaultContext` is to be redefined** - away
+  from "the context a resolver gets when the caller passes none" and towards something like a
+  *global* context, available in addition to the chain rather than in place of it. Frank is working
+  out that definition; nothing about it is settled beyond the direction, and `Executer.js`,
+  `SPECIFICATION.md` 4.2, 6.3, 8.1 and section 10 all move with it. Until it is written, the
+  constructor stops reading `defaultContext` for a missing option, which is what makes
+  `test/spec/ChainTest.js:229` green again and what removes the shared-object defect above.
+
+- [ ] **A write from an expression can be made to persist under `ContextDeconstructorExecuter`.**
+  Raised by Frank on 2026-08-30 with the switch of the default: `${counter++} ${counter++}` answers
+  `"0 0"` there, because the assignment hits a destructured local binding and nothing carries it
+  back. A write-back closes it, verified the same day under node 24 against a real resolver context:
+  keep the destructured names as `let` bindings inside the generated function instead of in the
+  parameter list, and copy each one back in a `finally`, guarded by a comparison —
+  `if (counter !== context.counter) context.counter = counter;`. Two runs then answer `0` and `1`,
+  and `getData("counter")` answers `2`. **The generated code never looks at the expression**: the
+  names come from `contextProperties`, the list the generator already builds for the destructuring,
+  so the write-back is emitted from the same source and works for any name - verified with `i++`
+  and `test = test + "!"` on 2026-08-30. **The guard is not an optimization, it is the correctness
+  half**: destructuring pulls the values of the whole chain into locals, so an unguarded write-back
+  would copy every inherited name into the own context of the resolver the expression runs on and
+  shadow the resolvers above it from then on. With the guard, a leaf built with `{ counter: 0 }`
+  under a root carrying `inherited` holds exactly `{"counter":2}` after two runs — measured, not
+  assumed. What is left to decide before this is implemented: the cost, one comparison per context
+  property per execution on top of the destructuring that already reads them all, which
+  `npm run bench` can measure per executer since 2026-08-30; whether the write-back also runs when
+  the statement throws, which `finally` does by default; and whether a getter that answers a fresh
+  object on every read turns the comparison into a spurious write. `SPECIFICATION.md` 6.5 promises
+  nothing about a written value being readable afterwards, so this widens what the executer can do
+  rather than fixing a broken rule - which is why it is a capability with a state, not a defect.
+  Consumer-visible, so the outcome belongs in `CHANGELOG.md`. One boundary belongs in the same
+  note: a name the context does **not** carry is not destructured either, so nothing is written
+  back for it - `${ x = 5 }` stays the global-write case of 6.5 and is not covered by this.
