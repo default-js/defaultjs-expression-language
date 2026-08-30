@@ -31,6 +31,39 @@ describe("Specification 6.1 - every access goes through the proxy", () => {
 		const leaf = new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root });
 		expect(leaf.context.rootOnly).toBe("from root");
 	});
+
+	// The proxy answers the names of the whole chain, which is more than the object it was built
+	// over carries. A frozen object cannot be spoken for that way - a proxy over one may report
+	// nothing but its own keys - so the proxy is not built over the context at all.
+	it("enumerates the chain over a context the caller froze", async () => {
+		const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root" });
+		const leaf = new ExpressionResolver({ context: Object.freeze({ leafOnly: "from leaf" }), name: "leaf", parent: root });
+		const names = Object.keys(leaf.context);
+		expect(names.includes("leafOnly")).toBe(true);
+		expect(names.includes("rootOnly")).toBe(true);
+	});
+
+	it("resolves over a context the caller froze", async () => {
+		const resolver = new ExpressionResolver({ context: Object.freeze({ own: "frozen" }), name: "root" });
+		expect(await resolver.resolve("${ own }")).toBe("frozen");
+	});
+
+	// A single frozen link is enough: the property cache walks the prototype chain, so the names of
+	// Object.prototype are reported for an object that has no own key beside its own.
+	it("enumerates a frozen context that stands alone", async () => {
+		const resolver = new ExpressionResolver({ context: Object.freeze({ own: "frozen" }), name: "solo" });
+		expect(Object.keys(resolver.context).includes("own")).toBe(true);
+		expect(JSON.stringify(resolver.context).includes("frozen")).toBe(true);
+	});
+
+	// Every executer reads the context in its own way, and the deconstruction one reads its names
+	// before it runs a statement, so a frozen context reaches each of them differently.
+	for (const { name: executer, variableName } of EXECUTERS) {
+		it(`resolves over a frozen context [${executer}]`, async () => {
+			const resolver = new ExpressionResolver({ context: Object.freeze({ own: "frozen" }), name: "solo", executer });
+			expect(await resolver.resolve(`\${ ${variableName("own")} }`)).toBe("frozen");
+		});
+	}
 });
 
 for (const { name: executer, variableName } of EXECUTERS) {
@@ -130,16 +163,27 @@ describe("Specification 6.4 - the global object as a context object", () => {
 		expect(result).toBe(2);
 	});
 
-	// The rule holds under three of the four executers. The deconstruction executer destructures
-	// the context, which asks the proxy for ownKeys, and that trap reports only string names -
-	// a target carrying a non-configurable own symbol therefore violates the proxy invariant and
-	// the engine throws. In this runner the symbol is vitest's own Symbol(matchers-object) on
-	// globalThis.
-	// not implemented, waits for BACKLOG.md "The `ownKeys` trap drops symbols, and a global context is where that breaks"
-	it.fails("takes the global object as an ordinary link under the deconstruction executer", async () => {
+	// This executer gets its own case because it is the one that reads the names of the context
+	// before it runs a statement, so a global context reaches it differently than the other three.
+	it("takes the global object as an ordinary link under the deconstruction executer", async () => {
 		const resolver = new ExpressionResolver({ context: globalThis, name: "global", executer: ContextDeconstructorExecuterName });
 		const result = await resolver.resolve("${ Math.round(1.5) }", "fallback");
 		expect(result).toBe(2);
+	});
+
+	// A link below a global one asks the global link for its names, which is where an indexed name
+	// of the global object reaches an executer that turns names into code. A page carrying a frame
+	// has one: window[0] is frames[0], so the own name "0" appears for as long as the frame does.
+	it("carries a link below a global one while the page has a frame", async () => {
+		const frame = document.createElement("iframe");
+		document.body.appendChild(frame);
+		try {
+			const root = new ExpressionResolver({ context: globalThis, name: "global", executer: ContextDeconstructorExecuterName });
+			const leaf = new ExpressionResolver({ context: { own: "from leaf" }, name: "leaf", parent: root, executer: ContextDeconstructorExecuterName });
+			expect(await leaf.resolve("${ own }")).toBe("from leaf");
+		} finally {
+			frame.remove();
+		}
 	});
 });
 

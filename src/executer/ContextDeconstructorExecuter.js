@@ -1,6 +1,7 @@
 import { registrate } from "../ExecuterRegistry.js";
 import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
+import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 
 let DEBUG = false;
 export const EXECUTERNAME = "context-deconstruction-executer";
@@ -61,7 +62,7 @@ const getOrCreateFunction = (aStatement, contextProperties) => {
 const EXECUTER = new Executer({
 	defaultContext: {},
 	execution: (aStatement, aContext) => {
-		const propertyNames = Object.getOwnPropertyNames(aContext || {});
+		const propertyNames = GLOBAL === aContext ? [] : Object.getOwnPropertyNames(aContext || {});
 		if(propertyNames.length > 50)
 			console.warn(`High count of properties at first level, can be decrease the performence! count: ${propertyNames.length}`);
 

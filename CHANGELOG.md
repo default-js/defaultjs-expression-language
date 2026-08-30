@@ -95,6 +95,29 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **A frozen context object broke every operation that enumerates a context.** `Object.keys`, a
+  spread, `JSON.stringify` and `Object.getOwnPropertyNames` over a context raised
+  `TypeError: 'ownKeys' on proxy: trap returned extra keys but proxy target is non-extensible`
+  where the caller had handed in a frozen object, and under `ContextDeconstructorExecuter` — which
+  reads the names of a context before it runs a statement — *every* expression failed with it. The
+  proxy answers for the whole chain, which is more than the handed-in object holds, and a proxy may
+  not do that over a target that guarantees anything about its own keys. It now stands over a
+  target of its own, so any context object works.
+
+  Two things follow for every context, not only a frozen one: **enumeration now describes the
+  chain**, so `Object.keys`, a spread and `JSON.stringify` answer the names of every link instead of
+  only the one the call was made on — each with the enumerability it has where it is defined, so a
+  prototype's members stay out of `Object.keys` as they would on the object itself. And operations
+  that are not intercepted — `Object.getPrototypeOf`, `Object.defineProperty`, `Object.isExtensible`
+  — now see that empty target rather than the context object. See `SPECIFICATION.md` 6.1.
+
+- **A page carrying a frame broke every resolver below a global-object link.** The property cache of
+  a global context handed its names out unfiltered, while every other context drops the names that
+  cannot stand for a variable. A window that embeds a frame carries the own name `"0"` — the indexed
+  access to `frames[0]` — which reached `ContextDeconstructorExecuter` through the chain and made
+  every generated function a `SyntaxError: Unexpected number`, including one for an expression that
+  only read its own context. Both caches apply the same rule now.
+
 - **A resolver built on the global object threw on every lookup.** `new ExpressionResolver({
   context: globalThis })` — and every resolver built while `EsprimaExecuter` is the default,
   since that executer declares the global object as its default context — answered `undefined`
@@ -103,8 +126,15 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   expects the link holding it, so reading the property off that answer raised a `TypeError` that
   the executer swallowed. The wrapper answers the link now, and the global object is an ordinary
   link of the chain: it carries every name, so it answers every lookup that reaches it and nothing
-  below it is consulted. Under `ContextDeconstructorExecuter` such a resolver can still fail for
-  an unrelated reason — see `SPECIFICATION.md` 6.4 and `BACKLOG.md`.
+  below it is consulted.
+
+  **A context that is the global object is no longer put behind a proxy.** There is nothing for a
+  proxy to add there — the object already carries every name — and putting one in front of it
+  broke every operation that enumerates a context, because a proxy may not hide what its target
+  guarantees. `getData()` on such a resolver therefore answers the global object itself.
+  `ContextDeconstructorExecuter` skips reading the property names when the context is the global
+  object, so it no longer generates a destructuring pattern over every global name. See
+  `SPECIFICATION.md` 6.1 and 6.4.
 
 - **The instance `resolve` did not understand the scope syntax.** It stripped the delimiters and
   passed everything between them to the executer with the scope filter hardcoded to `null`, so

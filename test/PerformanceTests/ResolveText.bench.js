@@ -1,5 +1,6 @@
 import { bench, describe } from "vitest";
 import { ExpressionResolver } from "../../index.js";
+import { EXECUTERS } from "../TestUtils.js";
 
 /**
  * What replacing expressions in a text costs. The other three benchmarks all call `resolve` with
@@ -24,7 +25,14 @@ import { ExpressionResolver } from "../../index.js";
  *   the scanner's literal states, which is what decided the regex-literal branch.
  *
  * None of the four expressions in `literals` fails - deliberately, because a failing statement
- * writes a warning with a stack trace and that would be measured instead of the parsing.
+ * writes a warning with a stack trace and that would be measured instead of the parsing. Since the
+ * case runs under every executer it also has to hold for the strictest of them, which is what took
+ * the context read out of the arrow function on 2026-08-30; the `literals` numbers from before that
+ * day are therefore not comparable either.
+ *
+ * Since 2026-08-30 all four cases run under every executer. The text handling itself is the
+ * resolver's and does not change with the executer, so what the comparison shows is what each
+ * executer costs per expression - `plain` is the control, it carries none.
  *
  * Setup lives in the module body on purpose - see ChainBuilder.js for why a bench file has
  * nowhere else to put it.
@@ -42,47 +50,66 @@ const buildText = (expression) => {
 	return text;
 };
 
-const TEXT_DISTINCT = buildText((i) => "${ count + " + i + " }");
-const TEXT_REPEATED = buildText(() => "${ word }");
-const TEXT_PLAIN = buildText((i) => "no expression " + i);
-const TEXT_LITERALS = buildText((i) => {
-	switch (i % 5) {
-		case 0:
-			return "${ {a: 1}.a }";
-		case 1:
-			return "${ (() => { return count; })() }";
-		case 2:
-			return "${ `x${word}y` }";
-		case 3:
-			return "${ /ab/.test(word) }";
-		default:
-			return '${ "a::b".length }';
-	}
-});
+/**
+ * The four texts, spelled for one executer - `ContextObjectExecuter` addresses a context value as
+ * `ctx.value` where the other three take `value` (SPECIFICATION.md 8.3).
+ */
+const buildTexts = (variableName) => {
+	const word = variableName("word");
+	const count = variableName("count");
 
-const RESOLVER = new ExpressionResolver({ context: CONTEXT, name: "root" });
+	return {
+		distinct: buildText((i) => "${ " + count + " + " + i + " }"),
+		repeated: buildText(() => "${ " + word + " }"),
+		plain: buildText((i) => "no expression " + i),
+		literals: buildText((i) => {
+			switch (i % 5) {
+				case 0:
+					return "${ {a: 1}.a }";
+				case 1:
+					// the braces of a function body, not a context read: EsprimaExecuter cannot reach a
+					// context value from inside a nested function (BACKLOG.md), and a statement that
+					// fails would measure the warning it writes instead of the parsing
+					return "${ (() => { return 1; })() }";
+				case 2:
+					return "${ `x${" + word + "}y` }";
+				case 3:
+					return "${ /ab/.test(" + word + ") }";
+				default:
+					return '${ "a::b".length }';
+			}
+		})
+	};
+};
+
+const ENTRIES = EXECUTERS.map(({ name: executer, variableName }) => ({
+	executer,
+	texts: buildTexts(variableName),
+	resolver: new ExpressionResolver({ context: CONTEXT, name: "root", executer })
+}));
 
 // one call per text before the measurement, so the code cache is warm and what is measured is
 // the text handling rather than the first compilation of every statement in it
-await RESOLVER.resolveText(TEXT_DISTINCT);
-await RESOLVER.resolveText(TEXT_REPEATED);
-await RESOLVER.resolveText(TEXT_PLAIN);
-await RESOLVER.resolveText(TEXT_LITERALS);
+for (const { texts, resolver } of ENTRIES) {
+	for (const text of Object.values(texts)) await resolver.resolveText(text);
+}
 
-describe("resolveText over a text", () => {
-	bench(`${COUNT} distinct expressions`, async () => {
-		await RESOLVER.resolveText(TEXT_DISTINCT);
-	});
+for (const { executer, texts, resolver } of ENTRIES) {
+	describe(`resolveText over a text [${executer}]`, () => {
+		bench(`${COUNT} distinct expressions`, async () => {
+			await resolver.resolveText(texts.distinct);
+		});
 
-	bench(`one expression ${COUNT} times`, async () => {
-		await RESOLVER.resolveText(TEXT_REPEATED);
-	});
+		bench(`one expression ${COUNT} times`, async () => {
+			await resolver.resolveText(texts.repeated);
+		});
 
-	bench("no expression at all", async () => {
-		await RESOLVER.resolveText(TEXT_PLAIN);
-	});
+		bench("no expression at all", async () => {
+			await resolver.resolveText(texts.plain);
+		});
 
-	bench("expressions carrying literals", async () => {
-		await RESOLVER.resolveText(TEXT_LITERALS);
+		bench("expressions carrying literals", async () => {
+			await resolver.resolveText(texts.literals);
+		});
 	});
-});
+}

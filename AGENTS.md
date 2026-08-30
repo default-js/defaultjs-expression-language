@@ -120,6 +120,10 @@ A consumer who wants a non-default executer imports it explicitly; that same imp
 
 ## Conventions
 
+- **Separation of concerns.** A component does its own job and carries no rule on behalf of
+  another one: a cache caches, a proxy proxies, and a check lives with the part that needs it.
+  Where two parts need the same constant, it is provided centrally rather than duplicated. The
+  decision of 2026-08-30 in `DECISIONS.md` carries the case that produced this rule.
 - Indent with **tabs** — spaces only in markdown, where nesting is column-based syntax.
 - Files are utf-8 with LF endings, a final newline, and no trailing whitespace.
 - ESM imports **always carry the `.js` extension** — the sources run untranspiled in the browser.

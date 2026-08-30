@@ -19,6 +19,42 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-08-30 — Where does a check belong that only one part of the code needs?
+
+**Decision:** With the part that needs it. Separation of concerns is a rule of this code base, not
+a preference: a component does its own job and does not carry a rule on behalf of another one.
+Concretely, and this is the case that produced the rule: `ResolverContextHandle` is a cache and a
+proxy. It is filled with data structures that are already valid, so it checks and filters nothing.
+Where an executer needs a check — which names may appear in the code it generates — that check
+belongs to the executer and its implementation. Constants that more than one part needs are
+provided centrally, `Constants.js` being the obvious place.
+
+**Reasoning:** Frank's, on 2026-08-30, against the assessment written the same day. A filter placed
+where the data is stored rather than where the rule applies looks cheap — it runs once instead of
+per use — but it makes the storage answer for a consumer it knows nothing about, and every other
+consumer pays for a rule it never asked for. That was measurable here: `VARNAME_CHECK` and
+`RESERVED_WORDS` are needed by exactly one of four executers, the one that turns names into code
+(`Object.getOwnPropertyNames` appears in `ContextDeconstructorExecuter` alone), yet they were
+applied while the property cache was built and therefore narrowed **the lookup** for all four. A
+context carrying `test-test`, `class`, `0` or `undefined` answered `undefined` under
+`ContextObjectExecuter`, although `ctx["test-test"]` is an ordinary property access that executer
+can express. The component that owns the rule is the only one that can weigh it.
+
+**Alternatives:** Keep the filter where the names are collected, because it runs once per context
+instead of once per execution, and the one executer that needs it computes its name list on every
+call. That is a real cost and it is the argument that has to be measured when the check moves, not
+one that decides where the rule belongs. Splitting the rule — the syntactic half to the executer,
+the shadowing half (`undefined`, `constructor`) to the handle — was weighed and rejected for the
+same reason: it leaves the handle answering for a consumer's concern.
+
+**Consequences:** The filtering in `ResolverContextHandle` goes, including the `isVariableName`
+predicate added earlier the same day, and `ContextDeconstructorExecuter` takes the check over.
+Consumer-visible: names that were dropped become reachable and appear in an enumeration of a
+context, and the warning `Variable name is illegal …` leaves the context path. The same question
+is open for `RESERVED_NAMES` in `EsprimaExecuter`, which is that executer's version of the same
+rule — see `BACKLOG.md`. Beyond this case the rule applies to every part of the code, and it is
+the reason to ask, before adding a check anywhere, whose job the rule actually is.
+
 ## 2026-08-29 — Is the price of evaluating every occurrence on its own acceptable?
 
 **Decision:** Yes, and it is the only case that got slower. A text repeating one expression twenty

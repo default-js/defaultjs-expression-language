@@ -1,8 +1,8 @@
 import ExpressionResolver from "../src/ExpressionResolver.js";
-import { EXECUTERNAME as WithScopedExecuterName } from "../src/executer/WithScopedExecuter.js";
-import { EXECUTERNAME as ContextObjectExecuterName } from "../src/executer/ContextObjectExecuter.js";
-import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../src/executer/ContextDeconstructorExecuter.js";
-import { EXECUTERNAME as EsprimaExecuterName } from "../src/executer/EsprimaExecuter.js";
+import { EXECUTERNAME as WithScopedExecuterName, setupExecuter as setupWithScopedExecuter } from "../src/executer/WithScopedExecuter.js";
+import { EXECUTERNAME as ContextObjectExecuterName, setupExecuter as setupContextObjectExecuter } from "../src/executer/ContextObjectExecuter.js";
+import { EXECUTERNAME as ContextDeconstructorExecuterName, setupExecuter as setupContextDeconstructorExecuter } from "../src/executer/ContextDeconstructorExecuter.js";
+import { EXECUTERNAME as EsprimaExecuterName, setupExecuter as setupEsprimaExecuter } from "../src/executer/EsprimaExecuter.js";
 
 /**
  * Every registered executer, each with the name a statement has to use to reach a given property
@@ -12,13 +12,16 @@ import { EXECUTERNAME as EsprimaExecuterName } from "../src/executer/EsprimaExec
  * that freedom - see DECISIONS.md, 2026-08-24.
  *
  * A conformance suite whose rule has to hold under every executer loops over this and asks for a
- * name through `variableName`, so what it measures is the rule and not the spelling.
+ * name through `variableName`, so what it measures is the rule and not the spelling. The
+ * benchmarks loop over the same list, which is why each entry also carries its `setupExecuter`:
+ * every executer keeps a code cache of its own, and a benchmark that wants a cold cache has to
+ * switch off all four.
  */
 export const EXECUTERS = [
-	{ name: WithScopedExecuterName, variableName: (property) => property },
-	{ name: ContextObjectExecuterName, variableName: (property) => `ctx.${property}` },
-	{ name: ContextDeconstructorExecuterName, variableName: (property) => property },
-	{ name: EsprimaExecuterName, variableName: (property) => property }
+	{ name: WithScopedExecuterName, variableName: (property) => property, setupExecuter: setupWithScopedExecuter },
+	{ name: ContextObjectExecuterName, variableName: (property) => `ctx.${property}`, setupExecuter: setupContextObjectExecuter },
+	{ name: ContextDeconstructorExecuterName, variableName: (property) => property, setupExecuter: setupContextDeconstructorExecuter },
+	{ name: EsprimaExecuterName, variableName: (property) => property, setupExecuter: setupEsprimaExecuter }
 ];
 
 /**

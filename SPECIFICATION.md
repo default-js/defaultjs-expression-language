@@ -312,6 +312,22 @@ A context is never touched directly. Every access goes through the proxy of
 `ResolverContextHandle`, which is what implements the chain walk of 5.2 and what makes a write
 land on a defined link rather than on the object the caller handed in.
 
+The proxy stands over a target of its own rather than over the context object, because it answers
+for more than that object holds — the names of the whole chain. A proxy may not speak that freely
+for a target that guarantees anything about its own keys, so building it that way is what makes
+**any** context object usable, a frozen or sealed one included.
+
+Enumerating a context therefore describes the chain rather than one link: `Object.keys`, a spread
+and `JSON.stringify` answer every name the chain carries, each with the enumerability it has where
+it is defined — so the members of a prototype stay out of `Object.keys` exactly as they would on
+the object itself. `Object.getOwnPropertyNames` is the wider list an executer builds on and does
+name them. Values are read at the moment of the lookup (6.2). A write through the proxy lands on
+the link it was made on; where that link's context is frozen, the write fails as it would on the
+object itself.
+
+**One exception**: a context that is the global object is used as it is, with no proxy in front of
+it — see 6.4.
+
 ### 6.2 Names are a snapshot, values are live
 
 The set of keys a link contributes is captured when the resolver is built. Adding a key to the
@@ -350,16 +366,19 @@ This is what makes a typo in an expression indistinguishable from an empty value
 accepted (section 7).
 
 The global object may also be handed in as a context object; it is then an ordinary link of the
-chain. Two consequences follow from what such a link is, and both are intended:
+chain. Three things follow from what such a link is, and all three are intended:
 
 - It carries **every** name, so it answers every lookup that reaches it and no link below it is
   ever consulted. A global-object link therefore belongs at the root of a chain, not in the
   middle of one.
-- The set of names it contributes is every own name of the global object, which
-  `ContextDeconstructorExecuter` destructures on every execution.
-
-*Not yet implemented* — under `ContextDeconstructorExecuter` a resolver on the global object
-still fails, for an unrelated reason; see `BACKLOG.md`.
+- It is **not proxied**. A proxy exists to flatten the chain and to catch writes, and neither has
+  anything to add in front of an object that already carries every name — while a proxy is not
+  free to hide what its target guarantees, so putting one there breaks every operation that
+  enumerates the context. `getData()` on such a resolver therefore answers the global object
+  itself, and a write through it is an ordinary global write.
+- An executer may treat it as its own case. `ContextDeconstructorExecuter` reads the names of a
+  context before it runs a statement; for the global object it skips that, because the statement
+  reaches a global through the ordinary scope chain anyway (8.3).
 
 ### 6.5 Writing from inside an expression
 
@@ -598,7 +617,6 @@ Every rule above that the code does not keep today, in one place:
 | 4.1 the configuration form of the static calls | The static entry points take no configuration object |
 | 5.1 a generated name where none was passed | `effectiveChain` is a copy of `chain`, and a resolver without a name |
 | 5.5 `effectiveChain` and `contextChain` skip links without a context | `effectiveChain` is a copy of `chain`, and a resolver without a name |
-| 6.4 the global object as a context, under `ContextDeconstructorExecuter` | The `ownKeys` trap drops symbols, and a global context is where that breaks |
 | 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |
 | 6.6 `getData`, `deleteData` with a filter | `getData` and `deleteData` are broken on the filter path |
 | 6.6 the rules of the four data methods along the chain | The data methods have no rules along the chain |

@@ -183,6 +183,17 @@ Entries here are independent of each other. An undertaking whose steps depend on
   the fix is cheap: answer non-string properties in `get`/`has` without walking, or give the
   handle an own `Symbol.unscopables`. Consumer-visible performance, so the outcome belongs in
   `DECISIONS.md`.
+  **The cross-executer numbers of 2026-08-30 say it holds.** Since the benchmarks run under every
+  executer, the `with` block can be compared against three strategies that do not use one, over the
+  same chain. `RandomScope`, where the match sits a few links up, is the clearest: at depth 100 000
+  `with-scoped` answers **138 hz** while `context-object` answers **662 000 hz** and `esprima`
+  **457 000 hz** — the two that do not use `with` do not scale with the depth at all, exactly as a
+  lookup that stops at the match should not. `WarmResolve`, where the name sits at the bottom and
+  everyone walks the whole chain, puts the same three within a factor of three of each other
+  (13 / 41 / 41 hz at depth 1 000 000), so the difference is not the executer being faster in
+  general — it is the extra full walk that only `with` triggers. The default executer is therefore
+  the slowest of the four on any chain worth the name, which the entry on the deprecated default
+  should be read against.
 
 - [ ] **The deep-chain benchmarks are bimodal by a factor of two across runs.**
   At depths 100 000 and 1 000 000 a run settles into one of two states and stays there: roughly
@@ -276,14 +287,16 @@ Entries here are independent of each other. An undertaking whose steps depend on
      plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:41`. The public
      surface test asserts both exports exist but never flips them, deliberately: a debug switch
      has no observable effect to assert on.
-  3. The `set` and `delete` of `createGlobalCacheWrapper` (`ResolverContextHandle.js`). Reachable
-     since the global-context fix of 2026-08-29 — `keys` now runs — but only a write or a delete
-     through a resolver built on the global object reaches the other two, and nothing does that
-     today. Whether they should be exercised at all depends on the global-write switch of 6.5,
-     which is what decides whether such a write is allowed in the first place.
-  4. `ResolverContextHandle.js:118` (`get parent`) and `:122-123` (`updateData` on the handle,
-     not the one on the resolver). Both are public on a class that section 9 does not list, so
-     decide whether they are surface at all before covering them — see the `Context` export entry.
+  3. The `set` and `delete` of `createGlobalCacheWrapper` (`ResolverContextHandle.js`). Since a
+     global context is no longer proxied (2026-08-30), nothing routes a write through the wrapper
+     at all — only `has`, `get` and `keys` are reached, and those through a child link. Whether the
+     two remaining methods still have a caller is worth checking before covering them.
+  4. `get parent` and `updateData` on the handle (`ResolverContextHandle.js`, not the `updateData`
+     on the resolver). Both are public on a class that section 9 does not list, so decide whether
+     they are surface at all before covering them — see the `Context` export entry. One more reason
+     to settle it, noted 2026-08-30: `updateData(data)` replaces the data and rebuilds the cache,
+     but the proxy is decided in the constructor, so it cannot move a handle between the global
+     shape and the ordinary one.
   `src/version.js` is generated, so its 0 % stays noise. The 22 branches still open are spread over
   the scanner's state machine and `EsprimaExecuter`; they are combinations of literal states, not
   rules without a test. Update these numbers when the picture changes rather than adding a fourth
@@ -328,26 +341,50 @@ Entries here are independent of each other. An undertaking whose steps depend on
   carries no `fails` marker, since it does pass; it starts proving its rule the moment the typo
   is gone. Re-read it with this fix and make sure it still passes for the right reason.
 
-- [ ] **The `ownKeys` trap drops symbols, and a global context is where that breaks.**
-  Target: `SPECIFICATION.md` 6.4 — the global object stays a supported context object, under
-  every executer.
-  The trap collects the string keys of the property caches along the chain
-  (`src/ResolverContextHandle.js:100-111`) and never reports a symbol. A proxy must report every
-  non-configurable own property of its target, so as soon as the target carries a
-  non-configurable own symbol the trap violates the invariant and the engine throws
-  `TypeError: 'ownKeys' on proxy: trap result did not include 'Symbol(...)'`. Verified 2026-08-29
-  in the test browser: `new ExpressionResolver({ context: globalThis, executer:
-  "context-deconstruction-executer" })` throws on the first expression, because that executer
-  destructures the context and destructuring asks for `ownKeys`; the symbol it trips over there is
-  vitest's own `Symbol(matchers-object)` on `globalThis`. The other three executers answer
-  correctly since the global-context fix of the same day — `${ Math.round(1.5) }` is `2` and an own
-  global property reads back. So the reach is narrow but real: any context object carrying a
-  non-configurable own symbol, and the global object is the one consumers actually hand in.
-  A frozen context object is the second case. The fix is to report symbols as well, which means
-  deciding what the property cache does with them: it skips non-string names on purpose
-  (`:161-162`), because a symbol is not a variable name — so the trap has to reach past the cache
-  to the data objects rather than the cache learning about symbols. Consumer-visible, so the
-  outcome belongs in `CHANGELOG.md`. Found 2026-08-29 while fixing the global-context lookup.
+- [ ] **Take the name check out of `ResolverContextHandle` and give it to the executer that needs it.**
+  Agreed 2026-08-30, reasoning in `DECISIONS.md` — the cache stays a cache, the proxy stays a
+  proxy, both are filled with data structures that are already valid, and neither checks anything.
+  What goes: `VARNAME_CHECK`, `RESERVED_WORDS`, the `isVariableName` predicate and the warning
+  `Variable name is illegal …` in `#initPropertyCache`, plus the same filter in the cache wrapper of
+  a global context. What takes over: `ContextDeconstructorExecuter`, the only place that turns
+  context names into code (`Object.getOwnPropertyNames` appears nowhere else in `src/`), filters the
+  names it destructures. Constants that more than one part needs go into a central `Constants.js`.
+  Measured consequences, all consumer-visible: under `ContextObjectExecuter` a context carrying
+  `test-test`, `class`, `0` or `undefined` answers `undefined` today although `ctx["test-test"]` is
+  an ordinary property access — those become reachable; an enumeration of a context widens by the
+  same names; and the warning leaves the context path, where it fires today for consumers who never
+  generate code. Two things to settle while implementing: whether `undefined` and `constructor` may
+  then shadow through a `with` block, which is what dropping `RESERVED_WORDS` from the lookup
+  allows, and what the filter costs in the executer, which computes its name list on every call —
+  `npm run bench` covers every executer since 2026-08-30, so that is measurable now. Related and
+  worth deciding together: `RESERVED_NAMES` in `EsprimaExecuter` is that executer's version of the
+  same rule, see its entry above. `CHANGELOG.md` and `SPECIFICATION.md` 6.1 both move with it.
+
+- [ ] **A context that is not an object throws from inside the property cache.**
+  `ResolverContextHandle` keeps whatever it is handed except a falsy value (`data || {}`), so
+  `new ExpressionResolver({ context: "abc" })` — or `42`, or `true` — reaches `Reflect.ownKeys` on
+  a primitive and throws `TypeError: Reflect.ownKeys called on non-object` at construction, from
+  three frames below the call. A falsy primitive is silently taken as an empty context instead, so
+  `0` and `false` build a resolver and `42` does not. Verified 2026-08-30 in the test browser and
+  pinned in `test/general/ContextShapeTest.js`, which asserts only *that* it throws, so a decision
+  to reject a primitive with a clear message keeps the test green. To decide: reject with an error
+  that names the mistake, coerce (`Object(context)`), or ignore and take an empty context — the
+  last of the three is what the falsy half does today. `SPECIFICATION.md` says nothing about what a
+  context may be, which is the other half of the entry. Found 2026-08-30 while checking how the
+  executers treat unusual context shapes.
+
+- [ ] **`ContextDeconstructorExecuter` reads every property of a context, including one that throws
+  on access.**
+  It builds its destructuring pattern from the names of the context and then destructures, which
+  *calls* every accessor among them. A context whose accessor throws therefore breaks every
+  expression, including one that touches no name at all. Verified 2026-08-30 with an `arguments`
+  object, whose `callee` is a poisoned accessor in strict mode: `${ 1 + 1 }` answers `2` under
+  `WithScopedExecuter` and `TypeError: 'caller', 'callee', and 'arguments' properties may not be
+  accessed…` under this one. Pinned as the current difference in `test/general/ContextShapeTest.js`.
+  The same shape covers any context with a lazily computed or throwing getter, and note that
+  destructuring also *runs* every getter on every execution, which is a cost the other executers do
+  not pay. To decide whether that is a defect of the executer or the price of its strategy (8.3).
+  Found 2026-08-30 while checking how the executers treat unusual context shapes.
 
 - [ ] **A write to an unknown name inside an expression lands on `globalThis`.**
   Target: `SPECIFICATION.md` 6.5 — the negative guarantee and the three-level switch.
@@ -372,6 +409,11 @@ Entries here are independent of each other. An undertaking whose steps depend on
   back to `GLOBAL[property]` so reads are unaffected. Under `ContextDeconstructorExecuter` the write cannot be caught at all, so there
   the protected state means generating the body in strict mode: the assignment throws and is
   reported as an execution error.
+  **One case has no interception point since 2026-08-30:** a resolver whose context *is* the global
+  object is no longer proxied, so a write from an expression evaluated on it reaches the global
+  object directly and the switch cannot catch it there. Arguably that write is not "reaching out to
+  the global object" but writing into that resolver's own context — decide it explicitly rather
+  than discovering it while implementing.
   **`buildSecure` has to forward it in the same change.** Since 2026-08-29 it takes the
   constructor options inside its `option` argument and names them one by one
   (`src/ExpressionResolver.js:355`), so `allowGlobalWrite` has to be added to that destructuring
@@ -380,6 +422,22 @@ Entries here are independent of each other. An undertaking whose steps depend on
   together.
   Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
   Found 2026-08-22 while working out the specification questions.
+
+- [ ] **`EsprimaExecuter` cannot reach a context value from inside a nested function.**
+  Its rewrite turns an identifier into `ctx?.name`, but only where the identifier stands in the
+  statement itself. Verified 2026-08-30 in the test browser with a context `{ count: 3 }`:
+  `${ count }` answers `3`, while `${ (() => { return count; })() }`,
+  `${ [1,2].map(v => v + count).join() }` and `${ (function(){ return count; })() }` all raise
+  `ReferenceError: count is not defined`. Every other executer answers all four, because they put
+  the context into scope (`with`), into the parameter list, or hand it over as an object - and a
+  nested function closes over any of those. A callback is not an exotic thing to write in an
+  expression, so this is narrower than it looks only until someone writes `map`. §8.3 lets an
+  executer decide how a statement reaches a context value, but not to lose it halfway through the
+  statement. Read together with the `RESERVED_NAMES` entry above: both are about what the rewrite
+  does and does not see, and one pass over that rewrite should answer both. Consumer-visible, so
+  the outcome belongs in `CHANGELOG.md`. Found 2026-08-30 while making the benchmarks run under
+  every executer - the benchmark for expressions carrying literals had to stop reading the context
+  inside an arrow function because of it.
 
 - [ ] **`RESERVED_NAMES` in the esprima executer misspells `global`.**
   Related to `SPECIFICATION.md` 6.4, because it decides what an expression can reach.

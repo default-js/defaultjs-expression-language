@@ -18,6 +18,27 @@ import { ExpressionResolver } from "../../index.js";
 export const DEPTHS = [10, 1000, 100000, 1000000];
 
 /**
+ * Answers an entry into the chain that resolves under the given executer.
+ *
+ * The executer of a resolution is the one of the resolver the call is made on, and it is carried
+ * along the whole walk - `resolve(this.#executer, this, …)` in `ExpressionResolver`. So one chain
+ * serves every executer: a link on top of it, built with that executer and an empty context of its
+ * own, resolves over the same links below. Building one chain per executer is not an option, the
+ * deepest is a million links.
+ *
+ * The extra link costs one step of the walk, the same for every executer, so a comparison between
+ * them is unaffected. Note the empty context is passed explicitly: leaving `context` out takes the
+ * default executer's default context, which for `EsprimaExecuter` is the global object - and a
+ * global context answers every name itself, so nothing below it would ever be reached.
+ *
+ * @param {ExpressionResolver} aResolver the link to resolve over
+ * @param {string} anExecuterName
+ * @returns {ExpressionResolver}
+ */
+export const bindExecuter = (aResolver, anExecuterName) =>
+	new ExpressionResolver({ context: null, name: "entry", parent: aResolver, executer: anExecuterName });
+
+/**
  * Builds one chain up to the deepest entry of DEPTHS and returns the link found at each depth.
  * The bottom link is the only one carrying "first"; every link above it has to be walked.
  *

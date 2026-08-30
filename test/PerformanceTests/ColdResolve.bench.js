@@ -1,6 +1,6 @@
 import { bench, describe } from "vitest";
-import { setupExecuter } from "../../src/executer/WithScopedExecuter.js";
-import { buildChain, DEPTHS } from "./ChainBuilder.js";
+import { EXECUTERS } from "../TestUtils.js";
+import { buildChain, bindExecuter, DEPTHS } from "./ChainBuilder.js";
 
 /**
  * Case 1 of the former PerformanceTests: what a resolve over a deep chain costs when nothing
@@ -13,10 +13,12 @@ import { buildChain, DEPTHS } from "./ChainBuilder.js";
  * insertion into the cache, which a disabled cache skips.
  *
  * Two chain shapes, as in the original: links carrying a context that does not match, and
- * links carrying no context at all.
+ * links carrying no context at all. Since 2026-08-30 every shape runs under every executer,
+ * because generating code is exactly what the four of them do differently.
  */
 
-setupExecuter({ size: 0 });
+// every executer keeps a code cache of its own, so a cold measurement has to switch off all four
+for (const { setupExecuter } of EXECUTERS) setupExecuter({ size: 0 });
 
 const SHAPES = [
 	["links carry a non-matching context", buildChain({ test: "test" })],
@@ -24,12 +26,15 @@ const SHAPES = [
 ];
 
 for (const [shape, chain] of SHAPES) {
-	describe(`cold resolve, ${shape}`, () => {
-		for (const depth of DEPTHS) {
-			const resolver = chain.get(depth);
-			bench(`depth ${depth}`, async () => {
-				await resolver.resolve("${first}", "fail");
-			});
-		}
-	});
+	for (const { name: executer, variableName } of EXECUTERS) {
+		describe(`cold resolve, ${shape} [${executer}]`, () => {
+			const expression = `\${${variableName("first")}}`;
+			for (const depth of DEPTHS) {
+				const resolver = bindExecuter(chain.get(depth), executer);
+				bench(`depth ${depth}`, async () => {
+					await resolver.resolve(expression, "fail");
+				});
+			}
+		});
+	}
 }

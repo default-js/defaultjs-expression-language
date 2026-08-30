@@ -1,5 +1,7 @@
 import { bench, describe } from "vitest";
 import { ExpressionResolver } from "../../index.js";
+import { EXECUTERS } from "../TestUtils.js";
+import { bindExecuter } from "./ChainBuilder.js";
 
 /**
  * Case 3 of the former PerformanceTests, and a different question from the other two. Every
@@ -9,7 +11,8 @@ import { ExpressionResolver } from "../../index.js";
  * like, and it means only a few links are walked on average however tall the chain is.
  *
  * It is also the only one of the three that puts many distinct statements through the
- * CodeCache rather than a single one, so it exercises the cache as a cache.
+ * CodeCache rather than a single one, so it exercises the cache as a cache. Since 2026-08-30
+ * it does that for every executer, each of which keeps a cache of its own.
  *
  * Setup lives in the module body on purpose - see ChainBuilder.js for why a bench file has
  * nowhere else to put it.
@@ -40,11 +43,13 @@ for (let depth = 1; depth <= Math.max(...DEPTHS); depth++) {
 	if (wanted.has(depth)) entries.set(depth, resolver);
 }
 
-describe("random scope lookup", () => {
-	for (const depth of DEPTHS) {
-		const entry = entries.get(depth);
-		bench(`depth ${depth}`, async () => {
-			await entry.resolve("${var" + nextInt(MAX_VARNAMES) + "}", true);
-		});
-	}
-});
+for (const { name: executer, variableName } of EXECUTERS) {
+	describe(`random scope lookup [${executer}]`, () => {
+		for (const depth of DEPTHS) {
+			const entry = bindExecuter(entries.get(depth), executer);
+			bench(`depth ${depth}`, async () => {
+				await entry.resolve("${" + variableName("var" + nextInt(MAX_VARNAMES)) + "}", true);
+			});
+		}
+	});
+}
