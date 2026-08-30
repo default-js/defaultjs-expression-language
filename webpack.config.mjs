@@ -46,7 +46,7 @@ export default (env, argv) => {
 				index: true,
 				writeToDisk: false,
 			},
-			static: ["./WebContent", "./src/css"],
+			static: ["./WebContent"],
 			watchFiles: { paths: ["src/**/*", "./WebContent"] }
 		}
 	};

@@ -113,14 +113,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   file, so decide first whether the versions should really be dropped — they do make the
   file churn on every dependency bump. Found 2026-08-21 while closing out the toolchain plan.
 
-- [ ] **`devServer.static` serves a directory that does not exist.**
-  `webpack.config.mjs` lists `["./WebContent", "./src/css"]`, but there is no `src/css` — the
-  whole `src/` tree is `.js`. The dev server reports it anyway on startup
-  (`Content not from webpack is served from './WebContent, ./src/css' directory`, verified
-  2026-08-21), it just never resolves anything from it. Harmless, but it is the second dead
-  path found in that one option; the first was the `./webcontent` casing. Left standing while
-  fixing the casing so the change stayed on the agreed scope. Found 2026-08-21.
-
 - [ ] **A `parent` that is not an `ExpressionResolver` is silently dropped.**
   `constructor` keeps `parent` only when it passes `parent instanceof ExpressionResolver`
   (`src/ExpressionResolver.js:131`), and answers `null` otherwise. So a caller who passes the
@@ -232,20 +224,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   (2026-08-21). Either it is somebody's intended public helper — then it needs a test and a
   mention in the readme — or it goes. Deleting a published file is consumer-visible, so the
   outcome belongs in `CHANGELOG.md`. Found 2026-08-21 during the first coverage run.
-
-- [ ] **Two `TestUtils` helpers pass the context where the instance API expects a default value.**
-  `createResolveWithExecuterFunction` and `createResolveTextWithExecuterFunction`
-  (`test/TestUtils.js:9-21`) call `resolver.resolve(expression, data, defaultValue, timeout)`,
-  but the instance signature is `resolve(aExpression, aDefault)`
-  (`src/ExpressionResolver.js:253`): the context lands in the default value, the resolver
-  itself is built without one, and every expression resolves against an empty context. The
-  two extra arguments also defeat the `arguments.length == 2` check the `DefaultValue`
-  distinction depends on (`AGENTS.md`, Architecture). Neither helper has a consumer, so
-  nothing is failing today — the trap is that they look usable. Either give them the static
-  `ExpressionResolver.resolve(aExpression, aContext, aDefault, aTimeout)`, which does take all
-  four, or build the resolver with the context and drop the extra arguments. The sibling
-  helper `createResolverWithExecuterFactory` was fixed on 2026-08-21 and is fine.
-  Found 2026-08-21 while covering `setupExecuter`.
 
 - [ ] **`WarmResolve` and `ColdResolve` can report a mean two to four times too high at depth 10,
   and the cause is the chain they hold live.**
@@ -519,3 +497,20 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `src/` (`ExpressionResolver.js:77`, `ResolverContextHandle.js:95` and `:153`). The test names are
   the loudest part and the one with a price: renaming them changes what the gate prints.
   Found 2026-08-30.
+
+- [ ] **The executer's `defaultContext` has no reader left, so 4.2 and 6.3 are unimplemented.**
+  `SPECIFICATION.md` 4.2 says `context` defaults to the default context of the **executer in
+  use**, and 6.3 leans on it: leaving `context` out is explicitly *not* the same as passing
+  `context: null`, because the first takes that default — for `EsprimaExecuter` the global object.
+  Since the constructor change of 2026-08-30 (`src/ExpressionResolver.js:269`) the option defaults
+  to `null` and the handle turns that into `{}`, so both cases answer an empty context. Before
+  that the constructor read `DEFAULT_EXECUTER.defaultContext` — the *globally* configured default
+  executer, not the one this resolver was built with — so the rule as written was never
+  implemented either; the change removed the approximation. A `grep` for `defaultContext` over
+  `src/` now finds only the definition in `Executer.js` and the four executers setting it, and no
+  reader at all, which leaves half of the `Executer` interface of 8.1 dead in production while
+  section 9 lists it as public. To decide: implement 4.2 with the executer of the instance, or
+  change 4.2 and 6.3 and drop `defaultContext` from the interface. No test covers the rule, which
+  is why the gate stayed green through the change, and unlike the other entries of section 10 this
+  one carries no `fails` marker yet. Consumer-visible, so the outcome belongs in `DECISIONS.md`
+  and in `CHANGELOG.md`. Found 2026-08-30 while rebuilding `dist/` after the commit `some fixes`.

@@ -605,6 +605,8 @@ Every rule above that the code does not keep today, in one place:
 | Rule | `BACKLOG.md` entry |
 |---|---|
 | 4.1 the configuration form of the static calls | The static entry points take no configuration object |
+| 4.2 `context` defaults to the executer's default context | The executer's `defaultContext` has no reader left |
+| 6.3 leaving `context` out differs from `context: null` | The executer's `defaultContext` has no reader left |
 | 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |
 | 6.7 `allowGlobalWrite` as an option of `buildSecure` | A write to an unknown name inside an expression lands on `globalThis` |
 | 8.2 the default executer | The default executer announces itself as deprecated |

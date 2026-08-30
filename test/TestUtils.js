@@ -47,16 +47,27 @@ export const createResolverWithExecuterFactory = (executer) => {
 	}
 };
 
+/**
+ * A `resolve` bound to one executer: `(expression, context, defaultValue)`. The context builds the
+ * resolver instead of travelling as an argument, because the instance `resolve` takes the
+ * expression and a default value and nothing else (SPECIFICATION.md 4.2). Whether a default value
+ * was passed is forwarded through the argument count, which is what the `DefaultValue`
+ * distinction rests on, so `undefined` as a default stays different from no default at all. No
+ * timeout: that one exists on the static entry points only (4.5).
+ */
 export const createResolveWithExecuterFunction = (executer) => {
-	return async (expression, data, defaultValue, timeout) => {
-		const resolver =  new ExpressionResolver({ executer });
-		return resolver.resolve(expression, data, defaultValue, timeout);
+	return async function (expression, context, defaultValue) {
+		const resolver = new ExpressionResolver({ context, executer });
+		return arguments.length > 2 ? resolver.resolve(expression, defaultValue) : resolver.resolve(expression);
 	}
 };
 
+/**
+ * The same for `resolveText`, and by the same rules.
+ */
 export const createResolveTextWithExecuterFunction = (executer) => {
-	return async (expression, data, defaultValue, timeout) => {
-		const resolver = new ExpressionResolver({ executer });
-		return resolver.resolveText(expression, data, defaultValue, timeout);
+	return async function (text, context, defaultValue) {
+		const resolver = new ExpressionResolver({ context, executer });
+		return arguments.length > 2 ? resolver.resolveText(text, defaultValue) : resolver.resolveText(text);
 	}
 };
