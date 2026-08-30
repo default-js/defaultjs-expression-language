@@ -320,27 +320,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   without a word is the one answer that is now ruled out. Consumer-visible, so the outcome belongs
   in `DECISIONS.md`. Found 2026-08-21 while covering `setupExecuter`.
 
-- [ ] **`getData` and `deleteData` are broken on the filter path.**
-  Target: `SPECIFICATION.md` 6.6, which specifies all four data methods along the chain — note
-  that it changes more than these two defects: a filter selects exactly one link and an unmatched
-  filter throws.
-  Both walk to the parent when a filter names another link, and both get it wrong.
-  `getData` (`src/ExpressionResolver.js:199-201`) calls `this.parent.getData(key, filter)`
-  without returning it, so a lookup that has to travel up the chain answers `undefined` instead
-  of the value — verified 2026-08-21: `leaf.getData("value", "root")` returns `undefined` where
-  the root holds `from root`. `deleteData` (`:224-226`) calls `this.parent.deleteDataData(key,
-  filter)` — a method that does not exist, so the same case throws
-  `TypeError: this.parent.deleteDataData is not a function`. The two neighbours built on the
-  same three-branch shape, `updateData` (`:215-217`) and `mergeContext` (`:239-240`), are
-  correct, which is what makes the pair easy to miss. All four are public methods and none of
-  the four has a test. Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
-  Found 2026-08-21 while reading the uncovered branches for goal 3.
-  **One conformance test depends on this typo, noted 2026-08-24:** `test/spec/ContextTest.js`,
-  "deleteData throws on a filter that matches no link", passes today — but because
-  `deleteDataData` raises a `TypeError`, not because an unknown scope is rejected on purpose. It
-  carries no `fails` marker, since it does pass; it starts proving its rule the moment the typo
-  is gone. Re-read it with this fix and make sure it still passes for the right reason.
-
 - [ ] **Take the name check out of `ResolverContextHandle` and give it to the executer that needs it.**
   Agreed 2026-08-30, reasoning in `DECISIONS.md` — the cache stays a cache, the proxy stays a
   proxy, both are filled with data structures that are already valid, and neither checks anything.
@@ -470,33 +449,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   have to survive the change. Consumer-visible, so the outcome belongs in `DECISIONS.md` and in
   `CHANGELOG.md`.
 
-- [ ] **`effectiveChain` is a copy of `chain`, and a resolver without a name has none.**
-  Target: `SPECIFICATION.md` 5.1 and 5.5.
-  `chain` and `effectiveChain` (`src/ExpressionResolver.js:159-171`) build the same string by the
-  same rule, only through their own getter, so no input tells them apart; a link without a name
-  contributes the literal `"/null"` to both. Agreed 2026-08-22: `chain` names **every** link,
-  `effectiveChain` only the links whose context **holds at least one value**, and `contextChain`
-  collects the contexts of exactly those links instead of all of them — so both describe a state
-  that changes over a resolver's lifetime, unlike the structural `chain`. Alongside it, and the reason the
-  context became the deciding characteristic: **every resolver gets a name**. Where the caller
-  passes none, one is generated — prefix `ER` plus a counter — so `name` never answers `null` and
-  every link can appear in a chain path. All three getters are supported public API (plan
-  question 17), so all three need tests. Consumer-visible, so the outcome belongs in
-  `CHANGELOG.md`. Found 2026-08-22 while drafting the specification.
-  **The rule was simplified on 2026-08-24** (`DECISIONS.md`), after stage 2 showed the original
-  one had no workable definition of "holds a value": the property cache walks the prototype chain
-  to its end, so even `{}` holds the members of `Object.prototype`. What counts now is what the
-  caller handed to the constructor — a link provides a context unless it was built with `null`,
-  with `undefined`, or without the option, and nothing has been written to it since. So the fix
-  needs no inspection of the context at all: one flag per link, set at construction and set again
-  by `mergeContext`, `updateData` and a write from an expression. `SPECIFICATION.md` 5.5 carries
-  the rule.
-  **Three existing assertions expect the wrong result and are already marked `fails`:**
-  `test/ExecuterTests/WithScopedExecuterTests/ResolverChainTest.js:63,73,83` each expect
-  `effectiveChain` to be `/first/second/third` on a chain with one link built as `context: null` —
-  under 5.5 that link does not appear. The corrected expectations stand in the file; remove the
-  markers with this fix.
-
 - [ ] **The static entry points take no configuration object.**
   Target: `SPECIFICATION.md` 4.1.
   `ExpressionResolver.resolve` and `resolveText` are positional only
@@ -521,15 +473,49 @@ Entries here are independent of each other. An undertaking whose steps depend on
   which is at least visible but still an accident rather than a rule. `SPECIFICATION.md` 4.1 says
   nothing about it either.
 
-- [ ] **The data methods have no rules along the chain.**
-  Target: `SPECIFICATION.md` 6.6.
-  `getData`, `updateData`, `deleteData` and `mergeContext` each take a `filter`, and what they do
-  with the chain was never specified — the code answers three different things and one of them is
-  a defect (see the entry on the filter path above). Agreed 2026-08-22: a filter selects exactly
-  one link, and **a filter matching no link throws** in all four instead of being silently
-  ignored, which is what happens today. `updateData` without a filter searches from the calling
-  resolver towards the root and changes the value where the key lives, creating it on the calling
-  resolver only when no link carries it. `deleteData` removes the key from exactly one link — the
-  addressed one, or the first one carrying it; a chain-wide switch was weighed and dropped. `mergeContext` stays a shallow `Object.assign` into one link's context.
-  Consumer-visible in several places, so the outcome belongs in `CHANGELOG.md`.
-  Found 2026-08-22 while specifying the write path.
+- [ ] **The JSDoc of the whole package needs one pass.**
+  Agreed 2026-08-30, out of the naming review of the same day. What that review turned up, without
+  looking at every file: the constructor of `ResolverContextHandle` is documented as "Creates an
+  instance of Context" and declares `@param {ExpressionResolver} resolver` for a parameter that is
+  called `parent` and holds a `ResolverContextHandle` (`src/ResolverContextHandle.js:137-141`);
+  `#initPropertyCache` promises `@returns {Map<string,PropertyDefinition>}`, a type that exists
+  nowhere, and over a global context it answers no Map at all but the cache wrapper (`:260`); the
+  doc block of `resolveText` has its description and the next line run together into one broken
+  line (`src/ExpressionResolver.js:465`); the constructor lists `context`, `parent` and `name` but
+  not `executer`, which has its own entry above; `generate(aStatement, contextProperties)`
+  documents only its first parameter (`src/executer/ContextDeconstructorExecuter.js:30`); and
+  `CodeCache.has`, `get`, `set` and `clear` carry no JSDoc at all, although `AGENTS.md` asks for it
+  on everything public. The pass goes file by file rather than through this list. Worth doing in
+  one go with the entry below: a wrong name and a wrong doc line usually sit in the same place.
+
+- [ ] **Check every method name against what it does and what it answers.**
+  Agreed 2026-08-30, after `#addressedLink` had to be renamed to `#findResolver` — the name said
+  "link" where a resolver comes back. The same review found, again without looking at every file:
+  `#getPropertyDef` answers the handle that carries a name, not a property definition, and in two
+  of the traps the variable it lands in is called `proxy` (`src/ResolverContextHandle.js:164`,
+  `:182`, `:287`); `chain` and `effectiveChain` answer a string path while `contextChain` answers
+  an array, and none of the three answers a chain in the sense of section 2; `getData` without a
+  key answers the whole context; `toText` converts nothing, it replaces `undefined` and `null` by
+  their word and hands everything else back (`src/ExpressionResolver.js:93`); `traverse` rewrites
+  the AST it walks (`src/executer/EsprimaExecuter.js:76`); `buildSecure` promises a security its
+  own JSDoc denies; `setupExecuter` sets the code cache size and nothing else; `normalize`,
+  `startsRegex`, `parseScope` and `scanExpression` each say less than they do; `registrate` is not
+  an English word and stands on the public surface (`src/ExecuterRegistry.js:11`);
+  `getExecuterType` is the import alias of `getExecuter` and answers an instance, `ContextProxy`
+  the import alias of `ResolverContextHandle` (`src/ExpressionResolver.js:4`, `:6`); and
+  `EsprimaExecuter`, registered as `esprima-executer`, parses with `espree`. The public ones —
+  section 9 names `registrate`, the three chain getters and `buildSecure` — are consumer-visible,
+  so their outcome belongs in `DECISIONS.md` and `CHANGELOG.md`; the private ones are a rename and
+  nothing else.
+
+- [ ] **"Link" is out of the specification and still stands in every other file.**
+  Decided 2026-08-30: one member of a chain is a **resolver**, so `SPECIFICATION.md` lost the term
+  from its table of terms and from all 56 places that used it. Nothing else was touched beyond the
+  text written in the same session, which leaves roughly 145 occurrences: `test/` carries 78, most
+  of them in the names of the conformance tests that mirror the specification
+  (`test/spec/ContextTest.js` 24, `test/spec/ChainTest.js` 21); `DECISIONS.md` 35; `BACKLOG.md` 17;
+  `CHANGELOG.md` 11, entries under `[Unreleased]` among them, which a reader will meet without a
+  definition once the specification no longer carries one; `AGENTS.md` 2; and three comments in
+  `src/` (`ExpressionResolver.js:77`, `ResolverContextHandle.js:95` and `:153`). The test names are
+  the loudest part and the one with a price: renaming them changes what the gate prints.
+  Found 2026-08-30.

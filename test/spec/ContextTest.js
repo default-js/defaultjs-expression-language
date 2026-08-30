@@ -217,8 +217,7 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(leaf.getData("value")).toBe("from root");
 	});
 
-	// not implemented, waits for BACKLOG.md "`getData` and `deleteData` are broken on the filter path"
-	it.fails("getData with a filter reads from the addressed link", async () => {
+	it("getData with a filter reads from the addressed link", async () => {
 		const { leaf } = buildChain();
 		expect(leaf.getData("value", "root")).toBe("from root");
 	});
@@ -228,8 +227,7 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(leaf.getData("leafOnly", "leaf")).toBe("l");
 	});
 
-	// not implemented, waits for BACKLOG.md "The data methods have no rules along the chain"
-	it.fails("getData throws on a filter that matches no link", async () => {
+	it("getData throws on a filter that matches no link", async () => {
 		const { leaf } = buildChain();
 		let error = null;
 		try {
@@ -240,8 +238,7 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(error != null).toBe(true);
 	});
 
-	// not implemented, waits for BACKLOG.md "The data methods have no rules along the chain"
-	it.fails("updateData without a filter changes the value where the key lives", async () => {
+	it("updateData without a filter changes the value where the key lives", async () => {
 		const { root, leaf } = buildChain();
 		leaf.updateData("value", "changed");
 		expect(root.getData("value")).toBe("changed");
@@ -260,8 +257,7 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(root.getData("value")).toBe("changed");
 	});
 
-	// not implemented, waits for BACKLOG.md "The data methods have no rules along the chain"
-	it.fails("updateData throws on a filter that matches no link", async () => {
+	it("updateData throws on a filter that matches no link", async () => {
 		const { leaf } = buildChain();
 		let error = null;
 		try {
@@ -272,15 +268,13 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(error != null).toBe(true);
 	});
 
-	// not implemented, waits for BACKLOG.md "`getData` and `deleteData` are broken on the filter path"
-	it.fails("deleteData with a filter removes the key from the addressed link", async () => {
+	it("deleteData with a filter removes the key from the addressed link", async () => {
 		const { root, leaf } = buildChain();
 		leaf.deleteData("rootOnly", "root");
 		expect(root.getData("rootOnly")).toBeUndefined();
 	});
 
-	// not implemented, waits for BACKLOG.md "The data methods have no rules along the chain"
-	it.fails("deleteData without a filter removes the key from the first link carrying it", async () => {
+	it("deleteData without a filter removes the key from the first link carrying it", async () => {
 		const { root, leaf } = buildChain();
 		leaf.deleteData("value");
 		expect(root.getData("value")).toBeUndefined();
@@ -293,10 +287,6 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(leaf.getData("value")).toBe("from root");
 	});
 
-	// This one passes today, but not for the reason it states: the walk to the parent calls
-	// `deleteDataData`, a method that does not exist, so a TypeError comes out of the typo rather
-	// than a deliberate error about an unknown scope. It carries no marker, because it does pass -
-	// but it proves the rule only once that typo is gone. Noted in BACKLOG.md with the fix.
 	it("deleteData throws on a filter that matches no link", async () => {
 		const { leaf } = buildChain();
 		let error = null;
@@ -335,8 +325,7 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(root.getData("added")).toBe("a");
 	});
 
-	// not implemented, waits for BACKLOG.md "The data methods have no rules along the chain"
-	it.fails("mergeContext throws on a filter that matches no link", async () => {
+	it("mergeContext throws on a filter that matches no link", async () => {
 		const { leaf } = buildChain();
 		let error = null;
 		try {

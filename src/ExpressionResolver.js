@@ -1,9 +1,8 @@
-import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 import ObjectUtils from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 import DefaultValue from "./DefaultValue.js";
 import getExecuterType from "./ExecuterRegistry.js";
 import DefaultExecuter from "./executer/WithScopedExecuter.js";
-import ContextProxy from "./ResolverContextHandle.js";
+import ResolverContextHandle from "./ResolverContextHandle.js";
 import Executer from "./Executer.js";
 
 /** @type {Executer} */
@@ -34,6 +33,15 @@ const toDefaultValue = (value) => {
 
 	return new DefaultValue(value);
 };
+
+let NAME_COUNTER = 0;
+/**
+ * The name a resolver carries where the caller passed none. Only uniqueness is promised, the shape
+ * is not - SPECIFICATION.md 5.1.
+ *
+ * @returns {string}
+ */
+const generateName = () => `ER${++NAME_COUNTER}`;
 
 const execute = async function (anExecuter, aStatement, aContext) {
 	// 3.4: an empty statement answers undefined, the same as `return;` in JavaScript
@@ -103,7 +111,7 @@ const startsRegex = (aText, aIndex) => {
  * Splits the text between the delimiters into the scope prefix of 3.3 and the statement. Both
  * entry points parse the prefix through this, so there is one rule for it and not two.
  */
-const parseScope = (aContent) => {
+const splitScopeAndStatement = (aContent) => {
 	const scope = EXPRESSION_SCOPE.exec(aContent);
 	if (!scope) return { scope: null, statement: normalize(aContent) };
 
@@ -206,7 +214,7 @@ const scan = (aText) => {
 			continue;
 		}
 
-		const { scope, statement } = parseScope(aText.substring(index + 2, end - 1));
+		const { scope, statement } = splitScopeAndStatement(aText.substring(index + 2, end - 1));
 		if (!occurrences) occurrences = [];
 		occurrences.push({ start: index, end: end, escaped: false, scope: scope, statement: statement });
 		index = aText.indexOf(EXPRESSION_START, end);
@@ -252,16 +260,18 @@ export default class ExpressionResolver {
 	 * @date 3/10/2024 - 7:27:57 PM
 	 *
 	 * @constructor
-	 * @param {{ context?: any; parent?: any; name?: any; }} param0
-	 * @param {object} [param0.context=GLOBAL]
-	 * @param {ExpressionResolver} [param0.parent=null]
-	 * @param {?string} [param0.name=null]
+	 * @param {{ context?: any; parent?: any; name?: any; }} options
+	 * @param {object} [options.context=GLOBAL]
+	 * @param {ExpressionResolver} [options.parent=null]
+	 * @param {?string} [options.name=null] where none is passed, one is generated - 5.1
 	 */
-	constructor({ context = DEFAULT_EXECUTER.defaultContext, parent = null, name = null, executer } = {}) {
+	constructor(options = {}) {
+		const { context = null, parent = null, name = null, executer } = options;
 		this.#executer = typeof executer === "string" ? getExecuterType(executer) : ExpressionResolver.defaultExecuter;
 		this.#parent = parent instanceof ExpressionResolver ? parent : null;
-		this.#name = name;
-		this.#contextHandle = new ContextProxy(context, this.#parent ? this.#parent.contextHandle : null);
+		this.#name = name || generateName();
+		
+		this.#contextHandle = new ResolverContextHandle(context, this.#parent ? this.#parent.contextHandle : null);
 		this.#context = this.#contextHandle.proxy;
 	}
 
@@ -288,21 +298,28 @@ export default class ExpressionResolver {
 	 * @returns {string}
 	 */
 	get chain() {
-		return this.parent ? this.parent.chain + "/" + this.name : "/" + this.name;
+		return this.parent ? `${this.parent.chain}/${this.name}` : `/${this.name}`;
 	}
 
 	/**
 	 * get effective chain path
 	 *
+	 * Only the resolvers that provide a context appear, so this describes a state and not the
+	 * structure - SPECIFICATION.md 5.5. Where none provides one, the answer is the empty string.
+	 *
 	 * @readonly
 	 * @returns {string}
 	 */
 	get effectiveChain() {
-		return this.parent ? this.parent.effectiveChain + "/" + this.name : "/" + this.name;
+		const parentEffectiveChain = this.parent ? this.parent.effectiveChain : "";
+		return this.#contextHandle.providesData ? `${parentEffectiveChain}/${this.name}` : parentEffectiveChain;
 	}
 
 	/**
 	 * get context chain
+	 *
+	 * The contexts of exactly the resolvers that provide one, this resolver's first and the root's
+	 * last - SPECIFICATION.md 5.5.
 	 *
 	 * @readonly
 	 * @returns {Context[]}
@@ -311,7 +328,7 @@ export default class ExpressionResolver {
 		const result = [];
 		let resolver = this;
 		while (resolver) {
-			if (resolver.context) result.push(resolver.context);
+			if (resolver.contextHandle.providesData) result.push(resolver.context);
 
 			resolver = resolver.parent;
 		}
@@ -320,57 +337,112 @@ export default class ExpressionResolver {
 	}
 
 	/**
+	 * The resolver a call addresses: the one the filter names, or the resolver the call was made on
+	 * where no filter is given.
+	 *
+	 * A filter selects exactly one resolver by the rule of 5.3, and a filter matching none throws -
+	 * a wrong name in an API call is a mistake in the calling code, unlike a scope prefix inside an
+	 * expression, which answers undefined (5.4). See SPECIFICATION.md 6.6.
+	 *
+	 * @param {?string} filter
+	 * @returns {ExpressionResolver}
+	 */
+	#findResolver(filter) {
+		if (!filter) return this;
+
+		let resolver = this;
+		while (resolver) {
+			if (resolver.name === filter) return resolver;
+			resolver = resolver.parent;
+		}
+
+		throw new Error(`Filter "${filter}" matches no resolver of the chain!`);
+	}
+
+	/**
+	 * The nearest resolver from here to the root that carries the key itself, or null where none
+	 * carries it. What decides is whether a resolver provides the name, not what it holds -
+	 * SPECIFICATION.md 5.2.
+	 *
+	 * @param {string} key
+	 * @returns {ExpressionResolver|null}
+	 */
+	#resolverForKey(key) {
+		let resolver = this;
+		while (resolver) {
+			if (resolver.contextHandle.hasData(key)) return resolver;
+			resolver = resolver.parent;
+		}
+
+		return null;
+	}
+
+	/**
 	 * get data from context
+	 *
+	 * Reads along the chain from the addressed resolver by the rule of 5.2. Without a key it answers the
+	 * whole context of that resolver - the proxy, so every access on it still sees the chain.
 	 *
 	 * @param {string} key
 	 * @param {?string} filter
 	 * @returns {*}
 	 */
 	getData(key, filter) {
-		if (!key) return this.context;
-		else if (filter && filter != this.name) {
-			if (this.parent) this.parent.getData(key, filter);
-		} else {
-			return this.context[key];
-		}
+		const resolver = this.#findResolver(filter);
+		if (!key) return resolver.context;
+
+		return resolver.context[key];
 	}
 
 	/**
 	 * update data at context
+	 *
+	 * Without a filter the value is changed where the key lives, counting from here towards the root,
+	 * and created here where no resolver carries it. With a filter the addressed resolver is the
+	 * target outright - SPECIFICATION.md 6.6.
 	 *
 	 * @param {string} key
 	 * @param {*} value
 	 * @param {?string} filter
 	 */
 	updateData(key, value, filter) {
+		const resolver = this.#findResolver(filter);
 		if (!key) return;
-		else if (filter && filter != this.name) {
-			if (this.parent) this.parent.updateData(key, value, filter);
-		} else {
-			this.context[key] = value;
-		}
+
+		const target = filter ? resolver : this.#resolverForKey(key) || this;
+		target.context[key] = value;
 	}
 
+	/**
+	 * delete data from context
+	 *
+	 * Removes the key from one resolver - the addressed one with a filter, and without one the first
+	 * resolver carrying it, counting from here towards the root. Removing it uncovers the value of
+	 * the next resolver that carries the same key - SPECIFICATION.md 6.6.
+	 *
+	 * @param {string} key
+	 * @param {?string} filter
+	 */
 	deleteData(key, filter) {
+		const resolver = this.#findResolver(filter);
 		if (!key) return;
-		else if (filter && filter != this.name) {
-			if (this.parent) this.parent.deleteDataData(key, filter);
-		} else {
-			delete this.context[key];
-		}
+
+		const target = filter ? resolver : this.#resolverForKey(key);
+		if (target) delete target.context[key];
 	}
 
 	/**
 	 * merge context object
 	 *
+	 * A shallow assignment into the context of the addressed resolver, replacing what is there and adding
+	 * what is not. No search along the chain: a merged key shadows the resolvers above from here on -
+	 * SPECIFICATION.md 6.6.
+	 *
 	 * @param {object} context
 	 * @param {?string} filter
 	 */
 	mergeContext(context, filter) {
-		if (filter && filter != this.name) {
-			if (this.parent) this.parent.mergeContext(context, filter);
-		} else
-			this.#contextHandle.mergeData(context);
+		this.#findResolver(filter).contextHandle.mergeData(context);
 	}
 
 	/**
@@ -392,7 +464,7 @@ export default class ExpressionResolver {
 			if (aExpression.startsWith(EXPRESSION_START)) {
 				if (!aExpression.endsWith("}")) throw new SyntaxError(`Expression does not end with "}": ${aExpression}`);
 
-				const { scope, statement } = parseScope(aExpression.substring(2, aExpression.length - 1));
+				const { scope, statement } = splitScopeAndStatement(aExpression.substring(2, aExpression.length - 1));
 				return await resolve(this.#executer, this, statement, scope, defaultValue);
 			}
 

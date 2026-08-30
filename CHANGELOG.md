@@ -34,6 +34,10 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   context value is the executer's own — `ContextObjectExecuter` requires `ctx.value` where the
   other three take `value`, so switching executer can mean rewriting expressions.
 
+  **Revised again on 2026-08-30**: the term *Link* is gone. One member of a chain is a
+  **resolver** — section 2 no longer defines a second word for the same thing, and the rules read
+  in one vocabulary.
+
 ### Changed
 
 - **`resolve` no longer catches an error — it logs it and hands it on.** A statement that fails
@@ -85,6 +89,33 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   An escaped `${` **opens nothing**, so the text behind it is scanned like any other: a delimiter
   that would have stood inside its statement is an expression of its own and resolves. See
   `SPECIFICATION.md` 3.2.
+
+- **The four data methods follow the rules of the chain now.** `getData`, `updateData`,
+  `deleteData` and `mergeContext` each take a `filter`, and what it meant was never quite the same
+  in two of them. A filter now selects **exactly one resolver** by its name — the rule a scope
+  prefix inside an expression follows — and **a filter matching none throws**, where three of the
+  four used to do nothing at all. Without a filter, `updateData` changes the value **where the key
+  lives**, walking towards the root and creating the key on the calling resolver only where no
+  resolver carries it, and `deleteData` removes it from the first one carrying it; both used to act
+  on the calling resolver alone. A caller who wants to define a value on one resolver without
+  reaching into the rest of the chain uses `mergeContext({ key: value })`, which is unchanged. See
+  `SPECIFICATION.md` 6.6.
+
+- **Every resolver carries a name, and the two state getters mean what they say.** A resolver built
+  without a `name` used to keep `null` and put the literal `/null` into every chain path; it now
+  **generates** one — `ER1`, `ER2`, … — so `name` never answers `null`. Only the uniqueness of a
+  generated name is promised, never its shape.
+
+  With every resolver named, `effectiveChain` and `contextChain` can do what they were meant to:
+  `effectiveChain` names only the resolvers that **provide a context**, and `contextChain` collects
+  the contexts of exactly those — where the first used to answer the same string as `chain` and the
+  second the whole list. A resolver provides a context when the caller handed one to the
+  constructor, any value that is neither `null` nor `undefined`, or when a value has been written
+  to it since through `updateData`, `mergeContext` or an assignment inside an expression. What the
+  context holds decides nothing: an empty object counts. Both therefore describe a **state** that
+  changes over a resolver's lifetime, while `chain` stays structural — a consumer must not cache
+  either. Where no resolver provides a context, `effectiveChain` is the empty string. See
+  `SPECIFICATION.md` 5.1 and 5.5.
 
 ### Removed
 
@@ -241,3 +272,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   771 bytes in the three development bundles. The published files therefore differed from every
   local build. `dist/**` is now excluded from line-ending conversion and ships exactly as built.
   The minified bundles and source maps were never affected.
+
+- **`getData` and `deleteData` were broken wherever a filter named another resolver.** `getData`
+  walked to the parent without returning what it found, so a value living further up answered
+  `undefined`; `deleteData` called `deleteDataData`, a method that does not exist, so the same case
+  raised a `TypeError`. Both walk the chain properly now — and an unknown filter raises a
+  deliberate error instead of that `TypeError`, see the entry under *Changed*.

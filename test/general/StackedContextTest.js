@@ -51,7 +51,10 @@ describe(`general: context checks: `, () => {
 				context: {},
 				parent,
 			});
-			resolver.updateData("test", "success");
+			// mergeContext, not updateData: since SPECIFICATION.md 6.6 a filterless updateData changes the
+			// value where the key lives, which is the parent here. Defining a key on this resolver and
+			// shadowing the parent from here on is what mergeContext does.
+			resolver.mergeContext({ test: "success" });
 			expect(await resolver.resolve("${test}")).toBe("success");
 			expect(await parent.resolve("${test}")).toBe("test");
 			resolver.deleteData("test");

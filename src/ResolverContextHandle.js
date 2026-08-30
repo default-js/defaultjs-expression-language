@@ -1,5 +1,4 @@
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
-import ExpressionResolver from "./ExpressionResolver.js";
 import { isNullOrUndefined } from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 
 const VARNAME_CHECK = /^[$_\p{ID_Start}][$\p{ID_Continue}]*$/u;
@@ -132,17 +131,20 @@ export default class ResolverContextHandle {
 	#data = null;
 	/** @type {Map<string,ResolverContextHandle>|null} */
 	#cache = null;
+	/** @type {boolean} */
+	#providesData = false;
 
 	/**
 	 * Creates an instance of Context.
 	 *
 	 * @constructor
-	 * @param {object} data
-	 * @param {ExpressionResolver} resolver
+	 * @param {object} context
+	 * @param {ResolverContextHandle} parent
 	 */
-	constructor(data, parent) {
-		this.#data = data || {};
+	constructor(context, parent) {
+		this.#data = context || {};
 		this.#parent = parent ? parent : null;
+		this.#providesData = !isNullOrUndefined(context);
 
 		this.#cache = this.#initPropertyCache();
 
@@ -168,6 +170,7 @@ export default class ResolverContextHandle {
 					//console.log("set property:", property, "=", value);
 					this.#data[property] = value;
 					this.#cache.set(property, this);
+					this.#providesData = true;
 					return true;
 				},
 				deleteProperty: (data, property) => {
@@ -228,14 +231,39 @@ export default class ResolverContextHandle {
 		return this.#parent;
 	}
 
+	/**
+	 * Whether this handle provides the name itself. Every name of its own context counts, the ones
+	 * inherited through the prototype chain included (5.2); a handle over the global object
+	 * provides every name.
+	 *
+	 * @param {string} key
+	 * @returns {boolean}
+	 */
+	hasData(key) {
+		return this.#cache.has(key);
+	}
+
+	/**
+	 * Whether this handle provides a context: one was handed to the constructor, or a value has been
+	 * written since. What the data holds decides nothing - SPECIFICATION.md 5.5.
+	 *
+	 * @readonly
+	 * @type {boolean}
+	 */
+	get providesData() {
+		return this.#providesData;
+	}
+
 	updateData(data) {
 		this.#data = data || {};
+		this.#providesData = !isNullOrUndefined(data);
 		this.#cache = this.#initPropertyCache();
 	}
 
 	mergeData(data) {
 		if (typeof data !== "object" || data == null) return;
 		Object.assign(this.#data, data);
+		this.#providesData = true;
 		this.#cache = this.#initPropertyCache();
 	}
 

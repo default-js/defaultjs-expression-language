@@ -27,18 +27,16 @@ describe("Specification 5.1 - structure", () => {
 		expect(resolver.name).toBe("root");
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
 	// The shape of a generated name is not specified - only that it is unique and obeys the
 	// character rule of 3.3, so that it can appear in a chain path and be addressed like any
 	// other. Uniqueness is the test below.
-	it.fails("generates a name where the caller passed none", async () => {
+	it("generates a name where the caller passed none", async () => {
 		const resolver = new ExpressionResolver({ context: {} });
 		expect(typeof resolver.name).toBe("string");
 		expect(/^[a-zA-Z0-9\-_\s]+$/.test(resolver.name)).toBe(true);
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
-	it.fails("generates a different name for every unnamed resolver", async () => {
+	it("generates a different name for every unnamed resolver", async () => {
 		const first = new ExpressionResolver({ context: {} });
 		const second = new ExpressionResolver({ context: {} });
 		expect(first.name !== second.name).toBe(true);
@@ -199,8 +197,7 @@ describe("Specification 5.5 - inspecting the chain", () => {
 		expect(leaf.chain).toBe("/root/middle/leaf");
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
-	it.fails("chain carries the generated name of an unnamed link, never null", async () => {
+	it("chain carries the generated name of an unnamed link, never null", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 } });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: root });
 		expect(leaf.chain.includes("null")).toBe(false);
@@ -223,32 +220,28 @@ describe("Specification 5.5 - inspecting the chain", () => {
 		expect(root.effectiveChain).toBe("/root");
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
-	it.fails("effectiveChain skips a link built with context null", async () => {
+	it("effectiveChain skips a link built with context null", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ context: null, name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
 		expect(leaf.effectiveChain).toBe("/root/leaf");
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
-	it.fails("effectiveChain skips a link built without the context option", async () => {
+	it("effectiveChain skips a link built without the context option", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
 		expect(leaf.effectiveChain).toBe("/root/leaf");
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
-	it.fails("effectiveChain is the empty string when no link provides a context, while chain stays full", async () => {
+	it("effectiveChain is the empty string when no link provides a context, while chain stays full", async () => {
 		const root = new ExpressionResolver({ context: null, name: "root" });
 		const leaf = new ExpressionResolver({ context: null, name: "leaf", parent: root });
 		expect(leaf.effectiveChain).toBe("");
 		expect(leaf.chain).toBe("/root/leaf");
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
-	it.fails("effectiveChain describes a state - a link joins when a value is written to it", async () => {
+	it("effectiveChain describes a state - a link joins when a value is written to it", async () => {
 		const root = new ExpressionResolver({ context: null, name: "root" });
 		const leaf = new ExpressionResolver({ context: null, name: "leaf", parent: root });
 		expect(leaf.effectiveChain).toBe("");
@@ -256,8 +249,7 @@ describe("Specification 5.5 - inspecting the chain", () => {
 		expect(leaf.effectiveChain).toBe("/leaf");
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
-	it.fails("contextChain collects the contexts of exactly the links that provide one", async () => {
+	it("contextChain collects the contexts of exactly the links that provide one", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ context: null, name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
@@ -272,8 +264,7 @@ describe("Specification 5.5 - inspecting the chain", () => {
 		expect(contexts[contexts.length - 1] === root.context).toBe(true);
 	});
 
-	// not implemented, waits for BACKLOG.md "`effectiveChain` is a copy of `chain`, and a resolver without a name"
-	it.fails("contextChain is empty when no link provides a context", async () => {
+	it("contextChain is empty when no link provides a context", async () => {
 		const root = new ExpressionResolver({ context: null, name: "root" });
 		const leaf = new ExpressionResolver({ context: null, name: "leaf", parent: root });
 		expect(leaf.contextChain.length).toBe(0);

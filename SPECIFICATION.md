@@ -36,9 +36,8 @@ deeper must never overwrite values further up.
 | **Expression** | A statement in its delimited form, `${…}`, optionally carrying a scope prefix. |
 | **Resolver** | One `ExpressionResolver` instance: a name, a context, and optionally a parent. |
 | **Chain** | A resolver and its parents. Also called the stacking context. |
-| **Link** | One resolver within a chain. |
-| **Root** | The link that has no parent. A resolver without a parent is its own root. |
-| **Context** | The data an expression is evaluated against, one object per link. |
+| **Root** | The resolver that has no parent. A resolver without a parent is its own root. |
+| **Context** | The data an expression is evaluated against, one object per resolver. |
 | **Executer** | The strategy that turns a statement into a value. Pluggable. |
 
 **Direction.** The chain is drawn as a tree in the usual way of computer science: the **root at
@@ -99,7 +98,7 @@ elsewhere in the text, and the other way round.
 
 ### 3.3 Scope prefix
 
-`${name::statement}` evaluates the statement on the link of the chain that carries the name
+`${name::statement}` evaluates the statement on the resolver of the chain that carries the name
 `name`. The prefix is optional; without it the resolver the call was made on applies.
 
 The name is a label, not a JavaScript identifier. Allowed are **letters, digits, whitespace,
@@ -227,25 +226,22 @@ promise is awaited before it is answered or inserted into a text.
 ### 5.1 Structure
 
 Every resolver carries a `name` and may carry a `parent`. A resolver sees its own context and
-the contexts of **all its parents**; it never sees the context of a link below it.
+the contexts of **all its parents**; it never sees the context of a resolver below it.
 
 A name is not optional. Where the caller passes none, the resolver **generates** one. The only
 requirement on a generated name is that it is **unique** and obeys the character rule of 3.3; its
 shape is not part of this specification, and a consumer must not depend on it. `ER` plus a
 counter — `ER1`, `ER2` — is what the implementation uses. A generated name is addressable like
-any other, but it is not meant to be addressed: it exists so that every link can be named in a
+any other, but it is not meant to be addressed: it exists so that every resolver can be named in a
 chain path and so that `name` never answers `null`.
-
-*Not yet implemented* — an unnamed resolver keeps `name` at `null` today and contributes the
-literal `"/null"` to a chain path; see `BACKLOG.md`.
 
 ### 5.2 Lookup without a prefix
 
 The lookup starts at the resolver the call was made on and climbs towards the root. **The
-nearest link that carries the key answers**, and shadows every link above it.
+nearest resolver that carries the key answers**, and shadows every resolver above it.
 
-What decides is whether the key **exists** on a link, not what it holds. A key defined with the
-value `undefined` answers the lookup and stops the walk; a key that a link does not carry at all
+What decides is whether the key **exists** on a resolver, not what it holds. A key defined with the
+value `undefined` answers the lookup and stops the walk; a key that a resolver does not carry at all
 is passed on to the parent.
 
 Keys inherited through the **prototype chain** of a context object count as carried — a getter
@@ -253,16 +249,16 @@ or a method defined on a class is reachable from an expression.
 
 ### 5.3 Lookup with a prefix
 
-`${name::statement}` climbs the chain until it reaches the link whose `name` equals the prefix,
-and evaluates the statement there — against that link's context and the contexts above it.
+`${name::statement}` climbs the chain until it reaches the resolver whose `name` equals the prefix,
+and evaluates the statement there — against that resolver's context and the contexts above it.
 
-Where more than one link carries the name, the **first one found while climbing** answers, and
+Where more than one resolver carries the name, the **first one found while climbing** answers, and
 the ones above it are shadowed — the same rule as 5.2, and for the same reason: a chain is built
-by descending, so the nearest link is the one the caller most recently introduced.
+by descending, so the nearest resolver is the one the caller most recently introduced.
 
-### 5.4 A prefix no link carries
+### 5.4 A prefix no resolver carries
 
-The result is `undefined` — the link does not exist, and `undefined` is what JavaScript uses to
+The result is `undefined` — the resolver does not exist, and `undefined` is what JavaScript uses to
 say so. A default value, if one was passed, then applies as it does everywhere else.
 
 ### 5.5 Inspecting the chain
@@ -273,36 +269,33 @@ resolver.effectiveChain    // → "/root/leaf"
 resolver.contextChain      // → [context, …] from this resolver upwards
 ```
 
-`chain` names **every** link from the root down to this resolver, one path segment per link.
+`chain` names **every** resolver from the root down to this one, one path segment each.
 
-`effectiveChain` names only the links that **provide a context**. Since every link now carries a
-name, the context is what tells the links apart: a link that exists only to hold a name and a
-parent adds nothing to a lookup, and does not appear here.
+`effectiveChain` names only the resolvers that **provide a context**. Since every one of them now
+carries a name, the context is what tells them apart: a resolver that exists only to hold a name and
+a parent adds nothing to a lookup, and does not appear here.
 
-`contextChain` answers the contexts of exactly those links, this resolver's first, the root's
+`contextChain` answers the contexts of exactly those resolvers, this resolver's first, the root's
 last.
 
-A link counts as providing a context when the caller **handed one to the constructor** — any
+A resolver counts as providing a context when the caller **handed one to the constructor** — any
 value that is neither `null` nor `undefined` — **or** when a value has been set on it since,
 through `mergeContext`, `updateData`, or a write from an expression. What the context holds is
 irrelevant: an empty object counts, and so does an object holding only names an expression cannot
 reach.
 
-A link therefore provides no context only in one case: it was built without one — `context: null`,
-`context: undefined`, or the option left out — and nothing has been written to it since. Note that
-this is the one place where `context: null` and `context: {}` are told apart; for a lookup they
-behave the same (6.3).
+A resolver therefore provides no context only in one case: it was built without one —
+`context: null`, `context: undefined`, or the option left out — and nothing has been written to it
+since. Note that this is the one place where `context: null` and `context: {}` are told apart; for
+a lookup they behave the same (6.3).
 
 One consequence follows from that and is part of the rule: `effectiveChain` and `contextChain`
-describe a **state, not a structure**. A link built without a context joins both the moment a
+describe a **state, not a structure**. A resolver built without a context joins both the moment a
 value is set on it. `chain` is the opposite: it is structural and does not change. Neither result
 should be cached by a consumer.
 
-When no link qualifies, `effectiveChain` is the empty string, while `chain` still answers the
+When no resolver qualifies, `effectiveChain` is the empty string, while `chain` still answers the
 full path.
-
-*Not yet implemented* — `effectiveChain` returns exactly what `chain` returns, and
-`contextChain` collects every link; see `BACKLOG.md`.
 
 ## 6. The context
 
@@ -310,19 +303,19 @@ full path.
 
 A context is never touched directly. Every access goes through the proxy of
 `ResolverContextHandle`, which is what implements the chain walk of 5.2 and what makes a write
-land on a defined link rather than on the object the caller handed in.
+land on a defined resolver rather than on the object the caller handed in.
 
 The proxy stands over a target of its own rather than over the context object, because it answers
 for more than that object holds — the names of the whole chain. A proxy may not speak that freely
 for a target that guarantees anything about its own keys, so building it that way is what makes
 **any** context object usable, a frozen or sealed one included.
 
-Enumerating a context therefore describes the chain rather than one link: `Object.keys`, a spread
-and `JSON.stringify` answer every name the chain carries, each with the enumerability it has where
-it is defined — so the members of a prototype stay out of `Object.keys` exactly as they would on
-the object itself. `Object.getOwnPropertyNames` is the wider list an executer builds on and does
-name them. Values are read at the moment of the lookup (6.2). A write through the proxy lands on
-the link it was made on; where that link's context is frozen, the write fails as it would on the
+Enumerating a context therefore describes the chain rather than one resolver: `Object.keys`, a
+spread and `JSON.stringify` answer every name the chain carries, each with the enumerability it has
+where it is defined — so the members of a prototype stay out of `Object.keys` exactly as they would
+on the object itself. `Object.getOwnPropertyNames` is the wider list an executer builds on and does
+name them. Values are read at the moment of the lookup (6.2). A write through the proxy lands on the
+resolver it was made on; where that resolver's context is frozen, the write fails as it would on the
 object itself.
 
 **One exception**: a context that is the global object is used as it is, with no proxy in front of
@@ -330,7 +323,7 @@ it — see 6.4.
 
 ### 6.2 Names are a snapshot, values are live
 
-The set of keys a link contributes is captured when the resolver is built. Adding a key to the
+The set of keys a resolver contributes is captured when the resolver is built. Adding a key to the
 handed-in object afterwards has no effect until `contextHandle.resetCache()` runs — an accepted
 side effect, not a defect.
 
@@ -340,13 +333,13 @@ Values are always read at the moment of the lookup, so mutating what a key holds
 Writing **through** the resolver — `updateData`, `mergeContext`, or an assignment through the
 proxy — keeps the set of keys in step.
 
-### 6.3 A link without a context
+### 6.3 A resolver without a context
 
-A link built with `context: null` is an empty context, equivalent to `{}`. It contributes nothing
-to a lookup and is passed through. This is not the same as leaving `context` out, which takes the
-executer's default context (4.2).
+A resolver built with `context: null` is an empty context, equivalent to `{}`. It contributes
+nothing to a lookup and is passed through. This is not the same as leaving `context` out, which
+takes the executer's default context (4.2).
 
-Such a link gains content like any other: through `updateData`, `mergeContext`, or a write from
+Such a resolver gains content like any other: through `updateData`, `mergeContext`, or a write from
 an expression evaluated on it (6.5).
 
 ### 6.4 Reaching the global object
@@ -365,12 +358,12 @@ mechanism; the details belong to the executer (section 8).
 This is what makes a typo in an expression indistinguishable from an empty value, which is
 accepted (section 7).
 
-The global object may also be handed in as a context object; it is then an ordinary link of the
-chain. Three things follow from what such a link is, and all three are intended:
+The global object may also be handed in as a context object; it is then an ordinary resolver of the
+chain. Three things follow from what such a resolver is, and all three are intended:
 
-- It carries **every** name, so it answers every lookup that reaches it and no link below it is
-  ever consulted. A global-object link therefore belongs at the root of a chain, not in the
-  middle of one.
+- It carries **every** name, so it answers every lookup that reaches it and no resolver below it is
+  ever consulted. A resolver over the global object therefore belongs at the root of a chain, not in
+  the middle of one.
 - It is **not proxied**. A proxy exists to flatten the chain and to catch writes, and neither has
   anything to add in front of an object that already carries every name — while a proxy is not
   free to hide what its target guarantees, so putting one there breaks every operation that
@@ -392,7 +385,7 @@ expression must not create or change anything on the global object.
 
 What happens instead is the executer's business and differs between them. Where the assignment
 can be intercepted — the `with`-based executer, whose assignments pass through the context proxy
-— it lands in the context of the link the expression is evaluated on. Where it cannot — the
+— it lands in the context of the resolver the expression is evaluated on. Where it cannot — the
 deconstructor executer, whose assignments hit a destructured local binding — it throws and is
 reported as an execution error (7). Nothing beyond the negative guarantee is promised, in
 particular not that the written value is still readable afterwards.
@@ -408,7 +401,7 @@ overriding the one above it:
 
 A level that is not given falls back to the one above it, and the application level defaults to
 `false` — so out of the box no write from an expression reaches the global object. With the
-switch on, an assignment behaves as plain JavaScript would and a key no link carries becomes a
+switch on, an assignment behaves as plain JavaScript would and a key no resolver carries becomes a
 global variable.
 
 How an executer keeps the guarantee is up to it. `WithScopedExecuter` can intercept the
@@ -431,54 +424,51 @@ resolver.mergeContext(context, filter)
 These four are the supported way to change a context, and unlike an assignment inside an
 expression (6.5) their behaviour is guaranteed and identical under every executer.
 
-They act **on the chain**, not on one isolated link, and how far each one reaches is a matter of
+They act **on the chain**, not on one isolated resolver, and how far each one reaches is a matter of
 convention per method, listed below. The rule of 1.3 — a value introduced further from the root
 never overwrites one nearer to it — describes the *expression* path and the stacking mechanism.
 It is not a general prohibition on these methods, and further methods that act on the whole chain
 are explicitly not ruled out.
 
-`filter` is a scope name and selects **the one link** the call applies to, by the rule of 5.3.
-Without a filter that link is the resolver the call was made on. A filter that matches no link in
+`filter` is a scope name and selects **the one resolver** the call applies to, by the rule of 5.3.
+Without a filter it is the resolver the call was made on. A filter that matches no resolver in
 the chain is an **error and throws** — unlike a scope prefix inside an expression, which answers
 `undefined` (5.4): a wrong name in an API call is a mistake in the calling code, while a wrong
 name in an expression is data and must never stop a render (7).
 
-`getData` reads along the chain by the rule of 5.2 — the link nearest to the addressed one that
-carries the key answers. Without a key it answers the **whole context** of the addressed link:
+`getData` reads along the chain by the rule of 5.2 — the resolver nearest to the addressed one that
+carries the key answers. Without a key it answers the **whole context** of the addressed resolver:
 the proxy, so every access on it still sees the chain. That is intended, not an accident of the
 signature.
 
 `updateData` changes the value **where the key lives**, and the filter decides how far the call
 looks:
 
-- **Without a filter** the call walks from the resolver it was made on towards the root and
-  updates the context of the first link carrying the key. Carries no link it, the key is created
-  on the resolver the call was made on.
-- **With a filter** the addressed link is the target outright. The value is written there,
+- **Without a filter** the call walks from the resolver it was made on towards the root and updates
+  the context of the first resolver carrying the key. Where none carries it, the key is created on
+  the resolver the call was made on.
+- **With a filter** the addressed resolver is the target outright. The value is written there,
   whatever the rest of the chain holds.
 
-This is the deliberate counterpart to 1.3: the chain protects a link's value against being
+This is the deliberate counterpart to 1.3: the chain protects a resolver's value against being
 overwritten by an expression evaluated further from the root, while the data methods are the
-explicit path that may reach across links on purpose.
+explicit path that may reach across resolvers on purpose.
 
-`deleteData` removes a key from **one** link — the addressed one with a filter, and without one
-the first link carrying it, counting from the resolver the call was made on towards the root.
-Removing it there uncovers the value of the next link that carries the same key, if any: that is
+`deleteData` removes a key from **one** resolver — the addressed one with a filter, and without one
+the first resolver carrying it, counting from the resolver the call was made on towards the root.
+Removing it there uncovers the value of the next resolver that carries the same key, if any: that is
 the inverse of shadowing (5.2) and it is intended. There is no chain-wide variant; a caller who
-wants one walks the chain and deletes per link.
+wants one walks the chain and deletes per resolver.
 
-`mergeContext` assigns the keys of the passed object into the context of the addressed link — a
-**shallow** assignment, key by key, replacing what is there and adding what is not. No deep
-merge, and no search along the chain: keys that other links carry are untouched, and a merged key
-shadows them from this link onwards (5.2).
+`mergeContext` assigns the keys of the passed object into the context of the addressed resolver — a
+**shallow** assignment, key by key, replacing what is there and adding what is not. No deep merge,
+and no search along the chain: keys that other resolvers carry are untouched, and a merged key
+shadows them from this resolver onwards (5.2).
 
 That makes `mergeContext` the counterpart to `updateData`, and the two cover the whole of writing
 from outside: `updateData` changes a value **where it lives**, `mergeContext` defines values
-**here**. Defining a single key on one link is `mergeContext({ key: value })` with a one-key
+**here**. Defining a single key on one resolver is `mergeContext({ key: value })` with a one-key
 object; there is no separate method for it and none is planned.
-
-*Not yet implemented* — `getData` does not return the value it fetched from a parent, and
-`deleteData` calls a method that does not exist; see `BACKLOG.md`.
 
 ### 6.7 `buildSecure`
 
@@ -580,7 +570,7 @@ The third is the one that changes how an expression is written, so it is spelled
 the context into scope: the property `value` is addressed as `${value}`. `ContextObjectExecuter`
 does not — it hands the context to the statement as the object `ctx`, and the same property is
 addressed as `${ctx.value}`. An executer may make such a demand; what it may not do is change
-which link of the chain answers a lookup, or any other rule of this document. Switching executer
+which resolver of the chain answers a lookup, or any other rule of this document. Switching executer
 can therefore mean rewriting expressions, and that is intended, not a defect.
 
 ### 8.4 Tuning
@@ -615,10 +605,6 @@ Every rule above that the code does not keep today, in one place:
 | Rule | `BACKLOG.md` entry |
 |---|---|
 | 4.1 the configuration form of the static calls | The static entry points take no configuration object |
-| 5.1 a generated name where none was passed | `effectiveChain` is a copy of `chain`, and a resolver without a name |
-| 5.5 `effectiveChain` and `contextChain` skip links without a context | `effectiveChain` is a copy of `chain`, and a resolver without a name |
 | 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |
-| 6.6 `getData`, `deleteData` with a filter | `getData` and `deleteData` are broken on the filter path |
-| 6.6 the rules of the four data methods along the chain | The data methods have no rules along the chain |
 | 6.7 `allowGlobalWrite` as an option of `buildSecure` | A write to an unknown name inside an expression lands on `globalThis` |
 | 8.2 the default executer | The default executer announces itself as deprecated |
