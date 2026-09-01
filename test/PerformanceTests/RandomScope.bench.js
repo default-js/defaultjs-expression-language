@@ -1,6 +1,6 @@
 import { bench, describe } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS } from "../TestUtils.js";
+import { EXECUTERS } from "../ExecuterCapabilities.js";
 import { bindExecuter } from "./ChainBuilder.js";
 
 /**

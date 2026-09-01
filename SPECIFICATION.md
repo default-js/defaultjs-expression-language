@@ -548,24 +548,44 @@ name or an `Executer` instance.
 | `esprima-executer` | `EsprimaExecuter.js` | parsed to an AST, identifiers rewritten onto `ctx` |
 
 The executers are **not feature complete**. They are attempts at getting away from `with`, which
-is deprecated. The default is moving to `context-deconstruction-executer`; `WithScopedExecuter`
-is what every consumer gets today and announces its own deprecation on first use.
+is deprecated. The default is `context-deconstruction-executer`. `WithScopedExecuter` is still
+registered and reachable by name, and announces its own deprecation on the first expression it
+resolves.
 
 `esprima-executer` is registered only when its module is imported explicitly, because `espree`
-grows the browser bundle from 11.5 KB to 355.6 KB. It also cannot execute an assignment at all —
-`x = 5` is rewritten to `ctx?.x = 5`, which is a syntax error.
-
-*Open* — which executer is the default is decided (the deconstructor), the switch has not been
-made; see `BACKLOG.md`.
+grows the browser bundle from 11.5 KB to 355.6 KB. It is the least complete of the four; what it
+cannot do is in the table of 8.3.
 
 ### 8.3 Behaviour that is the executer's own
 
 An executer chooses how a statement reaches the global object (6.4), whether a write can be
 caught (6.5), and **how a statement addresses a value of the context**. All three differ between
-the implementations, and a consumer who cares has to read the executer's own description.
-Everything else in this document holds regardless of the executer in use.
+the implementations. Everything else in this document holds regardless of the executer in use:
+a **rule** is not something an implementation may decline.
 
-The third is the one that changes how an expression is written, so it is spelled out here.
+Where they may legitimately differ, they are **capabilities**, and this is what each executer has
+today. `no` is a statement about the implementation, not a promise that it stays that way; where
+one is meant to arrive, `BACKLOG.md` says so.
+
+| Capability | `with-scoped` | `context-object` | `context-deconstruction` | `esprima` |
+|---|---|---|---|---|
+| a name no resolver carries reaches the global object (6.4) | yes | yes | yes | no |
+| a write to a name the context carries is readable from it afterwards (6.5) | yes | yes | no | no |
+| a write to a name no resolver carries stays out of the global object (6.5) | no | yes | no | yes |
+| a context value is reachable from inside a function written in the statement (8.3) | yes | yes | yes | no |
+| a statement carrying an assignment executes rather than raising (8.2) | yes | yes | yes | no |
+
+The row about a write leaving the chain is the one to read twice: it is a **rule** of 6.5 that two
+implementations do not keep yet, carried in the table because a reader has to know it before
+choosing one. The other four are capabilities proper.
+
+The table is kept in machine-readable form in `test/ExecuterCapabilities.js`, where every row is
+read by the suite: a capability that stops working turns the gate red, and one that starts working
+turns it red as well. That file is the authority — this table is written from it by hand, and the
+suite cannot check the document, so a change goes into both.
+
+The dialect is no row of the table, because it is not a yes or no - but it is the difference that
+changes how an expression is written, so it is spelled out here.
 `WithScopedExecuter`, `ContextDeconstructorExecuter` and `EsprimaExecuter` put the properties of
 the context into scope: the property `value` is addressed as `${value}`. `ContextObjectExecuter`
 does not — it hands the context to the statement as the object `ctx`, and the same property is
@@ -609,4 +629,3 @@ Every rule above that the code does not keep today, in one place:
 | 6.3 leaving `context` out differs from `context: null` | The executer's `defaultContext` has no reader left |
 | 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |
 | 6.7 `allowGlobalWrite` as an option of `buildSecure` | A write to an unknown name inside an expression lands on `globalThis` |
-| 8.2 the default executer | The default executer announces itself as deprecated |

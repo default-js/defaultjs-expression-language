@@ -1,8 +1,5 @@
 import { describe, it, expect, afterAll } from "vitest";
-import { EXECUTERNAME as WithScopedName, setupExecuter as setupWithScoped } from "../../src/executer/WithScopedExecuter.js";
-import { EXECUTERNAME as ContextObjectName, setupExecuter as setupContextObject } from "../../src/executer/ContextObjectExecuter.js";
-import { EXECUTERNAME as ContextDeconstructorName, setupExecuter as setupContextDeconstructor } from "../../src/executer/ContextDeconstructorExecuter.js";
-import { EXECUTERNAME as EsprimaName, setupExecuter as setupEsprima } from "../../src/executer/EsprimaExecuter.js";
+import { EXECUTERS } from "../ExecuterCapabilities.js";
 import { ExpressionResolver } from "../../index.js";
 
 /**
@@ -21,22 +18,16 @@ import { ExpressionResolver } from "../../index.js";
  */
 const DEFAULT_SIZE = 5000;
 
-// the context object executer addresses the context through `ctx`, the other three take the
-// bare name - see test/ExecuterTests/DirectExecuterTests/ResolveTest.js
-const EXECUTERS = [
-	[WithScopedName, setupWithScoped, "${test}"],
-	[ContextObjectName, setupContextObject, "${ctx.test}"],
-	[ContextDeconstructorName, setupContextDeconstructor, "${test}"],
-	[EsprimaName, setupEsprima, "${test}"]
-];
-
 describe(`general: executer setup: `, () => {
 
 	afterAll(() => {
-		for (const [, setupExecuter] of EXECUTERS) setupExecuter({ size: DEFAULT_SIZE });
+		for (const { setupExecuter } of EXECUTERS) setupExecuter({ size: DEFAULT_SIZE });
 	});
 
-	for (const [executerName, setupExecuter, expression] of EXECUTERS) {
+	// name, dialect and setupExecuter all come from the catalogue - this file used to carry a
+	// list of its own, which said the same thing in a second place.
+	for (const { name: executerName, variableName, setupExecuter } of EXECUTERS) {
+		const expression = `\${${variableName("test")}}`;
 		// the constructor picks the executer up under `executer`, and only as a name - see
 		// the open TestUtils entry in BACKLOG.md before reaching for a helper here
 		const resolve = async (aContext) => new ExpressionResolver({ context: aContext, executer: executerName }).resolve(expression);

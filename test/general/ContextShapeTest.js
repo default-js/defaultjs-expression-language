@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS, catchError } from "../TestUtils.js";
+import { EXECUTERS } from "../ExecuterCapabilities.js";
+import { catchError } from "../TestUtils.js";
 import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/executer/ContextDeconstructorExecuter.js";
 import { EXECUTERNAME as WithScopedExecuterName } from "../../src/executer/WithScopedExecuter.js";
 
@@ -42,6 +43,14 @@ for (const { name: executer, variableName } of EXECUTERS) {
 		it("runs a statement over a Set context", async () => {
 			const resolver = new ExpressionResolver({ context: new Set(["x"]), name: "ctx", executer });
 			expect(await resolver.resolve("${ 1 + 1 }")).toBe(2);
+		});
+
+		// The context of a template engine is a DOM node more often than not, and what a statement
+		// reads off it sits on a prototype rather than on the node. Carried over from
+		// test/ExecuterTests/, which pinned it under one executer.
+		it("runs a statement over an element context and reads through it", async () => {
+			const resolver = new ExpressionResolver({ context: document.createElement("div"), name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("children")}.length }`)).toBe(0);
 		});
 
 		it("runs a statement over a NodeList context", async () => {

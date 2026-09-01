@@ -19,6 +19,107 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-01 — How does the test suite say what an executer can do, when the four differ on purpose?
+
+**Decision:** Through a **capability catalogue**, `test/ExecuterCapabilities.js`, and a vocabulary
+that separates three things:
+
+- a **function** — what all executers provide: execute an expression against a dynamic context.
+  One, not many.
+- a **capability** — a point where implementations may legitimately differ: whether a write
+  persists, whether a global is reachable, whether a nested function still sees the context.
+- a **rule** — a statement of `SPECIFICATION.md`. Normative. A rule that names no capability holds
+  for every executer, and an implementation may not decline it.
+
+The catalogue carries one row per capability with one state per executer, `supported` or
+`unsupported`, and nothing else. Whether a missing capability is meant to arrive belongs in
+`BACKLOG.md`, not in the table. A test asks the catalogue which `it` to use: `capabilityIt` answers
+the ordinary one where the state is `supported` and `it.fails` where it is not. The dialect — how a
+statement spells a context name — is not a capability, because it is not a yes or no; it stays as
+`variableName` on the executer entry, and the general suite takes its spelling from there rather
+than writing a bare name.
+
+The catalogue also declares, in `RULE_GROUPS`, which group each rule of the specification is tested
+in: `general` (once, in `test/spec/`), `per-executer` (once per implementation, in
+`test/executer/shared/`), or `both`. `test/general/RuleGroupTest.js` holds that declaration against
+what the shared suites actually open.
+
+**Reasoning:** The suite already knew all of this, but it knew it in the wrong places — a `FREEDOMS`
+table in one test file, a `leaksToday` boolean in another, an `it.fails` marker in a third. That is
+why the switch of the default executer on 2026-08-30 turned three unrelated tests red: what an
+executer can do was written into the assertions instead of being stated once. A table that a test
+reads is guarded in **both** directions, which prose and a skipped test are not: a capability that
+stops working fails the ordinary way, and one that starts working fails with `Expect test to fail`.
+Neither direction can pass unnoticed, so the table cannot claim a state the code does not have.
+Verified rather than argued: two rows were flipped on purpose and the gate answered in both
+directions.
+
+The vocabulary is load-bearing. *Specification* is the right word for the document and for a rule;
+it is the wrong word for the per-executer axis, because it would suggest an implementation may
+decline part of it. Keeping *rule* and *capability* apart is what makes it decidable where a case
+belongs — and where a rule is broken rather than absent, the row says so and `BACKLOG.md` carries
+the fix (the negative guarantee of 6.5 is the one such row today).
+
+**Alternatives:** Skipping a case per executer with `it.skip` — rejected: it guards nothing, and a
+capability that arrives goes unnoticed forever. Branching the expectation, `expect(result).toBe(reachesGlobals ? "2" : "${…}")` — that is what the suite did, and it hides the
+difference inside an assertion where no reader finds it; it also cannot say whether the second
+branch is a capability or a defect. Running the whole suite against `defaultExecuter` only —
+rejected: three implementations would stop being tested, and the fourth would be tested by
+accident, whichever it happens to be. A separate hand-written suite per executer — rejected as the
+starting point, because the rules would be copied four times and drift; what stays per executer is
+only what only that executer does.
+
+**Consequences:** The catalogue is the single place where "which executer can what" is written, and
+a row may only exist once a test reads it under every executer — a row nothing reads is a claim
+without cover. `SPECIFICATION.md` 8.3 carries the same table for a human reader, written by hand
+from the catalogue: the suite runs in a browser and cannot read the document, so a change has to go
+into both. The same limit applies to `RULE_GROUPS`, which lists the sections of the specification by
+hand. The general suite depends on the catalogue for its dialect, which is what makes a change of
+the default executer a one-line change rather than a rewrite — measured: with the default moved to
+`context-object-executer`, `test/spec/` answers one failure, and it is the case that pins the
+default by name.
+
+## 2026-09-01 — Which executer is the default, and what does the switch cost a consumer?
+
+**Decision:** `context-deconstruction-executer`. `with-scoped-executer` stays registered, keeps its
+deprecation notice and stays reachable by name, so a consumer who needs its behaviour back sets
+`ExpressionResolver.defaultExecuter = "with-scoped-executer"` or builds a resolver with
+`executer: "with-scoped-executer"`.
+
+**Reasoning:** Three arguments, none of them alone decisive. First, `with` is what the other three
+executers exist to get away from, and a default that announces its own deprecation on the first
+expression it resolves is a contradiction: either it is fit to be the default or the notice is
+noise. Second, the cross-executer benchmarks of 2026-08-30 put a price on it. Over a chain of depth
+100 000 with the asked name a few links up (`RandomScope`), `with-scoped` answers **138 hz** where
+`context-object` answers **662 000 hz** and `esprima` **457 000 hz**; `WarmResolve`, where every
+executer walks the whole chain anyway, puts the same three within a factor of three of each other
+(13 / 41 / 41 hz at depth 1 000 000). The gap is therefore not one executer being faster in
+general — it is a full-chain walk that only `with` triggers, which matches the `@@unscopables`
+lookup a `with` block performs while resolving a binding. That explanation is consistent with every
+number measured so far but has not been proven with a counter in the trap; the walk itself is
+carried in `BACKLOG.md`. Third, of the two candidates that do not use `with`, the deconstructor is
+the only one that leaves the way an expression is written alone: `context-object-executer` hands the
+context to the statement as `ctx` and therefore demands `${ctx.value}` where every expression
+written so far says `${value}` (8.3). Changing a default must not rewrite every consumer's
+expressions.
+
+**Alternatives:** `context-object-executer`, the fastest of the four in `RandomScope` — rejected on
+its dialect alone, and it stays available for a consumer who chooses it deliberately and accepts the
+rewrite. Staying on `with-scoped-executer` and dropping its deprecation notice instead — rejected:
+it keeps the slowest implementation as the one everybody gets and gives up the reason the other
+three were written. Waiting until `ContextDeconstructorExecuter` can also keep a write — rejected:
+6.5 promises nothing about a write persisting, so that is not a defect blocking the switch, and
+holding the default back for it would mean holding it back indefinitely.
+
+**Consequences:** A write from inside an expression stops persisting for everyone who did not pick
+an executer — conformant per 6.5, silent, and the reason the entry in `CHANGELOG.md` carries a
+migration note rather than a line. `SPECIFICATION.md` 8.2 loses its *Open* note and section 10 its
+row, so the specification and the code now say the same thing about the default. The conformance
+suite pins the default by name (`test/spec/ExecuterTest.js`), so the next change of default turns
+the gate red instead of announcing itself through unrelated failures — which is how this one was
+found. `WithScopedExecuter` is off the default path but stays in `src/executer/index.js` and in the
+bundle; whether it is removed for 3.0.0 is not decided here.
+
 ## 2026-08-30 — Where does a check belong that only one part of the code needs?
 
 **Decision:** With the part that needs it. Separation of concerns is a rule of this code base, not

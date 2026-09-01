@@ -136,29 +136,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   identifier would answer for the new one. Consumer-visible, so the outcome belongs in
   `DECISIONS.md` and in `CHANGELOG.md`.
 
-- [ ] **The default executer announces itself as deprecated, and nothing says what replaces it.**
-  Target: `SPECIFICATION.md` 8.2 — the default becomes `context-deconstruction-executer`. What
-  is left here is making the switch and the migration note that comes with it.
-  `WithScopedExecuter` is what every consumer gets without configuring anything
-  (`src/executer/index.js`), and on the first expression it resolves it writes
-  `console.warn(new Error("With Scoped expression execution is marked as deprecated."))`
-  (`src/executer/WithScopedExecuter.js:58`) — an `Error` object, so browsers print it with a
-  stack trace. The `initialCall` guard keeps it to once per page, so this is a notice, not
-  noise. But a default strategy that declares itself deprecated is a contradiction: either one
-  of the other three becomes the default, or the warning goes. Neither `DECISIONS.md` nor
-  `AGENTS.md` records why `with` is being retired or what consumers should move to, and the
-  readme documents none of it. Consumer-visible either way, so the outcome belongs in
-  `DECISIONS.md` and in `CHANGELOG.md`. Found 2026-08-21 while running the performance cases.
-  **What the migration note has to warn about, measured 2026-08-24** in stage 4: an assignment
-  inside an expression behaves differently on the two executers, and it fails silently. Under
-  `WithScopedExecuter`, `${ known = "after" }` lands in the context and `getData("known")` answers
-  `"after"`; under `ContextDeconstructorExecuter` the same expression answers `"after"` as its
-  value while the context still holds `"before"`, because the assignment hits a destructured local
-  binding. `SPECIFICATION.md` 6.5 allows exactly this — it promises nothing about a written value
-  being readable afterwards — so it is conformant, not a defect. But a consumer carried over by a
-  change of default gets no error, only a value that stops persisting. Pinned per executer in
-  `test/spec/ExecuterTest.js`.
-
 - [ ] **A name found at the top of a resolver chain costs as much as one found at the bottom.**
   Measured 2026-08-21 with `npm run bench`. `test/PerformanceTests/RandomScope.bench.js` builds
   a chain whose every link carries ~10 of 100 possible names, so a randomly asked name sits
@@ -183,9 +160,10 @@ Entries here are independent of each other. An undertaking whose steps depend on
   lookup that stops at the match should not. `WarmResolve`, where the name sits at the bottom and
   everyone walks the whole chain, puts the same three within a factor of three of each other
   (13 / 41 / 41 hz at depth 1 000 000), so the difference is not the executer being faster in
-  general — it is the extra full walk that only `with` triggers. The default executer is therefore
-  the slowest of the four on any chain worth the name, which the entry on the deprecated default
-  should be read against.
+  general — it is the extra full walk that only `with` triggers. `with-scoped-executer` is therefore
+  the slowest of the four on any chain worth the name. That measurement is one of the three reasons
+  the default moved away from it on 2026-09-01 — see `DECISIONS.md` — and what is left open here is
+  the walk itself, which still costs every consumer who keeps using that executer.
 
 - [ ] **The deep-chain benchmarks are bimodal by a factor of two across runs.**
   At depths 100 000 and 1 000 000 a run settles into one of two states and stays there: roughly
@@ -251,18 +229,38 @@ Entries here are independent of each other. An undertaking whose steps depend on
   tail of the deepest. Note that the same file's own comment explains why the tail is reused: a
   bench file has nowhere to put setup. Found 2026-08-29 while measuring the whole cycle for goal 5.
 
-- [ ] **Coverage as of 2026-08-29, and the four things still uncovered.**
-  Statements **93.28 %** (472/506), branches **91.85 %** (248/270), functions **90.81 %** (89/98),
-  lines **95.69 %** (422/441). Measured after the expression parsing rework, and every axis
-  is above the 2026-08-24 baseline it replaces — 92.51 % / 90.76 % / 90.32 % / 94.45 % — although
-  the package grew by about a hundred statements in the same work.
+- [ ] **Two rules run per executer but sit in the general suite.**
+  `test/spec/ExecuterTest.js` loops over `EXECUTERS` twice: once for 8.2, that every
+  implementation registers itself on import, and once for 8.4, that every implementation accepts
+  a cache size and keeps resolving. Both are per-executer in fact, while `RULE_GROUPS` in
+  `test/ExecuterCapabilities.js` declares 8.4 `general` and 8.2 `both` — true of where they run,
+  not of what they are. Raised while stage 3 of the executer conformance plan ran and left open
+  when that plan closed on 2026-09-01: stage 2 was scoped to 8.3, so moving them was never part
+  of it. Two ways out and neither is obviously right — move both loops into
+  `test/executer/shared/ExecuterRules.js` so the four conformance files carry them, which makes
+  the declaration honest but puts a registration check into a per-executer suite where it reads
+  oddly; or leave them where they are and write into the table why a loop in the general suite is
+  not the same thing as a per-executer rule. `test/general/RuleGroupTest.js` cannot tell the
+  difference either way: it holds the declaration against the shared suites, not against loops
+  elsewhere. Found 2026-09-01.
+
+- [ ] **Coverage as of 2026-09-01, and the four things still uncovered.**
+  Statements **92.81 %** (504/543), branches **90.94 %** (251/276), functions **91.58 %** (98/107),
+  lines **95.56 %** (453/474). Measured after the executer conformance work; the numbers before it
+  were 93.28 % / 91.85 % / 90.81 % / 95.69 % (472/506) on 2026-08-29. **The percentages fell while
+  the tests did not**: the package grew from 506 to 543 statements over the same days — the name
+  check moved into `ContextDeconstructorExecuter`, the constructor and the handle changed — so 39
+  statements are uncovered where 34 were, and every one of them is on the list below. Nothing was
+  lost when `test/ExecuterTests/` was dissolved: the one line its 117 cases covered that the new
+  suite did not — the `TemplateLiteral` branch of the esprima rewrite — came along as a case of
+  `test/executer/shared/ExecuterRules.js`, found by measuring rather than by counting tests.
   **`src/ExpressionResolver.js` is at 100 % of lines and functions**, the file that carried more
   than half of everything uncovered a week earlier.
   What is left is four items, and none of them is "write more tests for a rule":
   1. `src/Utils.js`, 0 %, all nine lines — dead code, its own entry above. Deleting it is what
      closes this, not a test.
-  2. The `setDebug` bodies of `ContextDeconstructorExecuter.js:13` and `EsprimaExecuter.js:13`,
-     plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:41`. The public
+  2. The `setDebug` bodies of `ContextDeconstructorExecuter.js:14` and `EsprimaExecuter.js:13`,
+     plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:42`. The public
      surface test asserts both exports exist but never flips them, deliberately: a debug switch
      has no observable effect to assert on.
   3. The `set` and `delete` of `createGlobalCacheWrapper` (`ResolverContextHandle.js`). Since a
@@ -275,9 +273,9 @@ Entries here are independent of each other. An undertaking whose steps depend on
      to settle it, noted 2026-08-30: `updateData(data)` replaces the data and rebuilds the cache,
      but the proxy is decided in the constructor, so it cannot move a handle between the global
      shape and the ordinary one.
-  `src/version.js` is generated, so its 0 % stays noise. The 22 branches still open are spread over
+  `src/version.js` is generated, so its 0 % stays noise. The 25 branches still open are spread over
   the scanner's state machine and `EsprimaExecuter`; they are combinations of literal states, not
-  rules without a test. Update these numbers when the picture changes rather than adding a fourth
+  rules without a test. Update these numbers when the picture changes rather than adding another
   baseline.
 
 - [ ] **The constructor option `executer` is undocumented and silently ignores an `Executer` instance.**

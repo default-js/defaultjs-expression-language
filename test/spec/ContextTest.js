@@ -1,22 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS } from "../TestUtils.js";
-import { EXECUTERNAME as WithScopedExecuterName } from "../../src/executer/WithScopedExecuter.js";
+import { EXECUTERS, defaultExecuterEntry } from "../ExecuterCapabilities.js";
 import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/executer/ContextDeconstructorExecuter.js";
 
 /**
  * Conformance tests for SPECIFICATION.md section 6 - the context.
  *
- * Split the same way as the chain suite. A rule that is only observable through a statement runs
- * once per registered executer, because 8.3 grants an executer three freedoms and none of them is
- * a rule of 6.2, 6.3 or the negative guarantee of 6.5. The rest - the proxy itself, the global
- * object as a context object, the four data methods, buildSecure - is resolver API and runs once.
+ * What is left here is resolver API: the proxy without a statement in play, the global object as a
+ * context object, the switch of 6.5, the four data methods and buildSecure. All of it is
+ * observable without executing anything and runs once.
+ *
+ * The rules that need a statement - 6.1 through the executer, 6.2, 6.3 and the negative guarantee
+ * of 6.5 - are asked of every executer in `test/executer/shared/ContextRules.js`.
  *
  * Two things of section 6 are deliberately not pinned here, and both belong to section 8:
  * how a name that no link carries reaches the global object (6.4, second half), and where an
  * assignment inside an expression lands when it can be intercepted (6.5) - the specification
  * calls that "the executer's business" in as many words.
+ *
+ * Where a statement reaches a context value, the name is spelled the way the default executer
+ * spells it, taken from the catalogue - the dialect is the executer's own (8.3), so a suite that
+ * wrote a bare name by hand would fail everywhere the day the default moves to the one that
+ * demands a prefix.
  */
+const { variableName } = defaultExecuterEntry();
 
 describe("Specification 6.1 - every access goes through the proxy", () => {
 
@@ -45,7 +52,7 @@ describe("Specification 6.1 - every access goes through the proxy", () => {
 
 	it("resolves over a context the caller froze", async () => {
 		const resolver = new ExpressionResolver({ context: Object.freeze({ own: "frozen" }), name: "root" });
-		expect(await resolver.resolve("${ own }")).toBe("frozen");
+		expect(await resolver.resolve(`\${ ${variableName("own")} }`)).toBe("frozen");
 	});
 
 	// A single frozen link is enough: the property cache walks the prototype chain, so the names of
@@ -55,105 +62,7 @@ describe("Specification 6.1 - every access goes through the proxy", () => {
 		expect(Object.keys(resolver.context).includes("own")).toBe(true);
 		expect(JSON.stringify(resolver.context).includes("frozen")).toBe(true);
 	});
-
-	// Every executer reads the context in its own way, and the deconstruction one reads its names
-	// before it runs a statement, so a frozen context reaches each of them differently.
-	for (const { name: executer, variableName } of EXECUTERS) {
-		it(`resolves over a frozen context [${executer}]`, async () => {
-			const resolver = new ExpressionResolver({ context: Object.freeze({ own: "frozen" }), name: "solo", executer });
-			expect(await resolver.resolve(`\${ ${variableName("own")} }`)).toBe("frozen");
-		});
-	}
 });
-
-for (const { name: executer, variableName } of EXECUTERS) {
-
-	describe(`Specification 6.2 - names are a snapshot, values are live [${executer}]`, () => {
-
-		it("does not see a key added to the handed-in object after the resolver was built", async () => {
-			const variableNameAdded = variableName("added");
-			const handed = { known: 1 };
-			const resolver = new ExpressionResolver({ context: handed, name: "root", executer });
-			handed.added = 2;
-			const result = await resolver.resolve(`\${typeof ${variableNameAdded}}`);
-			expect(result).toBe("undefined");
-		});
-
-		it("sees that key after resetCache", async () => {
-			const variableNameAdded = variableName("added");
-			const handed = { known: 1 };
-			const resolver = new ExpressionResolver({ context: handed, name: "root", executer });
-			handed.added = 2;
-			resolver.contextHandle.resetCache();
-			const result = await resolver.resolve(`\${${variableNameAdded}}`, "fallback");
-			expect(result).toBe(2);
-		});
-
-		it("reads a value at the moment of the lookup, so a mutation is visible immediately", async () => {
-			const variableNameHolder = variableName("holder");
-			const handed = { holder: { name: "before" } };
-			const resolver = new ExpressionResolver({ context: handed, name: "root", executer });
-			handed.holder.name = "after";
-			const result = await resolver.resolve(`\${${variableNameHolder}.name}`, "fallback");
-			expect(result).toBe("after");
-		});
-
-		it("keeps the set of names in step when a value is written through the resolver", async () => {
-			const variableNameFresh = variableName("fresh");
-			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
-			resolver.updateData("fresh", 2);
-			const result = await resolver.resolve(`\${${variableNameFresh}}`, "fallback");
-			expect(result).toBe(2);
-		});
-	});
-
-	describe(`Specification 6.3 - a link without a context [${executer}]`, () => {
-
-		it("contributes nothing to a lookup and is passed through", async () => {
-			const variableNameValue = variableName("value");
-			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
-			const middle = new ExpressionResolver({ context: null, name: "middle", parent: root, executer });
-			const leaf = new ExpressionResolver({ context: { leafOnly: 1 }, name: "leaf", parent: middle, executer });
-			const result = await leaf.resolve(`\${${variableNameValue}}`, "fallback");
-			expect(result).toBe("from root");
-		});
-
-		it("gains content like any other link", async () => {
-			const variableNameValue = variableName("value");
-			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
-			const middle = new ExpressionResolver({ context: null, name: "middle", parent: root, executer });
-			const leaf = new ExpressionResolver({ context: { leafOnly: 1 }, name: "leaf", parent: middle, executer });
-			middle.mergeContext({ value: "from middle" });
-			const result = await leaf.resolve(`\${${variableNameValue}}`, "fallback");
-			expect(result).toBe("from middle");
-		});
-	});
-
-	describe(`Specification 6.5 - no write from an expression reaches the global object [${executer}]`, () => {
-
-		// The rule holds under every executer, but only two of them break it today, so only those
-		// two carry the marker: with-scoped lets an assignment to an unknown name fall out of the
-		// `with` block into global scope, and the deconstructor executer generates a sloppy-mode
-		// body where an undeclared assignment does the same. The other two keep the guarantee
-		// already - context-object writes through the proxy, esprima rewrites the identifier onto
-		// the context object - and a test marked fails would fail there for passing.
-		const leaksToday = executer === WithScopedExecuterName || executer === ContextDeconstructorExecuterName;
-		const pin = leaksToday ? it.fails : it;
-
-		// The switch is off by default, so this is the guarantee as it stands out of the box. The
-		// leak is read and cleaned up before the assertion, because a test marked fails stops at
-		// the assertion and would otherwise leave the name on globalThis for every later test.
-		pin("does not create a global for a name no link carries", async () => {
-			const leakName = `leaked_${executer.replace(/-/g, "_")}`;
-			const variableNameLeak = variableName(leakName);
-			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
-			await resolver.resolveText(`\${${variableNameLeak} = 1}`);
-			const leaked = leakName in globalThis;
-			delete globalThis[leakName];
-			expect(leaked).toBe(false);
-		});
-	});
-}
 
 describe("Specification 6.4 - the global object as a context object", () => {
 
@@ -343,13 +252,13 @@ describe("Specification 6.7 - buildSecure", () => {
 
 	it("builds a resolver over the filtered context", async () => {
 		const secure = ExpressionResolver.buildSecure({ context: { open: "ok", secret: "hidden" }, propFilter });
-		const result = await secure.resolve("${ open }", "fallback");
+		const result = await secure.resolve(`\${ ${variableName("open")} }`, "fallback");
 		expect(result).toBe("ok");
 	});
 
 	it("does not carry a property the filter rejected", async () => {
 		const secure = ExpressionResolver.buildSecure({ context: { open: "ok", secret: "hidden" }, propFilter });
-		const result = await secure.resolve("${ typeof secret }");
+		const result = await secure.resolve(`\${ typeof ${variableName("secret")} }`);
 		expect(result).toBe("undefined");
 	});
 

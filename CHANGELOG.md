@@ -38,6 +38,14 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   **resolver** — section 2 no longer defines a second word for the same thing, and the rules read
   in one vocabulary.
 
+  **Revised again on 2026-09-01**: section 8.3 carries a **capability table** — one row per point
+  where the four executers legitimately differ, one column per executer. A consumer can now see,
+  before picking one, whether a write from an expression persists, whether a global is reachable,
+  whether a context value survives into a callback written in the statement, and whether an
+  assignment executes at all. One row is a *rule* that two implementations do not keep yet rather
+  than a capability, and it is marked as such. 8.2 no longer describes the limits of
+  `esprima-executer` in prose; the table carries them.
+
 ### Changed
 
 - **`resolve` no longer catches an error — it logs it and hands it on.** A statement that fails
@@ -57,6 +65,25 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   This is the loudest change of the release for anyone calling `resolve` directly. What used to be
   a silent `undefined` is now a rejected promise, so every call site that relied on the default
   value as a safety net needs one.
+
+- **The default executer is `context-deconstruction-executer`.** Anyone who never configured one
+  got `with-scoped-executer` before — a `with` block over the context, which announced its own
+  deprecation on the first expression it resolved. The new default destructures the context into
+  the parameters of the compiled function instead. How an expression is written does not change:
+  a context property `value` is still addressed as `${value}`, so nothing has to be rewritten for
+  the switch itself. Why the default moved, and why it moved to this one rather than to
+  `context-object-executer`, is in `DECISIONS.md`.
+
+  **What changes without an error: a write from inside an expression no longer reaches the
+  context.** `${ known = "after" }` still answers `"after"`, but the assignment lands on a
+  destructured local binding, so `getData("known")` keeps answering `"before"` — and a text
+  carrying `${ counter++ }` twice no longer counts across the two occurrences. Under
+  `with-scoped-executer` the write landed in the context. `SPECIFICATION.md` 6.5 promises nothing
+  here, because this is the executer's own (8.3), so both behaviours are conformant — which also
+  means nothing raises. A caller who wrote through an expression writes through `mergeContext` or
+  `updateData` instead, or keeps the old behaviour with
+  `ExpressionResolver.defaultExecuter = "with-scoped-executer"`: that executer stays registered
+  and reachable by its name.
 
 - **Escaping is a rule of `resolveText` alone.** `resolve("\${value}")` used to answer the text
   `${value}`; it now hands `\${value}` to the executer as a statement, which cannot compile it, so

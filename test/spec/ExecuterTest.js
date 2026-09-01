@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS } from "../TestUtils.js";
+import { EXECUTERS } from "../ExecuterCapabilities.js";
 import Executer from "../../src/Executer.js";
 import getExecuter, { registrate, getExecuter as namedGetExecuter } from "../../src/ExecuterRegistry.js";
 import * as WithScopedModule from "../../src/executer/WithScopedExecuter.js";
@@ -23,27 +23,14 @@ const MODULE_OF = {
 /**
  * Conformance tests for SPECIFICATION.md section 8 - the executers.
  *
- * This is the file 8.3 points at: the three things an executer decides for itself are pinned here,
- * per executer and with the answer each one gives, instead of being skipped in the suites whose
- * rules have to hold everywhere. The other files rely on that - they loop over the executers and
- * ask for a context value through `variableName`, which only makes sense because the table below
- * says what each executer's answer is.
- */
-
-/**
- * What each executer answers to the three freedoms of 8.3.
+ * What is left here is what does not belong to one executer: the interface and the registry of
+ * 8.1, which implementation is the default, that every implementation registers itself on import
+ * (8.2), and that each one accepts a cache size (8.4).
  *
- * `reachesGlobals` - whether a name that no link carries resolves against the global object.
- * `assignmentLandsInContext` - whether an assignment to a key the context carries is readable
- * from the context afterwards. 6.5 promises nothing here beyond the negative guarantee, so this
- * is a description of the implementation, not a rule other executers have to follow.
+ * 8.3 - what an executer decides for itself - is per executer by definition and lives in
+ * `test/executer/shared/ExecuterRules.js`, written against the capability catalogue. What an
+ * executer answers where a capability is unsupported sits in that executer's own directory.
  */
-const FREEDOMS = {
-	[WithScopedExecuterName]: { reachesGlobals: true, assignmentLandsInContext: true },
-	[ContextObjectExecuterName]: { reachesGlobals: true, assignmentLandsInContext: true },
-	[ContextDeconstructorExecuterName]: { reachesGlobals: true, assignmentLandsInContext: false },
-	[EsprimaExecuterName]: { reachesGlobals: false, assignmentLandsInContext: false }
-};
 
 describe("Specification 8.1 - the interface", () => {
 
@@ -124,68 +111,9 @@ describe("Specification 8.2 - the implementations", () => {
 		});
 	}
 
-	// not implemented, waits for BACKLOG.md "The default executer announces itself as deprecated"
-	it.fails("uses context-deconstruction-executer as the default", async () => {
+	it("uses context-deconstruction-executer as the default", async () => {
 		expect(ExpressionResolver.defaultExecuter === getExecuter(ContextDeconstructorExecuterName)).toBe(true);
 	});
-
-	it("cannot execute an assignment under esprima-executer", async () => {
-		const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer: EsprimaExecuterName });
-		// the assignment raises, so per 7 the expression stands as written and the default does not
-		// cover it
-		const result = await resolver.resolveText("${ x = 5 }", "fallback");
-		expect(result).toBe("${ x = 5 }");
-	});
-});
-
-for (const { name: executer, variableName } of EXECUTERS) {
-
-	describe(`Specification 8.3 - what this executer decides for itself [${executer}]`, () => {
-
-		const { reachesGlobals, assignmentLandsInContext } = FREEDOMS[executer];
-
-		it("addresses a context value the way its own dialect spells it", async () => {
-			const variableNameValue = variableName("value");
-			const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer });
-			const result = await resolver.resolve(`\${${variableNameValue}}`, "fallback");
-			expect(result).toBe("from context");
-		});
-
-		it(`${reachesGlobals ? "reaches" : "does not reach"} a global that no link carries`, async () => {
-			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
-			// where the executer does not reach the global, the statement raises on it and per 7 the
-			// expression stands as written - the default does not cover an error
-			const result = await resolver.resolveText("${ Math.round(1.5) }", "no global");
-			expect(result).toBe(reachesGlobals ? "2" : "${ Math.round(1.5) }");
-		});
-
-		it(`an assignment to a key the context carries ${assignmentLandsInContext ? "lands there" : "does not land there"}`, async () => {
-			const variableNameKnown = variableName("known");
-			const resolver = new ExpressionResolver({ context: { known: "before" }, name: "root", executer });
-			await resolver.resolveText(`\${${variableNameKnown} = "after"}`);
-			expect(resolver.getData("known")).toBe(assignmentLandsInContext ? "after" : "before");
-		});
-	});
-}
-
-describe("Specification 8.3 - only context-object-executer demands the ctx prefix", () => {
-
-	it("does not answer a bare context name under context-object-executer", async () => {
-		const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer: ContextObjectExecuterName });
-		// through resolveText, because a bare name is a ReferenceError under this executer and
-		// resolve lets that through (7) - what is pinned here is the dialect, not the error policy.
-		// The expression stands as written, which is what a failing statement does in a text.
-		const result = await resolver.resolveText("${ value }", "fallback");
-		expect(result).toBe("${ value }");
-	});
-
-	for (const name of [WithScopedExecuterName, ContextDeconstructorExecuterName, EsprimaExecuterName]) {
-		it(`answers a bare context name under ${name}`, async () => {
-			const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer: name });
-			const result = await resolver.resolve("${ value }", "fallback");
-			expect(result).toBe("from context");
-		});
-	}
 });
 
 describe("Specification 8.4 - tuning", () => {

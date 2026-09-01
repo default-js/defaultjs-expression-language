@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { EXECUTERS, createResolveWithExecuterFunction, createResolveTextWithExecuterFunction } from "../TestUtils.js";
+import { EXECUTERS } from "../ExecuterCapabilities.js";
+import { createResolveWithExecuterFunction, createResolveTextWithExecuterFunction } from "../TestUtils.js";
 
 /**
  * The two helpers had no consumer, which is how they came to pass the context where the instance

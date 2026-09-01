@@ -1,6 +1,6 @@
 import { bench, describe } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS } from "../TestUtils.js";
+import { EXECUTERS } from "../ExecuterCapabilities.js";
 
 /**
  * What replacing expressions in a text costs. The other three benchmarks all call `resolve` with
