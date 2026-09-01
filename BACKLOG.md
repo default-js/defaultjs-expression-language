@@ -35,8 +35,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   decide whether that stays as is or gets a documented entry point. **`./src/Executer.js` needs
   the same treatment**, noted 2026-08-24: `SPECIFICATION.md` 9 lists `Executer` as public — it is
   the interface an own implementation builds on — but `index.js` exports only `ExpressionResolver`
-  and `ExecuterRegistry`, so the only way to it is the deep import, which `test/spec/PublicSurfaceTest.js`
-  now pins. Either whitelist it too, or export it from `index.js` and drop it from the deep-import
+  and `ExecuterRegistry`, so the only way to it is the deep import, which
+  `test/spec/9-the-public-surface.Test.js` now pins. Either whitelist it too, or export it from `index.js` and drop it from the deep-import
   list. Not to be mixed into the
   toolchain work; the outcome belongs in `DECISIONS.md`. Found 2026-08-20.
 
@@ -230,19 +230,16 @@ Entries here are independent of each other. An undertaking whose steps depend on
   bench file has nowhere to put setup. Found 2026-08-29 while measuring the whole cycle for goal 5.
 
 - [ ] **Two rules run per executer but sit in the general suite.**
-  `test/spec/ExecuterTest.js` loops over `EXECUTERS` twice: once for 8.2, that every
-  implementation registers itself on import, and once for 8.4, that every implementation accepts
-  a cache size and keeps resolving. Both are per-executer in fact, while `RULE_GROUPS` in
-  `test/ExecuterCapabilities.js` declares 8.4 `general` and 8.2 `both` — true of where they run,
-  not of what they are. Raised while stage 3 of the executer conformance plan ran and left open
-  when that plan closed on 2026-09-01: stage 2 was scoped to 8.3, so moving them was never part
-  of it. Two ways out and neither is obviously right — move both loops into
-  `test/executer/shared/ExecuterRules.js` so the four conformance files carry them, which makes
-  the declaration honest but puts a registration check into a per-executer suite where it reads
-  oddly; or leave them where they are and write into the table why a loop in the general suite is
-  not the same thing as a per-executer rule. `test/general/RuleGroupTest.js` cannot tell the
-  difference either way: it holds the declaration against the shared suites, not against loops
-  elsewhere. Found 2026-09-01.
+  `test/spec/8.2-the-implementations.Test.js` and `test/spec/8.4-tuning.Test.js` each loop over
+  `EXECUTERS` although they sit in the general suite: the first checks that every implementation
+  registers itself on import, the second that every one accepts a cache size and keeps resolving.
+  Since 2026-09-01 the directory is what says whether a rule runs once or per executer, and by
+  that rule these two are in the wrong place. Two ways out and neither is obviously right — move
+  them to `test/executer/rules/` as `8.2-…` and `8.4-…`, which is honest about how they run but
+  puts a registration check among the rules about executing statements; or leave them and accept
+  that a loop is not the same thing as a per-executer rule, because neither case asks anything
+  the executer decides — they ask the same question of four implementations. Raised while the
+  executer conformance plan ran, still open after the test structure was rebuilt on 2026-09-01.
 
 - [ ] **Coverage as of 2026-09-01, and the four things still uncovered.**
   Statements **92.81 %** (504/543), branches **90.94 %** (251/276), functions **91.58 %** (98/107),
@@ -253,7 +250,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   statements are uncovered where 34 were, and every one of them is on the list below. Nothing was
   lost when `test/ExecuterTests/` was dissolved: the one line its 117 cases covered that the new
   suite did not — the `TemplateLiteral` branch of the esprima rewrite — came along as a case of
-  `test/executer/shared/ExecuterRules.js`, found by measuring rather than by counting tests.
+  `test/executer/rules/8.3-what-the-executer-decides.Test.js`, found by measuring rather than by
+  counting tests.
   **`src/ExpressionResolver.js` is at 100 % of lines and functions**, the file that carried more
   than half of everything uncovered a week earlier.
   What is left is four items, and none of them is "write more tests for a rule":
@@ -410,7 +408,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   therefore rewritten to `ctx?.Math`. The same holds for every global the list does not name —
   `JSON`, `Date`, `Number`, `Promise`. The other three executers answer `2`. That is legal under
   8.3, which lets an executer decide how a statement reaches the global object, and it is pinned
-  as such in `test/spec/ExecuterTest.js` — but it makes the list the whole surface a consumer of
+  as such in the capability catalogue — but it makes the list the whole surface a consumer of
   this executer gets, which is the argument for reviewing it rather than patching one typo.
   **Agreed 2026-08-24: rework the list as a whole, not the typo alone.** The direction to try
   first, Frank's: build it initially from the global context — the names of `GLOBAL` itself —
@@ -489,7 +487,9 @@ Entries here are independent of each other. An undertaking whose steps depend on
   from its table of terms and from all 56 places that used it. Nothing else was touched beyond the
   text written in the same session, which leaves roughly 145 occurrences: `test/` carries 78, most
   of them in the names of the conformance tests that mirror the specification
-  (`test/spec/ContextTest.js` 24, `test/spec/ChainTest.js` 21); `DECISIONS.md` 35; `BACKLOG.md` 17;
+  (after the 2026-09-01 split: 35 in `test/spec/`, 12 in `test/executer/rules/`, most of them in
+  `6.6-reading-and-writing-from-outside` and `5.5-inspecting-the-chain`); `DECISIONS.md` 35;
+  `BACKLOG.md` 17;
   `CHANGELOG.md` 11, entries under `[Unreleased]` among them, which a reader will meet without a
   definition once the specification no longer carries one; `AGENTS.md` 2; and three comments in
   `src/` (`ExpressionResolver.js:77`, `ResolverContextHandle.js:95` and `:153`). The test names are
@@ -546,7 +546,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   out takes the **executer's default context**, and since that is implemented (2026-08-30) the
   default is `{}` under three executers and the global object under `esprima-executer` — never
   `null`, so `effectiveChain` and `contextChain` now count a resolver that 5.5 says they must skip.
-  `test/spec/ChainTest.js:229` fails on exactly that and is the only test that catches it. Both
+  `test/spec/5.5-inspecting-the-chain.Test.js` fails on exactly that and is the only test that
+  catches it. Both
   rules were written on 2026-08-22 and neither knew the other would land. To decide which one moves:
   either 5.5 drops "the option left out" from its list, and then a resolver built without a context
   joins the chain carrying whatever its executer defaults to — under `esprima-executer` the whole
@@ -563,7 +564,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   out that definition; nothing about it is settled beyond the direction, and `Executer.js`,
   `SPECIFICATION.md` 4.2, 6.3, 8.1 and section 10 all move with it. Until it is written, the
   constructor stops reading `defaultContext` for a missing option, which is what makes
-  `test/spec/ChainTest.js:229` green again and what removes the shared-object defect above.
+  `test/spec/5.5-inspecting-the-chain.Test.js` green again and what removes the shared-object
+  defect above.
 
 - [ ] **A write from an expression can be made to persist under `ContextDeconstructorExecuter`.**
   Raised by Frank on 2026-08-30 with the switch of the default: `${counter++} ${counter++}` answers

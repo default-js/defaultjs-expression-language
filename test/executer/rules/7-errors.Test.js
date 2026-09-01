@@ -1,26 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../../index.js";
+import { EXECUTERS } from "../../ExecuterCapabilities.js";
 import { catchError } from "../../TestUtils.js";
 
 /**
- * The sections of SPECIFICATION.md this suite opens. Held against the catalogue by
- * test/general/RuleGroupTest.js: 7 is declared `both` - the warnings are the general half.
- */
-export const SECTIONS = ["7"];
-
-/**
- * SPECIFICATION.md 7 - what the two entry points do with an error, for one executer.
+ * SPECIFICATION.md 7 - what the two entry points do with an error, asked of every executer.
  *
  * A text keeps rendering and leaves the expression that failed standing as written, while `resolve`
  * logs the error and lets it through. Neither answers the default value for an error - a default
  * covers a missing result, never a failing statement. The error arrives from the executer, so both
- * halves are asked of every one of them; none of this is a capability, the rule holds throughout.
+ * halves are asked of each of them; none of this is a capability.
  *
  * What the warnings say happens above the executer and is checked once, in the general suite.
- *
- * @param {{name: string, variableName: Function}} anExecuterEntry an entry of EXECUTERS
  */
-export const errorRules = ({ name: executer, variableName }) => {
+
+for (const { name: executer, variableName } of EXECUTERS) {
 
 	describe(`Specification 7 - a failing statement is caught in a text [${executer}]`, () => {
 
@@ -66,4 +60,4 @@ export const errorRules = ({ name: executer, variableName }) => {
 			expect(error instanceof Error).toBe(true);
 		});
 	});
-};
+}

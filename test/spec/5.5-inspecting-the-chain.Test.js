@@ -2,51 +2,11 @@ import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
 
 /**
- * Conformance tests for SPECIFICATION.md section 5 - the chain.
+ * SPECIFICATION.md 5.5 - chain, effectiveChain and contextChain.
  *
- * What is left here is the half that never executes a statement: 5.1 and 5.5 read `name`, `parent`
- * and the three chain getters off ExpressionResolver, so they run once, against whatever
- * ExpressionResolver.defaultExecuter is.
- *
- * A lookup cannot be observed without executing a statement, so 5.2, 5.3 and 5.4 are asked of
- * every executer instead - `test/executer/shared/ChainRules.js`, run once per executer. That they
- * are not capabilities is the point: 8.3 lets an executer decide how a statement reaches a context
- * value, never which resolver of the chain answers it.
+ * These read off the resolver without executing anything, so they run once. effectiveChain and
+ * contextChain describe a state that changes over a resolver's lifetime, chain is structural.
  */
-
-describe("Specification 5.1 - structure", () => {
-
-	it("keeps the name the caller passed", async () => {
-		const resolver = new ExpressionResolver({ context: {}, name: "root" });
-		expect(resolver.name).toBe("root");
-	});
-
-	// The shape of a generated name is not specified - only that it is unique and obeys the
-	// character rule of 3.3, so that it can appear in a chain path and be addressed like any
-	// other. Uniqueness is the test below.
-	it("generates a name where the caller passed none", async () => {
-		const resolver = new ExpressionResolver({ context: {} });
-		expect(typeof resolver.name).toBe("string");
-		expect(/^[a-zA-Z0-9\-_\s]+$/.test(resolver.name)).toBe(true);
-	});
-
-	it("generates a different name for every unnamed resolver", async () => {
-		const first = new ExpressionResolver({ context: {} });
-		const second = new ExpressionResolver({ context: {} });
-		expect(first.name !== second.name).toBe(true);
-	});
-
-	it("answers null as the parent of a resolver that has none", async () => {
-		const root = new ExpressionResolver({ context: {}, name: "root" });
-		expect(root.parent).toBe(null);
-	});
-
-	it("points a link at its parent", async () => {
-		const root = new ExpressionResolver({ context: {}, name: "root" });
-		const leaf = new ExpressionResolver({ context: {}, name: "leaf", parent: root });
-		expect(leaf.parent === root).toBe(true);
-	});
-});
 
 describe("Specification 5.5 - inspecting the chain", () => {
 

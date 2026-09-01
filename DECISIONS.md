@@ -19,6 +19,68 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-01 — Where does the test suite say what it tests, and where does it say what an executer may decline?
+
+**Decision:** In the directory, the file name and the capability catalogue — in that order, and
+nowhere else. This **replaces the `RULE_GROUPS` half of the entry below**, taken the same day.
+
+- **The directory is the group.** `test/spec/` holds the rules that run once, against
+  `ExpressionResolver.defaultExecuter`. `test/executer/rules/` holds the rules that only show
+  through a statement and are therefore asked of every implementation. `test/general/` holds what
+  pins no rule of `SPECIFICATION.md` at all — the code cache, the shape a context may have, the
+  helpers of the suite itself.
+- **The file name is the rule.** One file per section, `<section>-<slug>.Test.js`. A section with
+  halves in both groups — 6.1, 6.5, 7, 8.2 — has a file in each, and that is the whole answer to
+  what the `both` state of the old table tried to express.
+- **The catalogue is what an executer may decline.** `test/ExecuterCapabilities.js` carries, per
+  capability, the case that decides it (`context`, `run`, `expected`) and a matrix of one row per
+  capability against one column per executer. `test/executer/CapabilityTest.js` generates the tests
+  from it. No test file decides for itself that something is a capability.
+- **A case is unambiguous**: `yes` runs as `it` and has to pass, `no` runs as `it.fails` and has to
+  fail. There is deliberately **no test anywhere that pins what an executer answers instead**.
+
+**Reasoning:** Frank's, on 2026-09-01, against the structure delivered the same day, and every point
+of it held up.
+
+`RULE_GROUPS` was introduced against the `ChainTest.js:229` failure — a test counted as
+executer-independent until the constructor started reading `defaultContext` off the executer. But it
+would not have caught that: neither a declaration nor the test holding it against the shared suites
+can see a rule *becoming* executer-dependent. What actually caught it was changing the default
+executer, and what guards against it now is that the general suite takes its dialect from the
+catalogue, so the swap is a one-line experiment. The table checked its own consistency and nothing
+else, which is a problem that only exists once the table does.
+
+The counter-tests were worse than useless. `"does not count across two occurrences of a counting
+write"` said the same as `context/write-back: no`, in a second file, with no link between them: the
+day the deconstructor gains the write-back — it is in `BACKLOG.md` with a finished draft — that test
+turns red and the catalogue knows nothing about it. Two places to change for one fact is exactly
+what the catalogue was built to end. Removing them cost nothing: every case in the two
+`OwnBehaviourTest` files was either the other side of a capability or a rule the other three
+executers keep as well (`window.Math.round(1.5)` answers `2` everywhere, verified before it moved).
+
+Grouping the shared rules by theme rather than by section hid what a file contains behind its name —
+`ContextRules.js` carried 6.1, 6.2, 6.3 and 6.5 — and the four `ConformanceTest.js` files differed
+in one import line each. A file per section that loops over the executers itself removes both, and
+the count of files is not a cost worth paying attention to at this size: 36 files run in 8.3 s
+against 3.7 s for 18, so the split has room before it needs a second look.
+
+**Alternatives:** Keeping `RULE_GROUPS` and describing in it why a loop in the general suite is not a
+per-executer rule — rejected, because a table that has to explain its own exceptions is the thing
+being replaced. Carrying both expectations in a capability row, `{ supported, unsupported }` —
+rejected by Frank as reintroducing the complication: a case that answers two different things
+depending on a table is no longer a case one can read. A directory per executer holding a generated
+conformance file — that is what existed, and it produced four files with nothing in them.
+
+**Consequences:** `RULE_GROUPS`, `sectionsOf` and `test/general/RuleGroupTest.js` are gone, together
+with the `SECTIONS` exports of the shared suites. `SPECIFICATION.md` 8.3 still carries the capability
+table for a human reader and still has to be updated by hand — the suite runs in a browser and
+cannot read the document. Every file that loops over `EXECUTERS` now lives under `test/executer/`,
+which moved `ContextShapeTest`, `StackedContextTest` and `SetupExecuterTest` out of `test/general/`;
+what is left there pins no rule and loops over nothing. Two cases still loop over the executers from
+inside `test/spec/` — 8.2 and 8.4 — and they are the one open question this structure does not
+answer; `BACKLOG.md` carries it. Measured across the rebuild: 415 cases before and after the moves,
+coverage unchanged at 92.81 % of statements.
+
 ## 2026-09-01 — How does the test suite say what an executer can do, when the four differ on purpose?
 
 **Decision:** Through a **capability catalogue**, `test/ExecuterCapabilities.js`, and a vocabulary
@@ -38,6 +100,9 @@ the ordinary one where the state is `supported` and `it.fails` where it is not. 
 statement spells a context name — is not a capability, because it is not a yes or no; it stays as
 `variableName` on the executer entry, and the general suite takes its spelling from there rather
 than writing a bare name.
+
+**Superseded later the same day** — see the entry above: the group of a rule is the directory it
+lives in, and `RULE_GROUPS` is gone. What follows described it while it stood.
 
 The catalogue also declares, in `RULE_GROUPS`, which group each rule of the specification is tested
 in: `general` (once, in `test/spec/`), `per-executer` (once per implementation, in
