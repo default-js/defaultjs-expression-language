@@ -1,26 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { defaultExecuterEntry } from "../ExecuterCapabilities.js";
+import { useTestExecuter } from "../TestExecuter.js";
 
 /**
- * SPECIFICATION.md 3.4 - a statement is arbitrary JavaScript.
+ * SPECIFICATION.md 3.4 - the empty statement.
+ *
+ * What a statement may *contain* is a demand on the implementations and is asked of all four in
+ * `test/executer/rules/3.4-…`. What is left here is the one half of 3.4 that never reaches an
+ * executer at all: the empty statement, which the resolver answers by itself.
  * Where a statement reaches a context value, the name is spelled the way the default executer
  * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
  */
 
-const { variableName } = defaultExecuterEntry();
+useTestExecuter();
 
 describe("Specification 3.4 - a statement is arbitrary JavaScript", () => {
-
-	it("evaluates an operator expression over the context", async () => {
-		const result = await ExpressionResolver.resolve(`\${ ${variableName("a")} * ${variableName("b")} }`, { a: 6, b: 7 });
-		expect(result).toBe(42);
-	});
-
-	it("evaluates a call on a context member", async () => {
-		const result = await ExpressionResolver.resolve(`\${ ${variableName("value")}.toUpperCase() }`, { value: "text" });
-		expect(result).toBe("TEXT");
-	});
 
 	// 3.4 by way of JavaScript: an empty statement is what `return;` answers.
 	it("answers undefined for an empty statement", async () => {
@@ -40,8 +34,4 @@ describe("Specification 3.4 - a statement is arbitrary JavaScript", () => {
 		expect(result).toBe("a undefined b");
 	});
 
-	it("evaluates an await inside the statement", async () => {
-		const result = await ExpressionResolver.resolve("${ await Promise.resolve(20) + 1 }", {});
-		expect(result).toBe(21);
-	});
 });

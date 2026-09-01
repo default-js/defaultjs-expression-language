@@ -1,24 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
 import { catchError } from "../TestUtils.js";
-import { defaultExecuterEntry } from "../ExecuterCapabilities.js";
+import { useTestExecuter, answerWith } from "../TestExecuter.js";
 
 /**
- * Conformance tests for SPECIFICATION.md section 7 - errors.
+ * SPECIFICATION.md 7 - what the resolver says and does when a statement fails.
  *
- * What is left here is what happens above the executer: the warnings, and the statement each of
- * them names. It runs once.
+ * What is left here is what happens **above** the executer: the warning, and the statement it names.
+ * That an error arrives at all is the executer's part, and what each entry point makes of one is
+ * asked of every implementation in `test/executer/rules/7-errors.Test.js`.
  *
- * The two entry points answer an error differently and that is the rest of section 7: a text keeps
- * rendering and leaves the expression that failed standing as written, while `resolve` logs the
- * error and lets it through. Neither answers the default value for an error. The error arrives
- * from the executer, so both halves are asked of every one of them in
- * `test/executer/shared/ErrorRules.js`.
- *
- * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (8.3).
+ * The failure is therefore produced rather than provoked: `answerWith` throws, and what is asserted
+ * is that the resolver names the statement and hands the error on. Before 2026-09-01 each case wrote
+ * a statement that happened to fail under whichever implementation was the default - which meant a
+ * changed executer could silently take the failure away and leave the case green for nothing.
  */
-const { variableName } = defaultExecuterEntry();
+
+useTestExecuter();
 
 describe("Specification 7 - what the warnings say", () => {
 
@@ -34,54 +32,58 @@ describe("Specification 7 - what the warnings say", () => {
 		} finally {
 			console.warn = original;
 		}
+
 		return warnings;
 	};
 
+	const STATEMENT = "missingProbe.deep";
+
 	it("names the statement that failed in a text", async () => {
+		answerWith(() => {
+			throw new Error("from the executer");
+		});
 		const resolver = new ExpressionResolver({ context: {}, name: "root" });
-		const statement = `${variableName("missingProbe")}.deep`;
-		const warnings = await collectWarnings(() => resolver.resolveText(`\${ ${statement} }`));
-		expect(warnings.some((warning) => warning.includes(statement))).toBe(true);
+		const warnings = await collectWarnings(() => resolver.resolveText(`\${ ${STATEMENT} }`));
+		expect(warnings.some((warning) => warning.includes(STATEMENT))).toBe(true);
 	});
 
 	// resolve logs before it throws, so the console names the statement even though the caller is
 	// handed the error as well.
 	it("names the statement that failed before resolve raises it", async () => {
+		answerWith(() => {
+			throw new Error("from the executer");
+		});
 		const resolver = new ExpressionResolver({ context: {}, name: "root" });
-		const statement = `${variableName("missingProbe")}.deep`;
 		let error = null;
 		const warnings = await collectWarnings(async () => {
-			error = await catchError(() => resolver.resolve(`\${ ${statement} }`));
+			error = await catchError(() => resolver.resolve(`\${ ${STATEMENT} }`));
 		});
 		expect(error instanceof Error).toBe(true);
-		expect(warnings.some((warning) => warning.includes(statement))).toBe(true);
+		expect(warnings.some((warning) => warning.includes(STATEMENT))).toBe(true);
 	});
 
-	// A statement that does not compile is an error like any other. The input reaches the executer
-	// as a statement because 3.2 does not apply to resolve at all: the backslashes are part of the
-	// statement, and that statement is not valid JavaScript.
-	it("names a statement that does not compile before resolve raises it", async () => {
-		const resolver = new ExpressionResolver({ context: { test: "resolved" }, name: "root" });
-		const expression = `\${${variableName("test")}}`;
-		let error = null;
-		const warnings = await collectWarnings(async () => {
-			error = await catchError(() => resolver.resolve(`\\${expression}`, "fallback"));
+	// The error the executer raised is the error the caller gets - not one the resolver wrapped or
+	// replaced. A SyntaxError is the case a consumer meets most often, because a statement that does
+	// not compile is how most failures start.
+	it("hands the caller the error the executer raised, unchanged", async () => {
+		const raised = new SyntaxError("does not compile");
+		answerWith(() => {
+			throw raised;
 		});
-		expect(error instanceof SyntaxError).toBe(true);
-		expect(warnings.some((warning) => warning.includes(expression))).toBe(true);
+		const resolver = new ExpressionResolver({ context: {}, name: "root" });
+		const error = await catchError(() => resolver.resolve(`\${ ${STATEMENT} }`));
+		expect(error === raised).toBe(true);
 	});
 
 	// The threshold is one second, so this test cannot be quicker than that.
 	it("names a statement that runs longer than a second, without affecting the resolution", async () => {
-		const context = {
-			slow: () => new Promise((resolve) => setTimeout(() => resolve("late"), 1200))
-		};
-		const resolver = new ExpressionResolver({ context, name: "root" });
+		answerWith(() => new Promise((resolve) => setTimeout(() => resolve("late"), 1200)));
+		const resolver = new ExpressionResolver({ context: {}, name: "root" });
 		let result = null;
 		const warnings = await collectWarnings(async () => {
-			result = await resolver.resolve(`\${ ${variableName("slow")}() }`, "fallback");
+			result = await resolver.resolve(`\${ ${STATEMENT} }`, "fallback");
 		});
 		expect(result).toBe("late");
-		expect(warnings.some((warning) => warning.includes(`${variableName("slow")}()`))).toBe(true);
+		expect(warnings.some((warning) => warning.includes(STATEMENT))).toBe(true);
 	});
 });

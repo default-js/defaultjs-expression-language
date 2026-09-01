@@ -77,6 +77,7 @@ Split by shape: independent items go in the backlog, settled questions get writt
 - `BACKLOG.md` — open items, findings, and work that was agreed but not yet implemented. Entries are deleted once done; git history is the archive.
 - `CHANGELOG.md` — what changed for consumers, per released version, newest first. Keep a Changelog format. Written while the change is made, released by moving `## [Unreleased]` to a version heading.
 - `DECISIONS.md` — architecture and API decisions with their reasoning. Anything that constrains later work, or that would otherwise be argued a second time, gets an entry. It answers *why*; `SPECIFICATION.md` answers *what*.
+- `TESTING.md` — the rules a test case follows: where it belongs, what it may assert, and what the three parts of the suite are for. Written 2026-09-01, after the suite was rebuilt around that question three times in one day.
 - `SPECIFICATION.md` — what the resolver does, rule by rule, and what it is meant to do where the code does not yet keep up. Written 2026-08-22 from an interview with Frank rather than from the code, because the code is not a reliable witness to its own intent. It is the reference for every fix to the resolver, and it is published with the package.
 - `plans/` — one file per ordered undertaking, named after it. **No plan is running.** The five so far — the toolchain modernization, the specification, the conformance suite, the expression parsing rework, and the executer conformance suite — were retired on 2026-08-21, 2026-08-22, 2026-08-24, 2026-08-29 and 2026-09-01. The last of them is **finished but still on disk**: `plans/executer-conformance.md` carries the record of its five stages, and that record only survives its deletion once it has been committed. A plan is a living document: update a stage's status the moment it goes green, along with what was actually installed and any deviation from the intent. When the undertaking is finished the plan is **deleted** — durable outcomes move into `DECISIONS.md` first, git history keeps the rest. A finished plan left lying around gets read as instructions. With nothing running, `plans/` does not exist.
 
@@ -139,15 +140,15 @@ A consumer who wants a non-default executer imports it explicitly; that same imp
 
 ## Tests
 
+**`TESTING.md` carries the rules** — where a case belongs, what it may assert, and how the three parts of the suite differ. Read it before writing or moving a test; what follows is only the shape of the whole.
+
 Vitest in browser mode, headless Chromium through Playwright — a real browser, because the package targets one and the tests reach for `document`, `window` and `document.location`. Configuration in `vitest.config.mjs`. The reasoning behind the runner choice is in `DECISIONS.md`.
 
 New test files **are** discovered automatically: anything matching `test/**/*Test.js` runs. Shared setup sits in `test/setup.js`, wired in through `setupFiles`; helpers in `test/TestUtils.js`.
 
-**The directory says how a rule is tested, the file name says which rule it is** (2026-09-01). `test/spec/` holds the rules that run once, against `ExpressionResolver.defaultExecuter`; `test/executer/rules/` holds those that only show through a statement and are therefore asked of every implementation; `test/general/` holds what pins no rule of the specification at all. One file per section of `SPECIFICATION.md`, named `<section>-<slug>.Test.js`, so a section with halves in both groups has a file in each. Where the four implementations may legitimately differ, the point is a **capability**: `test/ExecuterCapabilities.js` carries the case and the matrix, and `test/executer/CapabilityTest.js` generates the tests from it — supported runs as `it`, unsupported as `it.fails`, and there is deliberately no test anywhere that pins what an executer answers *instead*. See `DECISIONS.md`.
+**Three things are tested, and each has one place** (2026-09-01). `test/spec/` tests the **resolver** against `TestExecuter`, the implementation the suite owns, which **evaluates nothing** — it answers the statement it was handed, so a case reads the resolver's own work out of the result. `test/executer/rules/` tests the **implementations**: every rule that only shows through a statement, asked of all four, each case with a row in `MATRIX` (`test/ExecuterCapabilities.js`) that says `yes`, `no` (a freedom 8.3 grants) or `defect` (a rule not kept yet, naming its `BACKLOG.md` entry). `test/general/` holds what pins no rule at all. One file per section of `SPECIFICATION.md`, named `<section>-<slug>.Test.js`.
 
 Every test file imports what it uses — `import { describe, it, expect, beforeAll, afterAll } from "vitest"`. **`globals: true` is deliberately off** and must stay off: the suite uses the bare identifier `test` as its example of an undefined variable, and one `afterAll` calls `delete global.test`. With globals on, that is Vitest's own `test` function on `window`.
-
-The suite uses `describe` / `it` / `beforeAll` / `afterAll` with `async` functions and the matchers `toBe`, `toBeDefined`, `toBeUndefined`. Keeping that surface narrow is worth something on its own — don't widen it without a reason. Per-suite timeouts go in the options object, `describe(name, { timeout }, fn)`.
 
 ## Benchmarks
 

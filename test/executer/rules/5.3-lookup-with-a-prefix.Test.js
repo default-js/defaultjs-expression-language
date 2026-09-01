@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect } from "vitest";
 import { ExpressionResolver } from "../../../index.js";
-import { EXECUTERS } from "../../ExecuterCapabilities.js";
+import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
 
 /**
  * SPECIFICATION.md 5.3 - the resolver a scope prefix addresses, asked of every executer.
@@ -12,9 +12,12 @@ import { EXECUTERS } from "../../ExecuterCapabilities.js";
 
 for (const { name: executer, variableName } of EXECUTERS) {
 
+	// every case below is a row of the matrix, and the matrix decides whether it has to pass
+	const matrixIt = casesOf("5.3", executer);
+
 	describe(`Specification 5.3 - lookup with a prefix [${executer}]`, () => {
 
-		it("addresses the link the call is made on", async () => {
+		matrixIt("addresses the link the call is made on", async () => {
 			const variableNameValue = variableName("value");
 			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: root, executer });
@@ -22,7 +25,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from leaf");
 		});
 
-		it("climbs to the ancestor the prefix names", async () => {
+		matrixIt("climbs to the ancestor the prefix names", async () => {
 			const variableNameValue = variableName("value");
 			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: root, executer });
@@ -30,7 +33,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from root");
 		});
 
-		it("evaluates against the addressed link and the contexts above it", async () => {
+		matrixIt("evaluates against the addressed link and the contexts above it", async () => {
 			const variableNameRootOnly = variableName("rootOnly");
 			const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer });
 			const middle = new ExpressionResolver({ context: { middleOnly: "from middle" }, name: "middle", parent: root, executer });
@@ -39,7 +42,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from root");
 		});
 
-		it("answers from the first link carrying the name, climbing towards the root", async () => {
+		matrixIt("answers from the first link carrying the name, climbing towards the root", async () => {
 			const variableNameValue = variableName("value");
 			const outer = new ExpressionResolver({ context: { value: "from outer" }, name: "dup", executer });
 			const inner = new ExpressionResolver({ context: { value: "from inner" }, name: "dup", parent: outer, executer });
@@ -51,7 +54,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 		// What the text answers differs per executer - the expression stands where the statement
 		// raised, the default applies where it merely answered undefined (7) - so what is asserted
 		// is the rule itself: the value of the link below is not reachable from the addressed one.
-		it("does not see a link below the one the prefix names", async () => {
+		matrixIt("does not see a link below the one the prefix names", async () => {
 			const variableNameLeafOnly = variableName("leafOnly");
 			const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root, executer });

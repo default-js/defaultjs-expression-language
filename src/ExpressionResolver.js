@@ -260,13 +260,17 @@ export default class ExpressionResolver {
 	 * @date 3/10/2024 - 7:27:57 PM
 	 *
 	 * @constructor
-	 * @param {{ context?: any; parent?: any; name?: any; }} options
+	 * @param {{ context?: any; parent?: any; name?: any; executer?: (string|Executer); }} options
 	 * @param {object} [options.context=GLOBAL]
 	 * @param {ExpressionResolver} [options.parent=null]
 	 * @param {?string} [options.name=null] where none is passed, one is generated - 5.1
+	 * @param {(string|Executer)} [options.executer] the registered name of an executer, or an
+	 * `Executer` instance. A name that is not registered throws; an instance needs no registration,
+	 * because it addresses the executer directly. Without the option the resolver uses
+	 * `ExpressionResolver.defaultExecuter` - 4.2.
 	 */
 	constructor({ context, parent = null, name = null, executer } = {}) {
-		this.#executer = typeof executer === "string" ? getExecuterType(executer) : ExpressionResolver.defaultExecuter;
+		this.#executer = executer instanceof Executer ? executer : typeof executer === "string" ? getExecuterType(executer) : ExpressionResolver.defaultExecuter;
 		this.#parent = parent instanceof ExpressionResolver ? parent : null;
 		this.#name = name || generateName();		
 		this.#contextHandle = new ResolverContextHandle(context , this.#parent ? this.#parent.contextHandle : null);

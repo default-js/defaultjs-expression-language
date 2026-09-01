@@ -15,6 +15,15 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Added
 
+- **The constructor takes an `Executer` instance, not only a registered name.**
+  `new ExpressionResolver({ executer })` accepted a registered name and silently fell back to the
+  default for anything else — an instance included, although the static setter
+  `ExpressionResolver.defaultExecuter` has always accepted both. The two ends of the same concept
+  now follow the same rule. Nothing that worked before changes: a name is still looked up in the
+  registry and an unregistered one still throws. What is new is that an executer can be used
+  **without registering it**, which is what a caller wants for one that is built for a single
+  resolver. See `SPECIFICATION.md` 4.2.
+
 - **`SPECIFICATION.md` ships with the package.** It states what the resolver does, rule by
   rule — expression syntax, the resolver chain and its scopes, the context and what it
   guarantees, error handling, the executers, and the whole public surface. Where the code does

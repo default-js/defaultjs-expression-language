@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { defaultExecuterEntry } from "../ExecuterCapabilities.js";
+import { useTestExecuter, answersFromContext, answerWith } from "../TestExecuter.js";
 
 /**
  * SPECIFICATION.md 4.5 - the timeout delays the start of the resolution.
@@ -8,20 +8,23 @@ import { defaultExecuterEntry } from "../ExecuterCapabilities.js";
  * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
  */
 
-const { variableName } = defaultExecuterEntry();
+useTestExecuter();
+// the answer is the value the context carries under the statement - a lookup, so what a case
+// reads is which context the resolver handed over, not what anybody computed
+answersFromContext();
 
 describe("Specification 4.5 - the timeout delays the start", () => {
 
 	it("delays resolve by the given amount", async () => {
 		const start = Date.now();
-		const result = await ExpressionResolver.resolve(`\${ ${variableName("value")} }`, { value: "resolved" }, undefined, 100);
+		const result = await ExpressionResolver.resolve("${ value }", { value: "resolved" }, undefined, 100);
 		expect(result).toBe("resolved");
 		expect(Date.now() - start >= 90).toBe(true);
 	});
 
 	it("delays resolveText by the given amount", async () => {
 		const start = Date.now();
-		const result = await ExpressionResolver.resolveText(`a \${ ${variableName("value")} } b`, { value: "resolved" }, undefined, 100);
+		const result = await ExpressionResolver.resolveText("a ${ value } b", { value: "resolved" }, undefined, 100);
 		expect(result).toBe("a resolved b");
 		expect(Date.now() - start >= 90).toBe(true);
 	});
@@ -29,18 +32,18 @@ describe("Specification 4.5 - the timeout delays the start", () => {
 	// "delays the start by that amount" leaves nothing to delay by for 0, and a negative delay is
 	// not a delay either. Neither may swallow the resolution.
 	it("treats a timeout of zero and a negative timeout as no delay", async () => {
-		const expression = `\${ ${variableName("value")} }`;
+		const expression = "${ value }";
 		const zero = await ExpressionResolver.resolve(expression, { value: "resolved" }, undefined, 0);
 		const negative = await ExpressionResolver.resolve(expression, { value: "resolved" }, undefined, -100);
 		expect(zero).toBe("resolved");
 		expect(negative).toBe("resolved");
 	});
 
+	// The timeout delays the start; what the statement then takes is its own business. The answer is
+	// a promise that settles well after the delay, so nothing but a deadline could cut it short.
 	it("is not a deadline - a statement that runs longer is not aborted", async () => {
-		const context = {
-			slow: () => new Promise((resolve) => setTimeout(() => resolve("late"), 150))
-		};
-		const result = await ExpressionResolver.resolve(`\${ ${variableName("slow")}() }`, context, undefined, 10);
+		answerWith(() => new Promise((resolve) => setTimeout(() => resolve("late"), 150)));
+		const result = await ExpressionResolver.resolve("${ slow }", {}, undefined, 10);
 		expect(result).toBe("late");
 	});
 });

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS, defaultExecuterEntry } from "../ExecuterCapabilities.js";
+import { EXECUTERS } from "../ExecuterCapabilities.js";
+import { useTestExecuter, answersFromContext } from "../TestExecuter.js";
+import { catchError } from "../TestUtils.js";
 
 /**
  * SPECIFICATION.md 6.1 - the proxy, seen without executing a statement.
@@ -12,7 +14,10 @@ import { EXECUTERS, defaultExecuterEntry } from "../ExecuterCapabilities.js";
  * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
  */
 
-const { variableName } = defaultExecuterEntry();
+useTestExecuter();
+// the answer is the value the context carries under the statement - a lookup, so what a case
+// reads is which context the resolver handed over, not what anybody computed
+answersFromContext();
 
 describe("Specification 6.1 - every access goes through the proxy", () => {
 
@@ -41,7 +46,7 @@ describe("Specification 6.1 - every access goes through the proxy", () => {
 
 	it("resolves over a context the caller froze", async () => {
 		const resolver = new ExpressionResolver({ context: Object.freeze({ own: "frozen" }), name: "root" });
-		expect(await resolver.resolve(`\${ ${variableName("own")} }`)).toBe("frozen");
+		expect(await resolver.resolve("${ own }")).toBe("frozen");
 	});
 
 	// A single frozen link is enough: the property cache walks the prototype chain, so the names of
@@ -50,5 +55,27 @@ describe("Specification 6.1 - every access goes through the proxy", () => {
 		const resolver = new ExpressionResolver({ context: Object.freeze({ own: "frozen" }), name: "solo" });
 		expect(Object.keys(resolver.context).includes("own")).toBe(true);
 		expect(JSON.stringify(resolver.context).includes("frozen")).toBe(true);
+	});
+
+	// `data || {}` in the constructor of ResolverContextHandle turns a falsy context into an empty
+	// one, so 0, "" and false build a resolver that carries no name at all. Which shapes of context
+	// an *executer* can work with is a different question and has its rows in the matrix; this is
+	// about what the resolver makes of what it was handed.
+	it("takes a falsy primitive as an empty context", async () => {
+		for (const context of [0, "", false]) {
+			const resolver = new ExpressionResolver({ context, name: "ctx" });
+			expect(await resolver.resolve("${ anything }")).toBeUndefined();
+		}
+	});
+
+	// ...while a truthy one reaches `Reflect.ownKeys`, which only takes objects. The resolver
+	// therefore throws at construction, with an error from inside the property cache rather than one
+	// that names the mistake. Only that it throws is pinned; the message is not, so a decision to
+	// reject a primitive properly keeps this green. Open in BACKLOG.md: reject, coerce, or ignore.
+	it("throws on a truthy primitive as context", async () => {
+		for (const context of ["abc", 42, true]) {
+			const error = await catchError(() => new ExpressionResolver({ context, name: "ctx" }));
+			expect(error instanceof Error).toBe(true);
+		}
 	});
 });

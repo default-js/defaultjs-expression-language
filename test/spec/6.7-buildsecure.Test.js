@@ -1,12 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS, defaultExecuterEntry } from "../ExecuterCapabilities.js";
+import { EXECUTERS } from "../ExecuterCapabilities.js";
+import { useTestExecuter, answersFromContext } from "../TestExecuter.js";
 
 /**
  * SPECIFICATION.md 6.7 - buildSecure and its property filter.
  */
 
-const { variableName } = defaultExecuterEntry();
+useTestExecuter();
+// the answer is the value the context carries under the statement - a lookup, so what a case
+// reads is which context the resolver handed over, not what anybody computed
+answersFromContext();
 
 describe("Specification 6.7 - buildSecure", () => {
 
@@ -14,21 +18,19 @@ describe("Specification 6.7 - buildSecure", () => {
 
 	it("builds a resolver over the filtered context", async () => {
 		const secure = ExpressionResolver.buildSecure({ context: { open: "ok", secret: "hidden" }, propFilter });
-		const result = await secure.resolve(`\${ ${variableName("open")} }`, "fallback");
+		const result = await secure.resolve("${ open }", "fallback");
 		expect(result).toBe("ok");
 	});
 
 	it("does not carry a property the filter rejected", async () => {
 		const secure = ExpressionResolver.buildSecure({ context: { open: "ok", secret: "hidden" }, propFilter });
-		const result = await secure.resolve(`\${ typeof ${variableName("secret")} }`);
-		expect(result).toBe("undefined");
+		expect(await secure.resolve("${ secret }")).toBeUndefined();
 	});
 
-	it("filters the context, not the globals - it is not a sandbox", async () => {
-		const secure = ExpressionResolver.buildSecure({ context: { open: "ok", secret: "hidden" }, propFilter });
-		const result = await secure.resolve("${ typeof Math }", "fallback");
-		expect(result).toBe("object");
-	});
+	// That a statement can still reach a global - buildSecure is no sandbox - is not a rule of 6.7
+	// but a freedom of 8.3, and it is in the matrix as `reaches a global that no resolver carries`.
+	// It cannot be asserted here without evaluating something, and it would say nothing about
+	// buildSecure if it were.
 
 	it("forwards name and parent to the constructor", async () => {
 		const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root" });

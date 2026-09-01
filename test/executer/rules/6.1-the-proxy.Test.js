@@ -1,34 +1,105 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect } from "vitest";
 import { ExpressionResolver } from "../../../index.js";
-import { EXECUTERS } from "../../ExecuterCapabilities.js";
+import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
 
 /**
- * SPECIFICATION.md 6.1 - the proxy seen through a statement, asked of every executer.
+ * SPECIFICATION.md 6.1 - what a statement reads through the proxy, asked of every executer.
  *
  * What the proxy does without a statement in play - that it is not the object handed in, that it
- * enumerates the chain - is resolver API and runs once, in the general suite. Here is what reaches
- * an executer: every one of them reads the context in its own way, and the deconstruction one reads
- * all its names before it runs anything.
+ * enumerates the chain, what it makes of a primitive - is resolver API and runs once, in
+ * `test/spec/`. Here is what reaches an executer, and every implementation reads it in its own way:
+ * the deconstruction one reads all the names of a context before it runs anything, which is why the
+ * shape of a context can break it where it breaks nobody else.
+ *
+ * The shapes came from `ContextShapeTest.js`, dissolved on 2026-09-01. It described "what the code
+ * does today" outside the matrix, but that is exactly what a matrix row says - and one of its cases
+ * checked two named executers by hand, which is a row written in prose.
+ *
+ * A statement that only has to survive the context is `${ 1 + 1 }`, which touches no name at all:
+ * where it fails, the context broke the execution and not the statement.
  */
+
+const argumentsObject = (function () {
+	return arguments;
+})("a", "b");
 
 for (const { name: executer, variableName } of EXECUTERS) {
 
-	describe(`Specification 6.1 - every access goes through the proxy [${executer}]`, () => {
+	// every case below is a row of the matrix, and the matrix decides whether it has to pass
+	const matrixIt = casesOf("6.1", executer);
 
-		it("resolves over a context the caller froze", async () => {
+	describe(`Specification 6.1 - the proxy [${executer}]`, () => {
+
+		matrixIt("resolves over a context the caller froze", async () => {
 			const resolver = new ExpressionResolver({ context: Object.freeze({ own: "frozen" }), name: "solo", executer });
 			expect(await resolver.resolve(`\${ ${variableName("own")} }`)).toBe("frozen");
 		});
 
 		// A context may carry any key. The resolver filters none of them since 2026-08-30, so an
-		// executer that turns names into code has to skip what it cannot express instead of
-		// failing over it - see DECISIONS.md. Carried over from test/ExecuterTests/, where three
-		// of the four executers pinned this separately as "illegal object member".
-		it("resolves over a context carrying a key that is not a variable name", async () => {
+		// executer that turns names into code has to skip what it cannot express instead of failing
+		// over it - see DECISIONS.md.
+		matrixIt("resolves over a context carrying a key that is not a variable name", async () => {
 			const context = { known: "from context" };
 			context["not-a-name"] = true;
 			const resolver = new ExpressionResolver({ context, name: "root", executer });
 			expect(await resolver.resolve(`\${${variableName("known")}}`)).toBe("from context");
+		});
+
+		matrixIt("runs a statement over an array context", async () => {
+			const resolver = new ExpressionResolver({ context: ["a", "b"], name: "ctx", executer });
+			expect(await resolver.resolve("${ 1 + 1 }")).toBe(2);
+		});
+
+		matrixIt("runs a statement over a Map context", async () => {
+			const resolver = new ExpressionResolver({ context: new Map([["k", "v"]]), name: "ctx", executer });
+			expect(await resolver.resolve("${ 1 + 1 }")).toBe(2);
+		});
+
+		matrixIt("runs a statement over a Set context", async () => {
+			const resolver = new ExpressionResolver({ context: new Set(["x"]), name: "ctx", executer });
+			expect(await resolver.resolve("${ 1 + 1 }")).toBe(2);
+		});
+
+		matrixIt("runs a statement over a NodeList context", async () => {
+			const resolver = new ExpressionResolver({ context: document.querySelectorAll("body"), name: "ctx", executer });
+			expect(await resolver.resolve("${ 1 + 1 }")).toBe(2);
+		});
+
+		// An arguments object carries `callee`, a poisoned accessor because the function it belongs to
+		// is strict. Only an executer that reads the names of a context before running a statement
+		// touches it, and destructuring `callee` calls the getter. Whether that executer has to survive
+		// a context whose properties throw on access is open - see BACKLOG.md.
+		matrixIt("runs a statement over an arguments object as context", async () => {
+			const resolver = new ExpressionResolver({ context: argumentsObject, name: "ctx", executer });
+			expect(await resolver.resolve("${ 1 + 1 }")).toBe(2);
+		});
+
+		// The context of a template engine is a DOM node more often than not, and what a statement
+		// reads off it sits on a prototype rather than on the node.
+		matrixIt("reads through an element context", async () => {
+			const resolver = new ExpressionResolver({ context: document.createElement("div"), name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("children")}.length }`)).toBe(0);
+		});
+
+		// The indexed names of an array are dropped by the property cache because they are not
+		// variable names, `length` is kept because it is one.
+		matrixIt("reads the length of an array context and ignores its indices", async () => {
+			const resolver = new ExpressionResolver({ context: ["a", "b"], name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("length")} }`)).toBe(2);
+		});
+
+		matrixIt("reads a named key of a context that also carries a numeric one", async () => {
+			const resolver = new ExpressionResolver({ context: { 0: "zero", name: "named" }, name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("name")} }`)).toBe("named");
+		});
+
+		// A Map keeps its entries inside itself rather than as properties, so no executer reaches
+		// them - the name of an entry behaves like a name no resolver carries, which 7 and 8.3 cover.
+		// What a context of that shape does offer is its prototype, and an accessor there is read
+		// through the proxy with the context as its receiver.
+		matrixIt("reads an accessor of the prototype of a Map context", async () => {
+			const resolver = new ExpressionResolver({ context: new Map([["entry", "value"]]), name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("size")} }`)).toBe(1);
 		});
 	});
 }

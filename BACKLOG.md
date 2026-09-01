@@ -229,20 +229,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   tail of the deepest. Note that the same file's own comment explains why the tail is reused: a
   bench file has nowhere to put setup. Found 2026-08-29 while measuring the whole cycle for goal 5.
 
-- [ ] **Two rules run per executer but sit in the general suite.**
-  `test/spec/8.2-the-implementations.Test.js` and `test/spec/8.4-tuning.Test.js` each loop over
-  `EXECUTERS` although they sit in the general suite: the first checks that every implementation
-  registers itself on import, the second that every one accepts a cache size and keeps resolving.
-  Since 2026-09-01 the directory is what says whether a rule runs once or per executer, and by
-  that rule these two are in the wrong place. Two ways out and neither is obviously right — move
-  them to `test/executer/rules/` as `8.2-…` and `8.4-…`, which is honest about how they run but
-  puts a registration check among the rules about executing statements; or leave them and accept
-  that a loop is not the same thing as a per-executer rule, because neither case asks anything
-  the executer decides — they ask the same question of four implementations. Raised while the
-  executer conformance plan ran, still open after the test structure was rebuilt on 2026-09-01.
-
 - [ ] **Coverage as of 2026-09-01, and the four things still uncovered.**
-  Statements **92.81 %** (504/543), branches **90.94 %** (251/276), functions **91.58 %** (98/107),
+  Statements **92.81 %** (504/543), branches **91.00 %** (253/278), functions **91.58 %** (98/107),
   lines **95.56 %** (453/474). Measured after the executer conformance work; the numbers before it
   were 93.28 % / 91.85 % / 90.81 % / 95.69 % (472/506) on 2026-08-29. **The percentages fell while
   the tests did not**: the package grew from 506 to 543 statements over the same days — the name
@@ -276,24 +264,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   rules without a test. Update these numbers when the picture changes rather than adding another
   baseline.
 
-- [ ] **The constructor option `executer` is undocumented and silently ignores an `Executer` instance.**
-  Target: `SPECIFICATION.md` 4.2 — the option takes a registered name and nothing else.
-  `new ExpressionResolver({ executer })` is how a consumer pins one resolver to a non-default
-  executer, but the JSDoc above the constructor lists only `context`, `parent` and `name`
-  (`src/ExpressionResolver.js:118-128`), so the option exists only in the code. It also accepts
-  a name and nothing else: `typeof executer === "string" ? getExecuterType(executer) :
-  ExpressionResolver.defaultExecuter` (`:130`) falls back to the default for anything that is
-  not a string, an `Executer` instance included — while the static setter
-  `ExpressionResolver.defaultExecuter` (`:98-102`) accepts both a name and an instance. Same
-  concept, two rules, and the stricter one fails without a word. **Decided 2026-08-22** (plan
-  question 40): the option takes a **registered name and nothing else**. Every executer is
-  registered before use, so the name is what addresses it, and an unregistered name already
-  throws through `getExecuter`. What is left to settle is the other end of the asymmetry —
-  whether the static setter `defaultExecuter` stays permissive or is narrowed to names as well —
-  and what the constructor does when it is handed an instance anyway: falling back to the default
-  without a word is the one answer that is now ruled out. Consumer-visible, so the outcome belongs
-  in `DECISIONS.md`. Found 2026-08-21 while covering `setupExecuter`.
-
 - [ ] **Take the name check out of `ResolverContextHandle` and give it to the executer that needs it.**
   Agreed 2026-08-30, reasoning in `DECISIONS.md` — the cache stays a cache, the proxy stays a
   proxy, both are filled with data structures that are already valid, and neither checks anything.
@@ -319,7 +289,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   a primitive and throws `TypeError: Reflect.ownKeys called on non-object` at construction, from
   three frames below the call. A falsy primitive is silently taken as an empty context instead, so
   `0` and `false` build a resolver and `42` does not. Verified 2026-08-30 in the test browser and
-  pinned in `test/general/ContextShapeTest.js`, which asserts only *that* it throws, so a decision
+  pinned in `test/spec/6.1-the-proxy.Test.js`, which asserts only *that* it throws, so a decision
   to reject a primitive with a clear message keeps the test green. To decide: reject with an error
   that names the mistake, coerce (`Object(context)`), or ignore and take an empty context — the
   last of the three is what the falsy half does today. `SPECIFICATION.md` says nothing about what a
@@ -333,7 +303,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   expression, including one that touches no name at all. Verified 2026-08-30 with an `arguments`
   object, whose `callee` is a poisoned accessor in strict mode: `${ 1 + 1 }` answers `2` under
   `WithScopedExecuter` and `TypeError: 'caller', 'callee', and 'arguments' properties may not be
-  accessed…` under this one. Pinned as the current difference in `test/general/ContextShapeTest.js`.
+  accessed…` under this one. Pinned as a row of the matrix - `runs a statement over an arguments
+  object as context`, `no` for the deconstructor - in `test/executer/rules/6.1-the-proxy.Test.js`.
   The same shape covers any context with a lazily computed or throwing getter, and note that
   destructuring also *runs* every getter on every execution, which is a cost the other executers do
   not pay. To decide whether that is a defect of the executer or the price of its strategy (8.3).

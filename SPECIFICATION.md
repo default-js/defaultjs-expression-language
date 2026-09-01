@@ -164,10 +164,11 @@ resolver.resolveText(aText, aDefault)                                      // �
 `name` defaults to a generated name (5.1). Leaving `context` out and passing `context: null` are
 **not the same thing**: the first takes the executer's default context, which for
 `EsprimaExecuter` is the global object, while the second is an empty context, equivalent to `{}`
-(6.3). `executer` takes the **registered name** of an executer and
-nothing else — every executer is registered before it can be used, so the name is what addresses
-it; an unregistered name throws. Without the option the resolver uses
-`ExpressionResolver.defaultExecuter`. `allowGlobalWrite` defaults to
+(6.3). `executer` takes the **registered name** of an executer or an
+**`Executer` instance**. A name is looked up in the registry and an unregistered one throws; an
+instance is taken as it is and needs no registration, because it already addresses the executer.
+Without the option the resolver uses `ExpressionResolver.defaultExecuter`, whose setter accepts
+either form as well. Anything that is neither is ignored and the default applies. `allowGlobalWrite` defaults to
 `ExpressionResolver.allowGlobalWrite` (6.5).
 
 The instance methods stay **positional** and get no configuration form of their own. Everything a
@@ -563,26 +564,28 @@ caught (6.5), and **how a statement addresses a value of the context**. All thre
 the implementations. Everything else in this document holds regardless of the executer in use:
 a **rule** is not something an implementation may decline.
 
-Where they may legitimately differ, they are **capabilities**, and this is what each executer has
-today. `no` is a statement about the implementation, not a promise that it stays that way; where
-one is meant to arrive, `BACKLOG.md` says so.
+Everything below is a point where the four answer differently today. Every other rule of this
+document holds under all of them, which is why only the differences are listed:
 
-| Capability | `with-scoped` | `context-object` | `context-deconstruction` | `esprima` |
+| | `with-scoped` | `context-object` | `context-deconstruction` | `esprima` |
 |---|---|---|---|---|
-| a name no resolver carries reaches the global object (6.4) | yes | yes | yes | no |
-| a write to a name the context carries is readable from it afterwards (6.5) | yes | yes | no | no |
-| a write to a name no resolver carries stays out of the global object (6.5) | no | yes | no | yes |
-| a context value is reachable from inside a function written in the statement (8.3) | yes | yes | yes | no |
-| a statement carrying an assignment executes rather than raising (8.2) | yes | yes | yes | no |
+| reaches a global that no resolver carries (8.3) | yes | yes | yes | **no** |
+| makes a write to a name the context carries readable afterwards (6.5) | yes | yes | **no** | **no** |
+| executes a statement carrying an assignment (8.2) | yes | yes | yes | **no** |
+| keeps a write to a name no resolver carries out of the global object (6.5) | *defect* | yes | *defect* | yes |
+| reaches a context value from inside a function written in the statement (8.3) | yes | yes | yes | *defect* |
 
-The row about a write leaving the chain is the one to read twice: it is a **rule** of 6.5 that two
-implementations do not keep yet, carried in the table because a reader has to know it before
-choosing one. The other four are capabilities proper.
+**`no` and *defect* are not the same statement.** `no` is a freedom this section grants: the
+implementations may differ there and neither answer is wrong. *defect* means this document
+demands it and that implementation does not keep it yet — the last two rows are rules, not
+choices, and `BACKLOG.md` carries their fixes. A consumer picking an executer has to read both
+columns for that reason.
 
-The table is kept in machine-readable form in `test/ExecuterCapabilities.js`, where every row is
-read by the suite: a capability that stops working turns the gate red, and one that starts working
-turns it red as well. That file is the authority — this table is written from it by hand, and the
-suite cannot check the document, so a change goes into both.
+The complete table — every case the suite asks of all four, not only the ones they answer
+differently — is `MATRIX` in `test/ExecuterCapabilities.js`, and every row of it is read by a
+test: a state that stops being true turns the gate red, and so does one that starts being true.
+That file is the authority; this one is written from it by hand, because the suite runs in a
+browser and cannot read a document.
 
 The dialect is no row of the table, because it is not a yes or no - but it is the difference that
 changes how an expression is written, so it is spelled out here.

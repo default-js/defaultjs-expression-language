@@ -19,7 +19,166 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-01 — What does the suite prove when a case answers a value?
+
+**Decision:** In `test/spec/` nothing is evaluated. `TestExecuter` answers the **statement it was
+handed**, so a case reads the resolver's own work out of the result and nothing else. Where a rule
+is about what the resolver does *with* a result, the result is set — `answerWith(fn)` for one case,
+`answersFromContext()` for a file that needs the value a context carries. Every rule that needs a
+statement to be *evaluated* is a demand on the implementations and lives in `test/executer/rules/`,
+with a row in the matrix.
+
+This supersedes the TestExecuter of the entry below, which destructured the context and compiled
+with `new Function` — `ContextDeconstructorExecuter` under another name.
+
+**Reasoning:** Frank's, on reading the result: a case must not test two things at once. The first
+case of 3.1 said both *the expression was delimited correctly* and *the statement was evaluated
+correctly*, and only the first belongs to 3.1. With an executer that answers the statement, the two
+come apart by themselves:
+
+```javascript
+const result = await ExpressionResolver.resolveText("a ${ {v: 2}.v } b", {});
+expect(result).toBe("a {v: 2}.v b");
+```
+
+That reads as what it is — the text the scanner cut out. What `{v: 2}.v` evaluates to is 3.4, asked
+of all four implementations in `test/executer/rules/3.4-…`.
+
+The evaluating TestExecuter had a second cost that only showed later: a case could rely on it
+without anybody noticing, because it behaved like a real implementation. The rewrite found several —
+section 7 wrote statements that *happened* to fail under the default executer, so a changed default
+could have taken the failure away and left the cases green for nothing. They now throw through
+`answerWith` and assert what the resolver does with an error, which is what section 7 is about.
+
+**Alternatives:** Keeping the evaluation and living with the double meaning — that is what was there,
+and it hid a broken scanner behind a working executer and the other way round. Teaching the
+TestExecuter just enough for `test/spec/` — rejected, since "just enough" grows with every case that
+finds it convenient, which is how the evaluating one came about.
+
+**Consequences:** 63 cases had to be rewritten, and several got sharper on the way: 4.4 sets the
+answer instead of finding a statement that produces it, 4.5 no longer needs a slow function in a
+context, and `${ await Promise.resolve(20) + 1 }` — one case that asked both whether `await` works
+and whether a global is reachable — is now two, one per side. `test/spec/` no longer needs
+`catchError` in 3.2 or a `typeof` in 4.2. What could not survive is one case of 6.7: "filters the
+context, not the globals" cannot be asserted without evaluating something, and it said nothing about
+`buildSecure` anyway — reaching a global is a freedom of 8.3 and has its row.
+
+Coverage is unchanged at 92.81 % of statements, and branches went up: the executer side covers the
+paths that need a compiler, which is where they belonged. The risk that the general suite would stop
+reaching them did not materialise — worth writing down, because it was the argument against this
+split.
+
+## 2026-09-01 — Does the constructor take an executer instance, or only a registered name?
+
+**Decision:** Both. `new ExpressionResolver({ executer })` keeps looking a **string** up in the
+registry and still throws on a name that is not registered; an **`Executer` instance** is now taken
+as it is. This **reverses the decision of 2026-08-22** ("a registered name and nothing else", plan
+question 40, written into `SPECIFICATION.md` 4.2), and it closes the `BACKLOG.md` entry that carried
+the question.
+
+**Reasoning:** Frank's, 2026-09-01. Three things, and the first is the one that decides it:
+
+The API already contradicted itself. `ExpressionResolver.defaultExecuter = anExecuter` has always
+accepted a name *or* an instance; the constructor accepted only a name and dropped an instance
+without a word — same concept, two rules, and the stricter one failing silently. Making the
+constructor permissive removes the asymmetry in the direction that breaks nothing.
+
+It is an **addition, not a change**: every call that works today works unchanged, so the library
+stays backwards compatible. That is what made the earlier decision worth revisiting rather than
+defending — it was taken to keep one way of addressing an executer, but a name and an instance are
+equally unambiguous, and the registry buys nothing where the caller already holds the object.
+
+And it makes the resolver testable from the outside. An executer built for one resolver — a
+recorder, a stub, an implementation under development — no longer has to be registered globally
+first, which means a test needs neither a registry entry nor a change of the default. That is the
+immediate reason it came up, but it is not the argument: an API that can only be driven through
+global state is harder to use for everyone, not only for a test.
+
+**Alternatives:** Narrowing the static setter to names instead, which would remove the asymmetry the
+other way — rejected: it takes something away that consumers may already use, for a consistency that
+is worth less than the loss. Leaving both as they were and passing the executer some other way in
+tests — rejected: it keeps a silent failure in the public API and works around it.
+
+**Consequences:** `SPECIFICATION.md` 4.2 says both forms; `CHANGELOG.md` carries it under Added. An
+executer that is neither a string nor an `Executer` is still ignored in favour of the default, which
+stays a silent fallback — the same class of thing as the `parent` that is not an `ExpressionResolver`
+(`BACKLOG.md`), and if that one is ever made loud, this one goes with it. The constructor JSDoc
+documents the option for the first time.
+
+## 2026-09-01 — What is tested against what?
+
+**Decision:** Three things are tested, and each has exactly one place. This **replaces both entries
+of 2026-09-01 below**, which describe stages of the same day's work rather than a concept.
+
+| What | Where | Against |
+|---|---|---|
+| the **resolver** — parsing, chain, entry points, data methods, public surface | `test/spec/` | `TestExecuter`, the implementation the suite owns |
+| the **implementations** — every rule only observable through a statement | `test/executer/rules/` | all four registered executers |
+| **which implementation answers what** | `MATRIX` in `test/ExecuterCapabilities.js` | data only — no test logic |
+
+`TestExecuter` (`test/TestExecuter.js`) is a small implementation of 8.1: it executes a statement
+against a context, lets errors through, and **records the statements handed to it**. It is never
+registered by `src/executer/index.js` and never a default. A file that needs it calls
+`useTestExecuter()`, which moves `ExpressionResolver.defaultExecuter` for that file and puts the
+previous one back — the static entry points of 4.1 take no executer, so a file that pins them has to
+move the default rather than pass an option.
+
+`MATRIX` holds **one row per case that runs per executer**, keyed by the case name the test carries,
+with three states: `yes` (has to pass, runs as `it`), `no` (a freedom 8.3 grants, runs as
+`it.fails`), `defect` (a rule the implementation does not keep yet, also `it.fails`, with its
+`BACKLOG.md` entry named in a comment). A section file asks `casesOf(section, executer)` and writes
+ordinary tests; a case whose name is no row throws.
+
+**Reasoning:** Frank's review of the structure delivered the same day, and each of its four points
+found something the rebuild had left in place because it had only reshaped what was there.
+
+*The general suite tested the resolver against a real implementation.* That is why it carried a
+dialect and `defaultExecuterEntry` — a workaround for a dependency it should not have had. 3.2 shows
+what it cost: the rule is that an escaped expression is **never handed to an executer**, and the
+suite asserted it through what a foreign implementation replied. With a recording executer it is
+asserted directly, and seven cases across 3.1, 3.2, 3.3 and 4.3 now state their rule instead of
+inferring it. The recorder is also the boundary marker: a case that needs `TestExecuter` taught
+something specific — one of the three freedoms of 8.3 — is a case that belongs on the executer side.
+
+*The catalogue carried test logic.* `run` and `expected` in a data file are tests in disguise, which
+had been rejected once already in another wrapping. They are back in the test files.
+
+*Five capability rows were a selection, not a table.* They were what the previous suite happened to
+have marked as a freedom. With every per-executer case in the matrix — 35 rows today — the table is
+what it looks like: the conformance overview of the package, in which a rule everybody keeps, a
+freedom, and a broken rule are told apart at a glance. That third state is what the old two-state
+table could not say, and it is the more useful half: `defect` names a rule with a backlog entry,
+`no` names a difference nobody has to fix.
+
+*`SetupExecuterTest` was 8.4 under another name.* Asking the same subject twice, once per executer
+and once in the general suite, is how a suite grows a duplicate that nobody reconciles. It is one
+file now, and the general half is gone.
+
+**Alternatives:** One file that runs every case, with the section files reduced to exported case
+tables — it would keep the matrix out of the test bodies entirely and cut the per-file setup cost,
+but the section files would stop being test files and every failure would report the same file.
+Decided against by Frank after both sides were laid out. Carrying both answers per capability row,
+`{ supported, unsupported }` — rejected by Frank as reintroducing the complication a case is meant
+to avoid: a test either passes or it does not. Teaching `TestExecuter` to block globals so that
+`test/spec/` cannot lean on them — rejected: 3.4 and 4.6 are about `Promise` and `await`, not about
+reachability, and a sandbox would have made those cases harder to read for a boundary the executer
+suite already guards.
+
+**Consequences:** `test/spec/` no longer knows any registered implementation, so changing the default
+executer cannot touch it — the case that pins which one is the default is the one place that
+notices. `capabilityIt`, `RULE_GROUPS`, `defaultExecuterEntry` and the generated `CapabilityTest.js`
+are gone; `MatrixTest.js` checks the table's shape instead of running cases from it. The gate went
+from 415 to 409 cases: seven added where a rule is now stated directly, thirteen dropped as
+duplicates of what 5.2 and 8.4 already ask. Coverage is unchanged at 92.81 % of statements — twice
+measured, because a rebuild that moves this much has to prove it lost nothing. What the matrix
+cannot check is a row no case reads any more: Vitest isolates each file, so nothing can see which
+rows were looked up. That is written into `MatrixTest.js` rather than papered over.
+
 ## 2026-09-01 — Where does the test suite say what it tests, and where does it say what an executer may decline?
+
+**Superseded the same day** — see the entry above. The directory and the file name stayed; the
+matrix grew from five selected rows to every per-executer case, and the general suite stopped
+running against a registered implementation.
 
 **Decision:** In the directory, the file name and the capability catalogue — in that order, and
 nowhere else. This **replaces the `RULE_GROUPS` half of the entry below**, taken the same day.
@@ -75,13 +234,17 @@ conformance file — that is what existed, and it produced four files with nothi
 with the `SECTIONS` exports of the shared suites. `SPECIFICATION.md` 8.3 still carries the capability
 table for a human reader and still has to be updated by hand — the suite runs in a browser and
 cannot read the document. Every file that loops over `EXECUTERS` now lives under `test/executer/`,
-which moved `ContextShapeTest`, `StackedContextTest` and `SetupExecuterTest` out of `test/general/`;
+which moved `ContextShapeTest`, `StackedContextTest` and `SetupExecuterTest` out of `test/general/`
+(all three were dissolved into section files later the same day);
 what is left there pins no rule and loops over nothing. Two cases still loop over the executers from
 inside `test/spec/` — 8.2 and 8.4 — and they are the one open question this structure does not
 answer; `BACKLOG.md` carries it. Measured across the rebuild: 415 cases before and after the moves,
 coverage unchanged at 92.81 % of statements.
 
 ## 2026-09-01 — How does the test suite say what an executer can do, when the four differ on purpose?
+
+**Superseded the same day** — see the entries above. The vocabulary held; the mechanism did not:
+the catalogue carried the cases themselves, which put test logic into a data file.
 
 **Decision:** Through a **capability catalogue**, `test/ExecuterCapabilities.js`, and a vocabulary
 that separates three things:
