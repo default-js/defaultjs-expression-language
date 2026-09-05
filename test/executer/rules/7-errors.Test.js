@@ -1,6 +1,6 @@
-import { describe, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../../index.js";
-import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
+import { EXECUTERS } from "../../ExecuterCapabilities.js";
 import { catchError } from "../../TestUtils.js";
 
 /**
@@ -12,16 +12,18 @@ import { catchError } from "../../TestUtils.js";
  * halves are asked of each of them; none of this is a capability.
  *
  * What the warnings say happens above the executer and is checked once, in the general suite.
+ *
+ * **Not a capability, so no row and no state** (2026-09-05): what is asked here is the resolver's
+ * work, not the executer's. It needs a real implementation to be seen at all, which is why it runs
+ * under all four as a plain `it` - a failure is a red gate the ordinary way, and there is nothing
+ * an executer may decline.
  */
 
 for (const { name: executer, variableName } of EXECUTERS) {
 
-	// every case below is a row of the matrix, and the matrix decides whether it has to pass
-	const matrixIt = casesOf("7", executer);
-
 	describe(`Specification 7 - a failing statement is caught in a text [${executer}]`, () => {
 
-		matrixIt("leaves the expression standing as written", async () => {
+		it("leaves the expression standing as written", async () => {
 			const variableNameMissing = variableName("missing");
 			const failing = `\${${variableNameMissing}.deep}`;
 			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
@@ -29,7 +31,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe(failing);
 		});
 
-		matrixIt("leaves it standing even where a default value was passed", async () => {
+		it("leaves it standing even where a default value was passed", async () => {
 			const variableNameMissing = variableName("missing");
 			const failing = `\${${variableNameMissing}.deep}`;
 			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
@@ -37,7 +39,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe(failing);
 		});
 
-		matrixIt("never stops the rest of a text from rendering", async () => {
+		it("never stops the rest of a text from rendering", async () => {
 			const variableNameKnown = variableName("known");
 			const variableNameMissing = variableName("missing");
 			const failing = `\${${variableNameMissing}.deep}`;
@@ -49,14 +51,14 @@ for (const { name: executer, variableName } of EXECUTERS) {
 
 	describe(`Specification 7 - resolve lets the error through [${executer}]`, () => {
 
-		matrixIt("raises the error the statement raised", async () => {
+		it("raises the error the statement raised", async () => {
 			const variableNameMissing = variableName("missing");
 			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
 			const error = await catchError(() => resolver.resolve(`\${${variableNameMissing}.deep}`));
 			expect(error instanceof Error).toBe(true);
 		});
 
-		matrixIt("raises it even where a default value was passed", async () => {
+		it("raises it even where a default value was passed", async () => {
 			const variableNameMissing = variableName("missing");
 			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
 			const error = await catchError(() => resolver.resolve(`\${${variableNameMissing}.deep}`, "fallback"));

@@ -102,13 +102,29 @@ rest, `SPECIFICATION.md` 6.5 is rewritten to say so, and the two cells that read
 
 ## Precondition
 
-`src/executer/ContextDeconstructorExecuter.js` carries an uncommitted draft in the working tree — the
-write-back of the `BACKLOG.md` entry (`generate2`, the destructured names as `let` bindings with a
-guarded copy-back in `finally`), `DEBUG = true`, the old `generate` half dead beside it and the warning
-threshold at 10 instead of 50. **Every state this plan records has to be measured against a clean
-tree**, or the catalogue documents an unreleased draft. Park it (`git stash`) before stage 1 and decide
-separately what happens to it — the write-back is its own undertaking and its facets are already in the
-list below, so it lands against a catalogue that is ready for it.
+`src/executer/ContextDeconstructorExecuter.js` carries the write-back draft of the `BACKLOG.md` entry
+— `generate2`, the destructured names as `let` bindings with a guarded copy-back in `finally`,
+`DEBUG = true`, the old `generate` half dead beside it, the warning threshold at 10 instead of 50.
+**It was committed by Frank on 2026-09-05 as `30e5623`**, so it is the state of the branch and no
+longer something to stash. What was written here before that — measure against a clean tree — is
+therefore not a precondition any more but a question for Frank, and two findings decide it:
+
+- **The write-back in it does not work.** It writes back only where
+  `Object.getOwnPropertyDescriptor(ctx, name)?.writable` is true, but the context is the proxy of
+  `ResolverContextHandle`, whose `getOwnPropertyDescriptor` trap answers an **accessor** descriptor
+  (`get`, `enumerable`, `configurable`). `writable` is `undefined` there, so nothing is ever copied
+  back. Verified indirectly and decisively: the capability row `makes a write to a name the context
+  carries readable afterwards` is `no` for the deconstructor and runs as `it.fails` — with the draft
+  in the tree it still fails, and a working write-back would have turned the gate red with
+  `Expect test to fail`. The draft in `BACKLOG.md` used a comparison guard
+  (`if (counter !== context.counter)`), which does not depend on a descriptor.
+- **Every state recorded so far is therefore the state without a write-back**, which is the state the
+  catalogue is supposed to describe today. Nothing measured in stage 0 is wrong because of the draft.
+
+What the draft does cost is coverage: it adds 20 statements and 18 lines to that file, nine of them
+unreachable (`generate` and `getOrCreateFunction`, which nothing calls any more), which is why the
+percentages cannot be compared against the `BACKLOG.md` baseline until it is either finished or
+reverted. That is Frank's call, not this plan's.
 
 ## The mechanism
 
@@ -314,12 +330,39 @@ Nothing is open. The plan is ready for approval as it stands.
 
 Each stage is green before the next one starts, and no stage changes a source file under `src/`.
 
-0. **Mechanism, vocabulary and the split.** `CAPABILITIES` replaces `MATRIX`, `casesOf` takes a
-   capability, `DEFECT` goes, `MatrixTest.js` is trimmed to the shape checks, the 26 non-capability
-   cases lose their rows and move to `test/executer/rules/` as plain tests, and the word settles
-   everywhere in the suite at once. **No case is added and none is removed**: 57 rows before, 31 rows
-   and 26 plain cases after, the same expectations, the gate green. Verified by the case count and by
-   `npm run test:coverage` against the numbers in `BACKLOG.md`, as `TESTING.md` §6 demands.
+0. **Mechanism, vocabulary and the split — done 2026-09-05, gate green.** `CAPABILITIES` replaced
+   `MATRIX`, `casesOf` takes a capability, `DEFECT` is gone, `MatrixTest.js` became
+   `CapabilityTableTest.js` with the shape checks only, and the 26 non-capability cases lost their
+   rows.
+
+   What was actually built: six files under `test/executer/capabilities/` (`syntax` 5 rows,
+   `context-scope` 8, `context-shape` 11, `context-write` 1, `global-scope` 3, `cache` 3 — 31 rows),
+   and `test/executer/rules/` keeps the seven section files as plain `it` plus a new
+   `8.2-registration.Test.js` for the contract case that used to sit beside the assignment. Six rule
+   files were deleted once their cases had moved.
+
+   **Deviation from the intent, deliberate:** the three cases of 3.4 that carry a context name —
+   the operator expression, the call on a context member, the `await` — went to `context-scope` and
+   not to `syntax`, because `syntax` asks with constants only. Same cases, same expectations, a
+   different capability than a straight reading of "3.4 becomes syntax" would give.
+
+   **Measured, not asserted.** Before: 37 files, 423 passed, 14 expected fail, 437 total. After: 38
+   files, 422 passed, 14 expected fail, 436 total. The one case of difference is the table's own test
+   — `MatrixTest.js` had 5 cases, `CapabilityTableTest.js` has 4: the two checks that policed `defect`
+   went with the state, and one check that every capability names its section came in. Everything
+   else is unchanged: `test/executer/` answers 232 cases, which is 31 rows × 4 plus 26 rules × 4 plus
+   the 4 of the table itself, and the 8 expected fails there are the same 8 cells as before.
+
+   **Coverage.** No file under `src/` was touched, so the move cannot have changed what the sources
+   do. What it could have changed is whether a branch lost its only reader, and it did not: the
+   uncovered set is exactly the list `BACKLOG.md` names — `Utils.js` whole, the `setDebug` bodies,
+   the two methods of the global cache wrapper, `get parent` and `updateData` on the handle — plus
+   nine dead lines of the write-back draft committed as `30e5623`. The **percentages** cannot be
+   compared against the `BACKLOG.md` baseline while that draft stands: it adds 20 statements and 18
+   lines to `ContextDeconstructorExecuter.js`, half of them unreachable, which is why the report reads
+   91.47 % of statements (515/563) against 92.81 % (504/543), 90.00 % of branches against 91.00 %,
+   90.26 % of functions against 91.58 %, 93.90 % of lines against 95.56 %. Re-measure once the draft
+   is finished or reverted — see *Precondition*.
 1. **`context-write` and the containment half of `global-scope`.** The groups the parked draft
    touches, so the catalogue is ready for it before it lands.
 2. **`context-shape` and `context-scope`.**

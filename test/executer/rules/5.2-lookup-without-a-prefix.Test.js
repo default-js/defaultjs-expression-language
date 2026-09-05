@@ -1,6 +1,6 @@
-import { describe, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../../index.js";
-import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
+import { EXECUTERS } from "../../ExecuterCapabilities.js";
 
 /**
  * SPECIFICATION.md 5.2 - which resolver of the chain answers a name, asked of every executer.
@@ -9,16 +9,18 @@ import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
  * capability: 8.3 lets an executer decide how a statement reaches a context value, never which
  * resolver answers it. The spelling comes from the catalogue through `variableName`, so what is
  * measured is the chain and not the dialect.
+ *
+ * **Not a capability, so no row and no state** (2026-09-05): what is asked here is the resolver's
+ * work, not the executer's. It needs a real implementation to be seen at all, which is why it runs
+ * under all four as a plain `it` - a failure is a red gate the ordinary way, and there is nothing
+ * an executer may decline.
  */
 
 for (const { name: executer, variableName } of EXECUTERS) {
 
-	// every case below is a row of the matrix, and the matrix decides whether it has to pass
-	const matrixIt = casesOf("5.2", executer);
-
 	describe(`Specification 5.2 - lookup without a prefix [${executer}]`, () => {
 
-		matrixIt("answers from the nearest link and shadows the links above", async () => {
+		it("answers from the nearest link and shadows the links above", async () => {
 			const variableNameValue = variableName("value");
 			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: root, executer });
@@ -26,7 +28,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from leaf");
 		});
 
-		matrixIt("reaches a value carried by an ancestor", async () => {
+		it("reaches a value carried by an ancestor", async () => {
 			const variableNameRootOnly = variableName("rootOnly");
 			const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root, executer });
@@ -39,7 +41,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 		// the text then answers still differs per executer - the expression stands where the
 		// statement raised, the default applies where it merely answered undefined - so what is
 		// asserted is the rule itself: the value of the link below is not reachable.
-		matrixIt("never sees the context of a link below", async () => {
+		it("never sees the context of a link below", async () => {
 			const variableNameLeafOnly = variableName("leafOnly");
 			const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer });
 			new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root, executer });
@@ -47,7 +49,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result.includes("from leaf")).toBe(false);
 		});
 
-		matrixIt("stops the walk at a key that holds undefined", async () => {
+		it("stops the walk at a key that holds undefined", async () => {
 			const variableNameValue = variableName("value");
 			const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer });
 			const leaf = new ExpressionResolver({ context: { value: undefined }, name: "leaf", parent: root, executer });
@@ -55,7 +57,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBeUndefined();
 		});
 
-		matrixIt("reaches a getter inherited through the prototype chain", async () => {
+		it("reaches a getter inherited through the prototype chain", async () => {
 			class Data {
 				get value() {
 					return "from getter";
@@ -67,7 +69,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(result).toBe("from getter");
 		});
 
-		matrixIt("reaches a method inherited through the prototype chain", async () => {
+		it("reaches a method inherited through the prototype chain", async () => {
 			class Data {
 				greet() {
 					return "from method";

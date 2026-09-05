@@ -5,38 +5,49 @@ import { EXECUTERNAME as ContextDeconstructorExecuterName, setupExecuter as setu
 import { EXECUTERNAME as EsprimaExecuterName, setupExecuter as setupEsprimaExecuter } from "../src/executer/EsprimaExecuter.js";
 
 /**
- * What each executer answers to every case that is asked of all of them - the conformance overview
- * of the package, in one table.
+ * What each executer supports - the capability catalogue of the package, in one table.
  *
- * Every case under `test/executer/` has a row here, not a selected few: the row is the only place
- * that says whether an implementation has to pass it. The case itself stays an ordinary test in the
- * file of its section; this file carries **no test logic**, only the table and the lookup that reads
- * it.
+ * **An executer has capabilities and nothing else** (decided by Frank, 2026-09-05). Beyond the
+ * interface it implements and the promise to execute an expression, nothing is demanded of it. What
+ * a capability measures is **how far an executer supports JavaScript over a dynamic context**: which
+ * constructs run, how much of the language's scoping survives, which values stay reachable, whether
+ * a write behaves the way an assignment does.
  *
- * Three states, and the difference between the last two is the reason the table is worth having:
+ * Two states, and both directions are guarded:
  *
- * - `yes`    - the case passes. It runs as `it`.
- * - `no`     - the case fails, and that is **a freedom the specification grants** (8.3): the
- *              implementations may differ here and neither answer is wrong. It runs as `it.fails`.
- * - `defect` - the case fails although the specification demands it. It runs as `it.fails` as well,
- *              but it is not a freedom: `BACKLOG.md` carries the fix and the comment names it.
+ * - `yes` - the executer supports it. The case runs as `it` and has to pass.
+ * - `no`  - it does not. The case runs as `it.fails` and has to fail.
  *
- * A row of nothing but `yes` is a rule every implementation keeps. A row carrying `no` is a
- * capability. A row carrying `defect` is a rule that is broken today - visible at a glance instead
- * of buried in a marker somewhere in the suite.
+ * A case that stops working turns the gate red the ordinary way, one that starts working turns it
+ * red with `Expect test to fail`, so the table cannot claim a state the code does not have. Whether
+ * a missing capability is **meant** to arrive is not written here - that belongs in `BACKLOG.md`
+ * (decided by Frank, 2026-08-30).
  *
- * Both directions are guarded: a case that stops working turns the gate red the ordinary way, one
- * that starts working turns it red with `Expect test to fail`. The table cannot claim a state the
- * code does not have. Whether a missing capability is meant to arrive is **not** written here - that
- * belongs in `BACKLOG.md` (decided by Frank, 2026-08-30).
+ * **There is no third state.** `defect` was dropped on 2026-09-05 together with the idea that an
+ * executer can break a rule: nothing an executer does can break a rule it was never given. What used
+ * to carry that label - the containment of a global write, the context value lost inside a nested
+ * function - is a capability two implementations lack, with a `BACKLOG.md` entry each.
  *
- * The dialect is no row: it is not a yes or no but a spelling, and it is carried as `variableName`
- * on the executer entry below.
+ * **Three things are deliberately not in this table**, because they are not capabilities:
+ *
+ * - **Rules of the resolver that only show through a statement** - the chain walk (5.2, 5.3, 5.4),
+ *   the name snapshot (6.2), a link without a context (6.3), the data methods from outside (6.6) and
+ *   the error policy (7). None of them is the executer's work: the walk lives in the proxy traps of
+ *   `ResolverContextHandle`, and every executer gets it for free. They stay in `test/executer/rules/`
+ *   as plain `it`, asked of every implementation because `TestExecuter` evaluates nothing and they
+ *   cannot be seen without a real one.
+ * - **The interface contract** - `defaultContext` and `execution` (8.1), registering on import and
+ *   being reachable by name (8.2). An implementation that fails it is not an executer, so it is no
+ *   yes/no axis.
+ * - **The dialect** - a spelling is not a yes or no. It is carried as `variableName` on the executer
+ *   entry below.
+ *
+ * `SPECIFICATION.md` 8.3 carries the same table for a human reader and is written from this one by
+ * hand: the suite runs in a browser and cannot read a document, so a change has to go into both.
  */
 
 export const YES = "yes";
 export const NO = "no";
-export const DEFECT = "defect";
 
 /**
  * Every registered executer, each with the name a statement has to use to reach a given property
@@ -63,154 +74,184 @@ export const EXECUTERS = [
 const COLUMNS = [WithScopedExecuterName, ContextObjectExecuterName, ContextDeconstructorExecuterName, EsprimaExecuterName];
 
 /**
- * Section → case name → one state per executer, in the order of `COLUMNS`.
+ * Capability → case name → one state per executer, in the order of `COLUMNS`.
  *
  * The case name is the key, so it is the same string the test carries: a case whose name is not in
  * the table throws instead of quietly running, and a row without a case is found by counting
- * (`test/executer/MatrixTest.js`). Renaming a test therefore means renaming its row - deliberately.
+ * (`test/executer/CapabilityTableTest.js`). Renaming a test therefore means renaming its row -
+ * deliberately.
+ *
+ * `specification` names the section a capability is read against, for a reader who wants the rule
+ * behind a row; the file that holds the cases is named after the capability, not after the section.
  */
-export const MATRIX = {
-	//                                                                                with-scoped  context-object  deconstruction  esprima
-	"3.4": {
-		"evaluates an operator expression over the context":                        [ YES,         YES,            YES,            YES ],
-		"evaluates a call on a context member":                                    [ YES,         YES,            YES,            YES ],
-		"evaluates an object literal":                                             [ YES,         YES,            YES,            YES ],
-		"evaluates an arrow function body":                                        [ YES,         YES,            YES,            YES ],
-		"evaluates a template literal":                                            [ YES,         YES,            YES,            YES ],
-		"evaluates a regular expression literal":                                  [ YES,         YES,            YES,            YES ],
-		"evaluates an await inside the statement":                                 [ YES,         YES,            YES,            YES ]
+export const CAPABILITIES = {
+
+	/**
+	 * Which JavaScript constructs run at all. **Constants only** - a context name never appears in a
+	 * case of this capability, because a construct that carries one asks two questions at once (does
+	 * it run, and does it still see the context) and a failure would not say which.
+	 */
+	syntax: {
+		specification: "3.4, 8.2",
+		description: "Which JavaScript constructs the executer can run, with constants inside them.",
+		cases: {
+			//                                                                          with-scoped  context-object  deconstruction  esprima
+			"evaluates an object literal":                                            [ YES,         YES,            YES,            YES ],
+			"evaluates an arrow function body":                                       [ YES,         YES,            YES,            YES ],
+			"evaluates a template literal":                                           [ YES,         YES,            YES,            YES ],
+			"evaluates a regular expression literal":                                 [ YES,         YES,            YES,            YES ],
+			// `x = 5` is rewritten to `ctx?.x = 5` by the esprima executer, which is not a legal
+			// assignment target, so it cannot run an assignment at all - independent of where the
+			// value would land, which is `context-write`.
+			"executes a statement carrying an assignment":                            [ YES,         YES,            YES,            NO ]
+		}
 	},
-	"5.2": {
-		"answers from the nearest link and shadows the links above":                [ YES,         YES,            YES,            YES ],
-		"reaches a value carried by an ancestor":                                   [ YES,         YES,            YES,            YES ],
-		"never sees the context of a link below":                                   [ YES,         YES,            YES,            YES ],
-		"stops the walk at a key that holds undefined":                             [ YES,         YES,            YES,            YES ],
-		"reaches a getter inherited through the prototype chain":                   [ YES,         YES,            YES,            YES ],
-		"reaches a method inherited through the prototype chain":                   [ YES,         YES,            YES,            YES ]
+
+	/**
+	 * How much of JavaScript's scoping survives: the same constructs, carrying a context name. This
+	 * is where the four differ most, and where the dialect applies without being a row.
+	 */
+	"context-scope": {
+		specification: "8.3",
+		description: "Whether a construct carrying a context name still reaches that value.",
+		cases: {
+			//                                                                          with-scoped  context-object  deconstruction  esprima
+			"evaluates an operator expression over the context":                       [ YES,         YES,            YES,            YES ],
+			"evaluates a call on a context member":                                    [ YES,         YES,            YES,            YES ],
+			"evaluates an await inside the statement":                                 [ YES,         YES,            YES,            YES ],
+			"addresses a context value the way its own dialect spells it":             [ YES,         YES,            YES,            YES ],
+			"answers a bare context name only where that is its dialect":              [ YES,         YES,            YES,            YES ],
+			"reads a context value from inside a template literal":                    [ YES,         YES,            YES,            YES ],
+			"answers from the context where the global object carries the same name":  [ YES,         YES,            YES,            YES ],
+			// The esprima rewrite skips function bodies whole (`IGNORED_TYPES`), so an identifier
+			// inside one is never rewritten onto the context. BACKLOG.md, "EsprimaExecuter cannot
+			// reach a context value from inside a nested function", which carries the six further
+			// shapes the same rewrite misses.
+			"reaches a context value from inside a nested function":                   [ YES,         YES,            YES,            NO ]
+		}
 	},
-	"5.3": {
-		"addresses the link the call is made on":                                   [ YES,         YES,            YES,            YES ],
-		"climbs to the ancestor the prefix names":                                  [ YES,         YES,            YES,            YES ],
-		"evaluates against the addressed link and the contexts above it":           [ YES,         YES,            YES,            YES ],
-		"answers from the first link carrying the name, climbing towards the root": [ YES,         YES,            YES,            YES ],
-		"does not see a link below the one the prefix names":                       [ YES,         YES,            YES,            YES ]
+
+	/**
+	 * Which structures can be put into scope as a context. `SPECIFICATION.md` says nothing about what
+	 * a context may be, so this table is what answers it - by writing down what each implementation
+	 * accepts rather than by a rule nobody wrote.
+	 */
+	"context-shape": {
+		specification: "6.1",
+		description: "Which context structures the executer can run a statement over.",
+		cases: {
+			//                                                                          with-scoped  context-object  deconstruction  esprima
+			"resolves over a context the caller froze":                                [ YES,         YES,            YES,            YES ],
+			"resolves over a context carrying a key that is not a variable name":      [ YES,         YES,            YES,            YES ],
+			"runs a statement over an array context":                                  [ YES,         YES,            YES,            YES ],
+			"runs a statement over a Map context":                                     [ YES,         YES,            YES,            YES ],
+			"runs a statement over a Set context":                                     [ YES,         YES,            YES,            YES ],
+			"runs a statement over a NodeList context":                                [ YES,         YES,            YES,            YES ],
+			// the deconstructor reads every name of a context before it runs anything, and `callee` on
+			// an arguments object is a poisoned accessor. BACKLOG.md keeps open whether it should cope.
+			"runs a statement over an arguments object as context":                    [ YES,         YES,            NO,             YES ],
+			"reads through an element context":                                        [ YES,         YES,            YES,            YES ],
+			"reads the length of an array context and ignores its indices":            [ YES,         YES,            YES,            YES ],
+			"reads a named key of a context that also carries a numeric one":          [ YES,         YES,            YES,            YES ],
+			"reads an accessor of the prototype of a Map context":                     [ YES,         YES,            YES,            YES ]
+		}
 	},
-	"5.4": {
-		"answers undefined":                                                        [ YES,         YES,            YES,            YES ],
-		"lets the default value apply":                                             [ YES,         YES,            YES,            YES ]
+
+	/**
+	 * Whether an assignment inside a statement behaves the way JavaScript's does - whether what was
+	 * written is there afterwards.
+	 */
+	"context-write": {
+		specification: "6.5",
+		description: "Whether a write from inside a statement is readable afterwards.",
+		cases: {
+			//                                                                          with-scoped  context-object  deconstruction  esprima
+			// The deconstructor writes into a destructured local binding and nothing carries it back;
+			// the esprima executer cannot run an assignment at all. BACKLOG.md carries the write-back
+			// that would close the first of the two.
+			"makes a write to a name the context carries readable afterwards":         [ YES,         YES,            NO,             NO ]
+		}
 	},
-	"6.1": {
-		"resolves over a context the caller froze":                                 [ YES,         YES,            YES,            YES ],
-		"resolves over a context carrying a key that is not a variable name":       [ YES,         YES,            YES,            YES ],
-		"runs a statement over an array context":                                  [ YES,         YES,            YES,            YES ],
-		"runs a statement over a Map context":                                     [ YES,         YES,            YES,            YES ],
-		"runs a statement over a Set context":                                     [ YES,         YES,            YES,            YES ],
-		"runs a statement over a NodeList context":                                [ YES,         YES,            YES,            YES ],
-		// the deconstructor reads every name of a context before it runs anything, and `callee` on an
-		// arguments object is a poisoned accessor. The specification says nothing about what a context
-		// may be, so this is a difference and not a broken rule - BACKLOG.md keeps the question open.
-		"runs a statement over an arguments object as context":                     [ YES,         YES,            NO,             YES ],
-		"reads through an element context":                                        [ YES,         YES,            YES,            YES ],
-		"reads the length of an array context and ignores its indices":            [ YES,         YES,            YES,            YES ],
-		"reads a named key of a context that also carries a numeric one":          [ YES,         YES,            YES,            YES ],
-		"reads an accessor of the prototype of a Map context":                     [ YES,         YES,            YES,            YES ]
+
+	/**
+	 * Which globals stay reachable from a statement, and whether a write to a name no resolver
+	 * carries can be caught before it reaches the global object.
+	 */
+	"global-scope": {
+		specification: "6.4, 6.5, 8.3",
+		description: "Which globals a statement reaches, and whether a write can be contained.",
+		cases: {
+			//                                                                          with-scoped  context-object  deconstruction  esprima
+			"reaches a global through window":                                         [ YES,         YES,            YES,            YES ],
+			// the esprima rewrite leaves only the identifiers of RESERVED_NAMES alone, so `Math`
+			// becomes `ctx?.Math` and the call raises. BACKLOG.md carries the rework of that list.
+			"reaches a global that no resolver carries":                               [ YES,         YES,            YES,            NO ],
+			// A capability since 2026-09-05, not a broken rule: with-scoped lets an assignment to an
+			// unknown name fall out of the `with` block into global scope, the deconstructor generates
+			// a sloppy-mode body where an undeclared assignment does the same. `SPECIFICATION.md` 6.5
+			// promised the containment and is being rewritten, because a promise the package cannot
+			// keep is corrected in the document. BACKLOG.md, "A write to an unknown name inside an
+			// expression lands on globalThis".
+			"keeps a write to a name no resolver carries out of the global object":    [ NO,          YES,            NO,             YES ]
+		}
 	},
-	"6.2": {
-		"does not see a key added to the handed-in object after the resolver was built": [ YES,    YES,            YES,            YES ],
-		"sees that key after resetCache":                                           [ YES,         YES,            YES,            YES ],
-		"reads a value at the moment of the lookup, so a mutation is visible immediately": [ YES,  YES,            YES,            YES ],
-		"keeps the set of names in step when a value is written through the resolver": [ YES,      YES,            YES,            YES ]
-	},
-	"6.3": {
-		"contributes nothing to a lookup and is passed through":                    [ YES,         YES,            YES,            YES ],
-		"gains content like any other link":                                        [ YES,         YES,            YES,            YES ]
-	},
-	"6.5": {
-		// A rule, and two implementations break it: with-scoped lets an assignment to an unknown name
-		// fall out of the `with` block into global scope, the deconstructor generates a sloppy-mode
-		// body where an undeclared assignment does the same. BACKLOG.md, "A write to an unknown name
-		// inside an expression lands on globalThis".
-		"keeps a write to a name no resolver carries out of the global object":     [ DEFECT,      YES,            DEFECT,         YES ],
-		// A freedom: 6.5 promises nothing about a written value being readable afterwards. BACKLOG.md
-		// carries the write-back that would close it for the deconstructor.
-		"makes a write to a name the context carries readable afterwards":          [ YES,         YES,            NO,             NO ]
-	},
-	"6.6": {
-		"shadows a value of the parent until the shadowing key is deleted":         [ YES,         YES,            YES,            YES ]
-	},
-	"7": {
-		"leaves the expression standing as written":                                [ YES,         YES,            YES,            YES ],
-		"leaves it standing even where a default value was passed":                 [ YES,         YES,            YES,            YES ],
-		"never stops the rest of a text from rendering":                            [ YES,         YES,            YES,            YES ],
-		"raises the error the statement raised":                                    [ YES,         YES,            YES,            YES ],
-		"raises it even where a default value was passed":                          [ YES,         YES,            YES,            YES ]
-	},
-	"8.2": {
-		// `x = 5` is rewritten to `ctx?.x = 5` by the esprima executer, which is a syntax error, so it
-		// cannot run an assignment at all - independent of where the value would land.
-		"registers itself on import of its module":                                 [ YES,         YES,            YES,            YES ],
-		"executes a statement carrying an assignment":                              [ YES,         YES,            YES,            NO ]
-	},
-	"8.3": {
-		"addresses a context value the way its own dialect spells it":              [ YES,         YES,            YES,            YES ],
-		"answers a bare context name only where that is its dialect":               [ YES,         YES,            YES,            YES ],
-		"answers from the context where the global object carries the same name":   [ YES,         YES,            YES,            YES ],
-		"reaches a global through window":                                          [ YES,         YES,            YES,            YES ],
-		"reads a context value from inside a template literal":                     [ YES,         YES,            YES,            YES ],
-		// A freedom of 8.3: the esprima rewrite leaves only the identifiers of RESERVED_NAMES alone,
-		// so `Math` becomes `ctx?.Math` and the call raises.
-		"reaches a global that no resolver carries":                                [ YES,         YES,            YES,            NO ],
-		// 8.3 lets an executer decide how a statement reaches a context value, not to lose it halfway
-		// through the statement. BACKLOG.md, "EsprimaExecuter cannot reach a context value from inside
-		// a nested function".
-		"reaches a context value from inside a nested function":                    [ YES,         YES,            YES,            DEFECT ]
-	},
-	"8.4": {
-		"keeps resolving with the cache switched off":                              [ YES,         YES,            YES,            YES ],
-		"caches again after being switched back on":                                [ YES,         YES,            YES,            YES ],
-		"serves a cached expression to a different context":                        [ YES,         YES,            YES,            YES ]
+
+	/**
+	 * What `setupExecuter` does to the compiled code cache. No case here proves caching - a cache hit
+	 * and a fresh compilation answer the same value by definition - what is pinned is that every
+	 * state a consumer can put an executer into keeps resolving.
+	 */
+	cache: {
+		specification: "8.4",
+		description: "Whether the executer keeps answering in every state of its code cache.",
+		cases: {
+			//                                                                          with-scoped  context-object  deconstruction  esprima
+			"keeps resolving with the cache switched off":                             [ YES,         YES,            YES,            YES ],
+			"caches again after being switched back on":                               [ YES,         YES,            YES,            YES ],
+			"serves a cached expression to a different context":                        [ YES,         YES,            YES,            YES ]
+		}
 	}
 };
 
 const EXECUTER_OF = new Map(EXECUTERS.map((executer) => [executer.name, executer]));
 
 /**
- * The state of one case under one executer. Throws on a section, a case or an executer the table
+ * The state of one case under one executer. Throws on a capability, a case or an executer the table
  * does not carry, and on a row that is not as wide as the table - a silent answer would let a case
  * pass or fail for a reason nobody wrote down.
  *
- * @param {string} aSection
+ * @param {string} aCapability
  * @param {string} aCaseName
  * @param {string} anExecuterName
- * @returns {string} YES, NO or DEFECT
+ * @returns {string} YES or NO
  */
-export const matrixState = (aSection, aCaseName, anExecuterName) => {
-	const section = MATRIX[aSection];
-	if (!section) throw new Error(`The matrix holds no section "${aSection}".`);
+export const capabilityState = (aCapability, aCaseName, anExecuterName) => {
+	const capability = CAPABILITIES[aCapability];
+	if (!capability) throw new Error(`The catalogue holds no capability "${aCapability}".`);
 
-	const row = section[aCaseName];
-	if (!row) throw new Error(`The matrix holds no case "${aCaseName}" in section ${aSection}.`);
+	const row = capability.cases[aCaseName];
+	if (!row) throw new Error(`The capability "${aCapability}" holds no case "${aCaseName}".`);
 	if (row.length !== COLUMNS.length) throw new Error(`The row "${aCaseName}" has ${row.length} cells where the table has ${COLUMNS.length} columns.`);
 
 	const column = COLUMNS.indexOf(anExecuterName);
-	if (column < 0) throw new Error(`The matrix has no column for the executer "${anExecuterName}".`);
+	if (column < 0) throw new Error(`The catalogue has no column for the executer "${anExecuterName}".`);
 
 	return row[column];
 };
 
 /**
- * The `it` of one section under one executer: it looks a case up by name and answers the ordinary
+ * The `it` of one capability under one executer: it looks a case up by name and answers the ordinary
  * `it` where the table says `yes`, the failing one otherwise.
  *
- * Used as `const matrixIt = casesOf("5.2", executer);` at the top of a section's loop, so that a
- * case reads like an ordinary test and names itself once.
+ * Used as `const capabilityIt = casesOf("context-scope", executer);` at the top of a capability's
+ * loop, so that a case reads like an ordinary test and names itself once.
  *
- * @param {string} aSection
+ * @param {string} aCapability
  * @param {string} anExecuterName
  * @returns {Function} (aCaseName, aFunction) => void
  */
-export const casesOf = (aSection, anExecuterName) => (aCaseName, aFunction) =>
-	(matrixState(aSection, aCaseName, anExecuterName) === YES ? it : it.fails)(aCaseName, aFunction);
+export const casesOf = (aCapability, anExecuterName) => (aCaseName, aFunction) =>
+	(capabilityState(aCapability, aCaseName, anExecuterName) === YES ? it : it.fails)(aCaseName, aFunction);
 
 /**
  * The catalogue entry of one executer, by its registered name. Throws on a name the catalogue

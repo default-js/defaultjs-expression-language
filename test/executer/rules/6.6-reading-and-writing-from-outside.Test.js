@@ -1,6 +1,6 @@
-import { describe, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../../index.js";
-import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
+import { EXECUTERS } from "../../ExecuterCapabilities.js";
 
 /**
  * SPECIFICATION.md 6.6 - the data methods seen through a resolution, asked of every executer.
@@ -13,19 +13,21 @@ import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
  * Carried over on 2026-09-01 from `StackedContextTest.js`, which named two of the four executers by
  * hand. Its other three cases were resolutions over a chain and nothing else - 5.2 asks that of all
  * four already - and they were dropped rather than moved.
+ *
+ * **Not a capability, so no row and no state** (2026-09-05): what is asked here is the resolver's
+ * work, not the executer's. It needs a real implementation to be seen at all, which is why it runs
+ * under all four as a plain `it` - a failure is a red gate the ordinary way, and there is nothing
+ * an executer may decline.
  */
 
 for (const { name: executer, variableName } of EXECUTERS) {
-
-	// every case below is a row of the matrix, and the matrix decides whether it has to pass
-	const matrixIt = casesOf("6.6", executer);
 
 	describe(`Specification 6.6 - reading and writing from outside [${executer}]`, () => {
 
 		// mergeContext, not updateData: a filterless updateData changes the value where the key lives,
 		// which is the parent here. Defining a key on this resolver and shadowing the parent from here
 		// on is what mergeContext does.
-		matrixIt("shadows a value of the parent until the shadowing key is deleted", async () => {
+		it("shadows a value of the parent until the shadowing key is deleted", async () => {
 			const expression = `\${${variableName("test")}}`;
 			const parent = new ExpressionResolver({ context: { test: "test" }, executer });
 			const resolver = new ExpressionResolver({ context: {}, parent, executer });
