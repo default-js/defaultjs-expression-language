@@ -362,6 +362,20 @@ Entries here are independent of each other. An undertaking whose steps depend on
   the outcome belongs in `CHANGELOG.md`. Found 2026-08-30 while making the benchmarks run under
   every executer - the benchmark for expressions carrying literals had to stop reading the context
   inside an arrow function because of it.
+  **The nested function is one of at least six places the rewrite does not reach, read off the code
+  on 2026-09-05 and not yet measured.** `TRAVERSABLE_PROPERTIES` (`src/executer/EsprimaExecuter.js:31`)
+  lists `body, arguments, argument, expression, callee, params, ast, object, left, right`. It does not
+  list `properties`, so no identifier inside an **object literal** is rewritten; not `elements`, so
+  none inside an **array literal**; not `test` / `consequent` / `alternate`, so none in a **ternary**;
+  not `tag` / `quasi`, so none in a **tagged template**; and the `MemberExpression` handler walks
+  `object` only, never `property`, so a **computed access** `obj[key]` loses its key. `new Cls()` is a
+  seventh shape with a different cause: the callee becomes `ctx?.Cls`, and `new ctx?.Cls()` is a
+  syntax error. So `${ {a: value}.a }`, `${ [value][0] }`, `${ flag ? a : b }` and `${ obj[key] }` are
+  expected to raise where the other three executers answer. **The suite does not catch any of this
+  today**, because the cases of `SPECIFICATION.md` 3.4 that use these constructs put constants inside
+  them - `${ {a: 4}.a }` - so they pin the parser rather than the rewrite. This strengthens the case
+  already made in the entry above: one pass over the rewrite, not one fix per shape. Found while
+  working out the fine-grained capability catalogue, `plans/executer-capabilities.md`.
 
 - [ ] **`RESERVED_NAMES` in the esprima executer misspells `global`.**
   Related to `SPECIFICATION.md` 6.4, because it decides what an expression can reach.
