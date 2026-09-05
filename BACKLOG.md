@@ -296,6 +296,34 @@ Entries here are independent of each other. An undertaking whose steps depend on
   context may be, which is the other half of the entry. Found 2026-08-30 while checking how the
   executers treat unusual context shapes.
 
+- [ ] **A context key named `ctx` breaks `ContextDeconstructorExecuter` for every statement.**
+  **A regression of `30e5623` (2026-09-05), not an old defect.** The write-back draft committed that
+  day generates a prologue of `let <name> = ctx.<name>;` per context key inside an arrow whose
+  parameter is `ctx`, so a context carrying a key called `ctx` produces `let ctx = ctx.ctx;` — the
+  binding is declared twice in the same scope and the generated function does not compile. Every
+  expression fails, not only one that touches the key. The version before the draft destructured the
+  names in the parameter list (`async ({ctx, known}) => …`), where a key called `ctx` is an ordinary
+  binding and nothing collides — so this arrived with the draft. A key called `context` is harmless:
+  the shadowing happens inside the generated arrow while `context || {}` is evaluated outside it.
+  Measured 2026-09-05, pinned as `runs a statement over a context carrying a key named ctx` in
+  `test/executer/capabilities/context-shape.Test.js`, `no` for the deconstructor and `yes` for the
+  other three. This hits the **default** executer, so it is consumer-visible: whatever happens to the
+  write-back, the generated names have to be ones a context cannot collide with. Found while
+  measuring the context shapes for the capability catalogue.
+
+- [ ] **`ContextDeconstructorExecuter` loses `this` inside a method of the context.**
+  A context that is a class instance — the shape a template engine hands in most often — answers
+  `${ greet() }` under `with-scoped`, `context-object` and `esprima`, because all three leave the
+  context as the receiver: a `with` block does, and a member access (`ctx.greet()`, `ctx?.greet()`)
+  does. The deconstructor binds the method to a local and calls it bare, so `this` is `undefined`
+  inside it and any method reading its own state raises. Measured 2026-09-05 and pinned as
+  `keeps this bound to the context when a method is called bare` in
+  `test/executer/capabilities/context-scope.Test.js`. Not a broken rule — 8.3 lets an executer decide
+  how a statement reaches a context value — but it is the **default** executer and the loss is
+  silent, so decide whether it stays a capability the default lacks or whether the generated code
+  binds the receiver. Consumer-visible either way, so the outcome belongs in `CHANGELOG.md`. Found
+  while measuring `context-scope` for the capability catalogue.
+
 - [ ] **`ContextDeconstructorExecuter` reads every property of a context, including one that throws
   on access.**
   It builds its destructuring pattern from the names of the context and then destructures, which
@@ -309,6 +337,13 @@ Entries here are independent of each other. An undertaking whose steps depend on
   destructuring also *runs* every getter on every execution, which is a cost the other executers do
   not pay. To decide whether that is a defect of the executer or the price of its strategy (8.3).
   Found 2026-08-30 while checking how the executers treat unusual context shapes.
+  **Both halves are pinned since 2026-09-05**, with a planted accessor rather than through an
+  `arguments` object: `reads a context value beside a getter that throws` and `leaves a getter of the
+  context unread when the statement does not touch it`, in
+  `test/executer/capabilities/context-shape.Test.js`, both `no` for the deconstructor and `yes` for
+  the other three. The second is the cost half made observable — the getter is counted, and
+  `${ 1 + 1 }` reads it once although it touches no name. The proxy itself does not read it: its
+  descriptor hands out a getter rather than a value (6.2), so this is the executer's doing alone.
 
 - [ ] **A write to an unknown name inside an expression lands on `globalThis`.**
   Target: `SPECIFICATION.md` 6.5 — the negative guarantee and the three-level switch.

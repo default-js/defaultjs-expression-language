@@ -396,7 +396,38 @@ Each stage is green before the next one starts, and no stage changes a source fi
    `leaves the ancestor untouched when writing a name it carries`, is all-`yes` with two of the four
    passing trivially because they wrote nothing at all — the case says so in its comment and is only
    read together with the row above it.
-2. **`context-shape` and `context-scope`.**
+2. **`context-shape` and `context-scope` — done 2026-09-05, gate green.** `context-shape` went from
+   11 rows to 19, `context-scope` from 8 to 26; 26 new rows, 104 new cases. Before: 488 cases, 34
+   expected fails. After: **592 cases, 51 expected fails** — the 17 new `no` cells, counted against
+   the table. Same method as stage 1: all rows in as `yes`, measure, correct, green in both
+   directions.
+
+   **One row was dropped from the plan's list on purpose.** A primitive context (`"abc"`, `42`) never
+   reaches an executer — `ResolverContextHandle` throws at construction — so it measures the
+   resolver, not the executer, and `test/spec/6.1-the-proxy.Test.js` already pins it. A row that no
+   executer can influence is not a capability. **The shorthand object literal `{value}` was dropped
+   too**, for a different reason: it only exists where the dialect is a bare name, so under
+   `context-object` the case would have to be a different construct — one row measuring two things.
+
+   What the measurements say, all of it predicted from the code first and then confirmed:
+
+   - **Thirteen of the eighteen new `context-scope` rows are `no` for `esprima`**, and they fall into
+     two groups with one cause each. Five are function shapes — an arrow with either body, a function
+     expression, a default parameter, an async function — because `IGNORED_TYPES` skips every function
+     body. Eight are positions its traversal never walks into: an object literal, an array literal, a
+     computed key, a spread, a ternary, the key of a computed member access, a tagged template, and
+     `new Cls()` (that last one for a second reason — `new ctx?.Cls()` is a syntax error).
+   - **What it does reach** is worth the rows it costs: both sides of `??`, a deep member access, an
+     optional chain. Those are on its list, and nothing said so before.
+   - **The deconstructor loses `this`** when a method of the context is called bare — the only
+     `context-scope` row it misses, and the esprima executer keeps it. Its own `BACKLOG.md` entry now.
+   - **A context key called `ctx` breaks the deconstructor outright**, every statement, and that is a
+     **regression of `30e5623`**: the committed draft emits `let ctx = ctx.ctx;` inside an arrow whose
+     parameter is `ctx`. The version before it destructured in the parameter list, where the same key
+     is harmless. Own `BACKLOG.md` entry, and it hits the default executer.
+   - **The getter pair** — one that throws, one that counts its reads — is `no` for the deconstructor
+     twice, which is the cost of reading every name before running anything, now observable rather
+     than inferred from the `arguments` shape.
 3. **`global-scope` (the reachability half) and `syntax`.**
 4. **`cache`**, and the contract tests of 8.1/8.2 as plain cases.
 5. **The documents.** `SPECIFICATION.md` in three places: 8.3 rewritten from the finished catalogue by

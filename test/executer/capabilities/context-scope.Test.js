@@ -92,5 +92,124 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			const result = await resolver.resolve(`\${ [1, 2].map((value) => value + ${variableName("count")}).join() }`);
 			expect(result).toBe("4,5");
 		});
+
+		// The row above is the callback shape - a function handed to a builtin. These four are the
+		// other shapes a function takes in an expression, apart because an executer that rewrites the
+		// statement before running it can see one and miss another.
+		capabilityIt("reaches a context value from inside an arrow with an expression body", async () => {
+			const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer });
+			expect(await resolver.resolve(`\${ (() => ${variableName("value")})() }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value from inside an arrow with a block body", async () => {
+			const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer });
+			expect(await resolver.resolve(`\${ (() => { return ${variableName("value")}; })() }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value from inside a function expression", async () => {
+			const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer });
+			expect(await resolver.resolve(`\${ (function () { return ${variableName("value")}; })() }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value from a default parameter", async () => {
+			const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer });
+			expect(await resolver.resolve(`\${ ((given = ${variableName("value")}) => given)() }`)).toBe("from context");
+		});
+
+		capabilityIt("awaits a context promise from inside a nested async function", async () => {
+			const resolver = new ExpressionResolver({ context: { promised: Promise.resolve("from context") }, name: "root", executer });
+			expect(await resolver.resolve(`\${ await (async () => await ${variableName("promised")})() }`)).toBe("from context");
+		});
+
+		// A literal carrying a context name, as against the literal of `syntax`, which carries a
+		// constant. The two together are what tell a broken parser from a rewrite that does not walk
+		// into the literal.
+		capabilityIt("reaches a context value inside an object literal", async () => {
+			const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer });
+			expect(await resolver.resolve(`\${ {carried: ${variableName("value")}}.carried }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value inside an array literal", async () => {
+			const resolver = new ExpressionResolver({ context: { value: "from context" }, name: "root", executer });
+			expect(await resolver.resolve(`\${ [${variableName("value")}][0] }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value as a computed key of an object literal", async () => {
+			const resolver = new ExpressionResolver({ context: { key: "k" }, name: "root", executer });
+			expect(await resolver.resolve(`\${ {[${variableName("key")}]: "hit"}["k"] }`)).toBe("hit");
+		});
+
+		capabilityIt("spreads a context object into an object literal", async () => {
+			const resolver = new ExpressionResolver({ context: { holder: { name: "from context" } }, name: "root", executer });
+			expect(await resolver.resolve(`\${ {...${variableName("holder")}}.name }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value from both branches of a ternary", async () => {
+			const context = { flag: true, hit: "from context", miss: "wrong branch" };
+			const resolver = new ExpressionResolver({ context, name: "root", executer });
+			const statement = `${variableName("flag")} ? ${variableName("hit")} : ${variableName("miss")}`;
+			expect(await resolver.resolve(`\${ ${statement} }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value as the key of a computed member access", async () => {
+			const context = { holder: { name: "from context" }, key: "name" };
+			const resolver = new ExpressionResolver({ context, name: "root", executer });
+			expect(await resolver.resolve(`\${ ${variableName("holder")}[${variableName("key")}] }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value inside a tagged template", async () => {
+			const context = { tag: (parts, carried) => carried, value: "from context" };
+			const resolver = new ExpressionResolver({ context, name: "root", executer });
+			expect(await resolver.resolve(`\${ ${variableName("tag")}\`a\${${variableName("value")}}b\` }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value on both sides of a nullish coalescing operator", async () => {
+			const context = { nothing: null, value: "from context" };
+			const resolver = new ExpressionResolver({ context, name: "root", executer });
+			expect(await resolver.resolve(`\${ ${variableName("nothing")} ?? ${variableName("value")} }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value through a deep member access", async () => {
+			const context = { deep: { middle: { leaf: "from context" } } };
+			const resolver = new ExpressionResolver({ context, name: "root", executer });
+			expect(await resolver.resolve(`\${ ${variableName("deep")}.middle.leaf }`)).toBe("from context");
+		});
+
+		capabilityIt("reaches a context value through an optional chain", async () => {
+			const context = { deep: { middle: { leaf: "from context" } } };
+			const resolver = new ExpressionResolver({ context, name: "root", executer });
+			expect(await resolver.resolve(`\${ ${variableName("deep")}?.middle?.leaf }`)).toBe("from context");
+		});
+
+		// Calling a method without naming its object is where the strategies part: a `with` block and
+		// a member access both leave the context as the receiver, a destructured local binding does
+		// not carry one at all.
+		capabilityIt("keeps this bound to the context when a method is called bare", async () => {
+			class Data {
+				constructor() {
+					this.value = "from this";
+				}
+				greet() {
+					return this.value;
+				}
+			}
+			const resolver = new ExpressionResolver({ context: new Data(), name: "root", executer });
+			expect(await resolver.resolve(`\${ ${variableName("greet")}() }`)).toBe("from this");
+		});
+
+		capabilityIt("constructs an instance of a class the context carries", async () => {
+			class Value {
+				constructor() {
+					this.name = "constructed";
+				}
+			}
+			const resolver = new ExpressionResolver({ context: { Value }, name: "root", executer });
+			expect(await resolver.resolve(`\${ new ${variableName("Value")}().name }`)).toBe("constructed");
+		});
+
+		capabilityIt("reads the same context value twice within one statement", async () => {
+			const resolver = new ExpressionResolver({ context: { count: 21 }, name: "root", executer });
+			expect(await resolver.resolve(`\${ ${variableName("count")} + ${variableName("count")} }`)).toBe(42);
+		});
 	});
 }

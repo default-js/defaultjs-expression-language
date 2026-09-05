@@ -127,7 +127,40 @@ export const CAPABILITIES = {
 			// inside one is never rewritten onto the context. BACKLOG.md, "EsprimaExecuter cannot
 			// reach a context value from inside a nested function", which carries the six further
 			// shapes the same rewrite misses.
-			"reaches a context value from inside a nested function":                   [ YES,         YES,            YES,            NO ]
+			"reaches a context value from inside a nested function":                   [ YES,         YES,            YES,            NO ],
+			// **Five function shapes, one answer**: the esprima rewrite skips every function body
+			// (`IGNORED_TYPES` holds FunctionExpression and ArrowFunctionExpression), so no identifier
+			// inside one is ever put onto the context. Measured 2026-09-05.
+			"reaches a context value from inside an arrow with an expression body":    [ YES,         YES,            YES,            NO ],
+			"reaches a context value from inside an arrow with a block body":          [ YES,         YES,            YES,            NO ],
+			"reaches a context value from inside a function expression":               [ YES,         YES,            YES,            NO ],
+			"reaches a context value from a default parameter":                        [ YES,         YES,            YES,            NO ],
+			"awaits a context promise from inside a nested async function":            [ YES,         YES,            YES,            NO ],
+			// **Seven positions the rewrite does not walk into**, and the reason each of them is a row
+			// of its own: `TRAVERSABLE_PROPERTIES` (EsprimaExecuter.js:31) lists neither `properties`
+			// nor `elements` nor `test`/`consequent`/`alternate` nor `tag`/`quasi`, and the
+			// MemberExpression handler walks `object` only, never `property`. `new Cls()` fails for a
+			// second reason: the callee becomes `ctx?.Cls` and `new ctx?.Cls()` is a syntax error.
+			// All measured 2026-09-05, all predicted from the code first - BACKLOG.md carries them.
+			"reaches a context value inside an object literal":                        [ YES,         YES,            YES,            NO ],
+			"reaches a context value inside an array literal":                         [ YES,         YES,            YES,            NO ],
+			"reaches a context value as a computed key of an object literal":          [ YES,         YES,            YES,            NO ],
+			"spreads a context object into an object literal":                         [ YES,         YES,            YES,            NO ],
+			"reaches a context value from both branches of a ternary":                 [ YES,         YES,            YES,            NO ],
+			"reaches a context value as the key of a computed member access":          [ YES,         YES,            YES,            NO ],
+			"reaches a context value inside a tagged template":                        [ YES,         YES,            YES,            NO ],
+			"constructs an instance of a class the context carries":                   [ YES,         YES,            YES,            NO ],
+			// The positions the rewrite *does* walk into, kept as rows because that is not obvious
+			// from the outside: a logical operator has `left` and `right`, a member access has
+			// `object`, and both are on its list.
+			"reaches a context value on both sides of a nullish coalescing operator":  [ YES,         YES,            YES,            YES ],
+			"reaches a context value through a deep member access":                    [ YES,         YES,            YES,            YES ],
+			"reaches a context value through an optional chain":                       [ YES,         YES,            YES,            YES ],
+			"reads the same context value twice within one statement":                 [ YES,         YES,            YES,            YES ],
+			// The one row of this capability the deconstructor misses, and the esprima executer keeps:
+			// a `with` block and a member access both leave the context as the receiver, a destructured
+			// local binding carries none, so `this` is undefined inside the method. Measured 2026-09-05.
+			"keeps this bound to the context when a method is called bare":            [ YES,         YES,            NO,             YES ]
 		}
 	},
 
@@ -153,7 +186,24 @@ export const CAPABILITIES = {
 			"reads through an element context":                                        [ YES,         YES,            YES,            YES ],
 			"reads the length of an array context and ignores its indices":            [ YES,         YES,            YES,            YES ],
 			"reads a named key of a context that also carries a numeric one":          [ YES,         YES,            YES,            YES ],
-			"reads an accessor of the prototype of a Map context":                     [ YES,         YES,            YES,            YES ]
+			"reads an accessor of the prototype of a Map context":                     [ YES,         YES,            YES,            YES ],
+			"runs a statement over a context without a prototype":                     [ YES,         YES,            YES,            YES ],
+			"runs a statement over a context carrying a symbol key":                   [ YES,         YES,            YES,            YES ],
+			// **A context key called `ctx` breaks the deconstructor entirely** - every statement, not
+			// only one that touches the key: its generated prologue emits `let ctx = ctx.ctx;`, which
+			// reads the binding it is declaring. A key called `context` is harmless, because the
+			// shadowing happens inside the generated arrow while the argument is evaluated outside it.
+			// Read off the code and measured 2026-09-05; BACKLOG.md carries it.
+			"runs a statement over a context carrying a key named ctx":                [ YES,         YES,            NO,             YES ],
+			"runs a statement over a context carrying a key named context":            [ YES,         YES,            YES,            YES ],
+			"runs a statement over a context carrying a key named like a reserved word": [ YES,       YES,            YES,            YES ],
+			"runs a statement over a context carrying many keys":                      [ YES,         YES,            YES,            YES ],
+			// Both are the same property from two sides: the deconstructor reads every name of a
+			// context before it runs anything. Where an accessor throws, no statement runs at all; where
+			// one merely costs, it is paid on every execution. The `arguments` row above is the shape
+			// found in the wild.
+			"reads a context value beside a getter that throws":                       [ YES,         YES,            NO,             YES ],
+			"leaves a getter of the context unread when the statement does not touch it": [ YES,      YES,            NO,             YES ]
 		}
 	},
 

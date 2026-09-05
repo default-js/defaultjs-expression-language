@@ -101,5 +101,87 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			const resolver = new ExpressionResolver({ context: new Map([["entry", "value"]]), name: "ctx", executer });
 			expect(await resolver.resolve(`\${ ${variableName("size")} }`)).toBe(1);
 		});
+
+		capabilityIt("runs a statement over a context without a prototype", async () => {
+			const context = Object.create(null);
+			context.known = "from context";
+			const resolver = new ExpressionResolver({ context, name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("known")} }`)).toBe("from context");
+		});
+
+		// The property cache keeps string keys only, so a symbol never reaches an executer that turns
+		// names into code. What is pinned is that carrying one breaks nothing.
+		capabilityIt("runs a statement over a context carrying a symbol key", async () => {
+			const context = { known: "from context" };
+			context[Symbol("marker")] = "from symbol";
+			const resolver = new ExpressionResolver({ context, name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("known")} }`)).toBe("from context");
+		});
+
+		// `ctx` and `context` are the names the generated code uses for itself - the parameter of the
+		// generated function and the argument of `new Function`. A context carrying either is a case
+		// no implementation was designed against, and the collision is invisible until someone has a
+		// key called `ctx`.
+		capabilityIt("runs a statement over a context carrying a key named ctx", async () => {
+			const resolver = new ExpressionResolver({ context: { ctx: "own ctx", known: "from context" }, name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("known")} }`)).toBe("from context");
+		});
+
+		capabilityIt("runs a statement over a context carrying a key named context", async () => {
+			const resolver = new ExpressionResolver({ context: { context: "own context", known: "from context" }, name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("known")} }`)).toBe("from context");
+		});
+
+		// The property cache drops reserved words today, so no executer sees the key. The row is here
+		// because that filter is what `BACKLOG.md` wants moved into the deconstructor - the day it
+		// moves, this row is where the change shows.
+		capabilityIt("runs a statement over a context carrying a key named like a reserved word", async () => {
+			const resolver = new ExpressionResolver({ context: { class: "reserved", known: "from context" }, name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("known")} }`)).toBe("from context");
+		});
+
+		// Wider than the threshold the deconstructor warns at, and wide enough that its generated
+		// prologue is one line per name.
+		capabilityIt("runs a statement over a context carrying many keys", async () => {
+			const context = { known: "from context" };
+			for (let index = 0; index < 60; index++) context[`filler${index}`] = index;
+			const resolver = new ExpressionResolver({ context, name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("known")} }`)).toBe("from context");
+		});
+
+		// The `arguments` row above is one instance of this, found in the wild; here the accessor is
+		// planted, so the case says what the shape is rather than which object happens to have it.
+		capabilityIt("reads a context value beside a getter that throws", async () => {
+			const context = { known: "from context" };
+			Object.defineProperty(context, "poisoned", {
+				get: () => {
+					throw new Error("this getter must not be read");
+				},
+				enumerable: true,
+				configurable: true
+			});
+			const resolver = new ExpressionResolver({ context, name: "ctx", executer });
+			expect(await resolver.resolve(`\${ ${variableName("known")} }`)).toBe("from context");
+		});
+
+		// The other half of the same property, and the one that costs on every execution rather than
+		// only where a getter throws: an executer that reads all the names of a context before running
+		// anything evaluates work nobody asked for. The proxy itself does not - it hands out a getter
+		// in its descriptor rather than a value (6.2).
+		capabilityIt("leaves a getter of the context unread when the statement does not touch it", async () => {
+			let reads = 0;
+			const context = { known: "from context" };
+			Object.defineProperty(context, "counted", {
+				get: () => {
+					reads++;
+					return "read";
+				},
+				enumerable: true,
+				configurable: true
+			});
+			const resolver = new ExpressionResolver({ context, name: "ctx", executer });
+			await resolver.resolve("${ 1 + 1 }");
+			expect(reads).toBe(0);
+		});
 	});
 }
