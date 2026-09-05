@@ -19,6 +19,126 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-05 — What does an executer owe this package, and what is its own?
+
+**Decision:** **An executer has capabilities and nothing else.** Beyond the interface of 8.1 and the
+promise to execute a statement, `SPECIFICATION.md` demands nothing of it. A **capability** measures
+how far an executer supports JavaScript over a dynamic context — which constructs run, how much of
+the language's scoping survives, which values stay reachable, whether a write behaves the way an
+assignment does. A **behaviour** is what the *resolver* does, and it holds under every executer. The
+two words separate by subject, not by rank: `SPECIFICATION.md` says *behaviour* for the resolver and
+*capability* for the executer, and 8.3 is renamed accordingly. This **supersedes the vocabulary half
+of the entry of 2026-09-01** below, which made *capability* the name of a difference between
+implementations.
+
+The third state of the table goes with it. `defect` said "the specification demands this and this
+implementation does not keep it", and there is no such thing once nothing is demanded: the catalogue
+has `yes` and `no`. Whether a `no` is meant to become a `yes` belongs in `BACKLOG.md`, which is where
+the decision of 2026-08-30 already put it.
+
+**Reasoning:** Frank's, against the structure delivered earlier the same day, and the code carries
+it. The 25 rows the table called rules — the chain walk of 5.2 to 5.4, the name snapshot of 6.2, a
+link without a context, the data methods from outside, the error policy of 7 — are not the executer's
+work at all: the walk lives in the proxy traps of `ResolverContextHandle`, and every executer gets it
+for free whether it opens a `with` block, hands the proxy over as `ctx` or destructures the names
+`ownKeys` already collected. An executer cannot break them except by not reaching the context, and
+that is a broken executer rather than a declined rule. Calling them "a demand on the implementations"
+was a misnomer that made it undecidable where a case belongs.
+
+The one case that argued back was the negative guarantee of 6.5, which only an executer can keep —
+and it was answered by moving the specification rather than the vocabulary; see the entry below.
+
+The widening of the catalogue decided the same day settled the umbrella: once the table lists what
+every implementation supports rather than only where the four differ, *capability* has to mean what
+an executer can do rather than where they disagree.
+
+**Alternatives:** *behaviour* as the umbrella with *rule* and *capability* as two kinds under it —
+proposed and rejected: it kept a distinction the executer axis does not have. Keeping `defect` for
+the containment of a global write — rejected with it, because that state only exists if the document
+may demand something of an implementation. Leaving the vocabulary as it stood — rejected: the
+published document said *behaviour* six times and never *capability*, while pointing the reader at a
+file whose name carries the word, and `CHANGELOG.md` described the document with the word the
+document did not use.
+
+**Consequences:** `test/ExecuterCapabilities.js` keeps its name and exports `CAPABILITIES` with two
+states. `SPECIFICATION.md` 8.3 is *Capabilities of an executer* and carries the six capabilities with
+one column per implementation, written by hand from the catalogue because the suite runs in a browser
+and cannot read a document. The `it.fails` marker regains one meaning per directory — *not implemented
+yet* in `test/spec/`, *this executer does not support this* in `test/executer/capabilities/` — which
+is a paragraph `AGENTS.md` no longer has to spend on the ambiguity. What is lost is the ability to say
+"this implementation is wrong" in the table; that statement now lives in `BACKLOG.md`, where the
+reasoning for it can be written down.
+
+## 2026-09-05 — Where does a case about an executer live?
+
+**Decision:** In two directories, and the directory answers what the case is.
+`test/executer/capabilities/<capability>.Test.js` holds the cases with a row in the catalogue, one
+file per capability, named after it. `test/executer/rules/<section>-<slug>.Test.js` holds the rules of
+the resolver that only show through a statement — no row, no state, plain `it` under all four
+implementations. This **replaces the file-per-section decision of 2026-09-01 for the capability half
+only**; the rules half keeps section names, so `TESTING.md` §2 stands for it as written.
+
+Every construct is asked **twice**, in two capabilities: `syntax` asks whether it runs, with constants
+inside it, and `context-scope` asks whether the same construct still reaches a context value. A case
+that puts a context name inside a construct answers both at once, and a failure then does not say
+which broke.
+
+**Reasoning:** A capability spans sections — `syntax` reads 3.4 and 8.2, `global-scope` reads 6.4, 6.5
+and 8.3 — so naming its file after one section would have to pick a winner. The rules do not span
+anything, so nothing is gained by renaming them.
+
+The two-questions rule was not a theory but a repair. Every case of 3.4 put a constant inside its
+construct — `${ {a: 4}.a }` — so all four executers answered `yes` to *evaluates an object literal*
+while one of them cannot reach a context value inside one. The same case shape hid it for the arrow
+function, the template literal and the regular expression. Splitting the question found 13 capability
+gaps in one executer that the suite had been green over.
+
+**Alternatives:** One directory with a naming convention — rejected: the difference between a row and
+no row is exactly what a reader needs to know before writing a case, and a directory says it without
+being read. Keeping one file per section for both halves — rejected for the reason above.
+
+**Consequences:** `TESTING.md` gains a section for each half and the table at its top lists four
+places instead of three. A capability that later splits in two means moving cases between files, and
+the catalogue key moving with them — the case count before and after is the guard, as it was for
+every stage of this undertaking.
+
+## 2026-09-05 — What happens when the specification promises something no implementation keeps?
+
+**Decision:** **The specification moves.** `SPECIFICATION.md` 6.5 promised that an assignment inside
+an expression could not reach the global object while a switch was off. Only an executer can keep that
+promise, an executer may be written by anyone, and three of the four shipped today break it in at
+least one shape — so the promise is withdrawn and restated as a **capability**, measured per
+implementation in the table of 8.3. The `allowGlobalWrite` switch stays in the document as pending,
+but its *off* state is bounded by what the executer in use can intercept.
+
+**Reasoning:** Frank's, on 2026-09-05: where we find that we promise something we cannot keep, the
+document is what gets corrected. The alternative offered at the time — keep the promise and point it
+at whichever executer the package ships as its default — was rejected by him on the spot, and rightly:
+a consumer who deliberately picks another executer would then read a guarantee that does not hold for
+them, which is worse than no guarantee at all.
+
+The measurements that forced it were taken the same day, by splitting one case into four.
+`esprima-executer` was thought to contain the write, and does so only at the top level of a statement
+— inside a function body its rewrite does not go, the identifier stays bare, and the sloppy assignment
+creates a global. A compound assignment cannot leak anywhere, because it raises on the read. And
+nothing contains an explicit `globalThis.x = 1`, which means the guarantee was never about sandboxing
+but only about the accidental leak of an unqualified name. A promise that has to be qualified three
+times is not the promise the document made.
+
+**Alternatives:** Requiring the containment of every executer and marking the two that fail as defects
+— that is what stood until this day, and it is incompatible with the entry above: nothing is demanded
+of an executer. Requiring it of the default executer only — rejected as above. Implementing the switch
+first and deciding afterwards — rejected: the specification would have kept a promise it could not
+keep for however long that takes, and the switch's own reach is what the measurement calls into
+question.
+
+**Consequences:** Section 10 loses its 6.5 row — there is no rule left there for the code to break —
+and keeps the two that name the unimplemented switch. `BACKLOG.md` carries the write-to-globalThis
+entry as a capability gap rather than a defect, with the open question of whether the switch is worth
+having on these terms. `CHANGELOG.md` records the withdrawal, because a consumer may have read the
+guarantee. What this rules out is a claim of safety: the package does not sandbox the global object,
+and 6.7 says the same about `buildSecure`.
+
 ## 2026-09-01 — What does the suite prove when a case answers a value?
 
 **Decision:** In `test/spec/` nothing is evaluated. `TestExecuter` answers the **statement it was

@@ -381,37 +381,40 @@ assignment does is decided by the executer, not by this package. `updateData`, `
 `deleteData` (6.6) are the supported way to change a context, and they are the only path with
 guaranteed behaviour.
 
-**The one guarantee is negative**: while the switch below is off, an assignment inside an
-expression must not create or change anything on the global object.
+**This document made a negative guarantee here until 2026-09-05** — that an assignment inside an
+expression could not create or change anything on the global object. It is withdrawn, because the
+package cannot keep it: only the executer can intercept an assignment, an executer is free to be
+written by anyone, and three of the four shipped today let an unqualified assignment reach the
+global object in at least one shape. A promise no implementation is required to keep is not a
+promise, so it is stated as what it is — **a capability, measured per executer in the table of
+8.3**. Pointing the promise at whichever executer happens to be the default was rejected on the same
+day: a consumer who picks another one would then read a guarantee that does not hold for them.
 
-What happens instead is the executer's business and differs between them. Where the assignment
-can be intercepted — the `with`-based executer, whose assignments pass through the context proxy
-— it lands in the context of the resolver the expression is evaluated on. Where it cannot — the
-deconstructor executer, whose assignments hit a destructured local binding — it throws and is
-reported as an execution error (7). Nothing beyond the negative guarantee is promised, in
-particular not that the written value is still readable afterwards.
+What is true today, measured rather than promised:
 
-This is governed by a switch that **allows** writing to the global object. It exists at three levels, each
-overriding the one above it:
+- An **unqualified assignment to a name no resolver of the chain carries** reaches the global object
+  under `with-scoped-executer` and `context-deconstruction-executer`. `context-object-executer`
+  contains it, because its dialect writes through the context proxy; `esprima-executer` contains it
+  at the top level of a statement but **not** from inside a function written in the statement.
+- A **compound assignment** to such a name (`x += 1`) cannot create anything anywhere: it reads
+  before it writes and raises on the read.
+- An **explicit write through `globalThis`** reaches the global object under every executer but one,
+  and that one only because its rewrite cannot produce the assignment at all. Nothing here is a
+  sandbox: a statement that asks for the global object by name gets it.
+- Where an assignment *is* intercepted, it lands in the context of the resolver the expression is
+  evaluated on — never in an ancestor's, so 1.3 holds. Whether the written value is readable
+  afterwards is again a capability: under the default executer it is not, except for a mutation of
+  an object the context already holds.
 
-| Level | How | Applies to |
-|---|---|---|
-| Application | `ExpressionResolver.allowGlobalWrite` | every resolver built from then on |
-| Resolver | constructor option `allowGlobalWrite` | that resolver |
-| Call | fifth argument of the static `resolve` / `resolveText` | the resolver that call builds |
-
-A level that is not given falls back to the one above it, and the application level defaults to
-`false` — so out of the box no write from an expression reaches the global object. With the
-switch on, an assignment behaves as plain JavaScript would and a key no resolver carries becomes a
-global variable.
-
-How an executer keeps the guarantee is up to it. `WithScopedExecuter` can intercept the
-assignment through the context proxy; `ContextDeconstructorExecuter` cannot, so there the
-protected state means the generated body is produced in strict mode and the assignment throws
-rather than reaching the global object.
-
-*Not yet implemented* — the switch does not exist yet; today a write to an unknown key creates a
-global variable under both executers. See `BACKLOG.md`.
+A **switch that allows writing to the global object** was agreed on 2026-08-22 and is not
+implemented. It exists at three levels, each overriding the one above it — `ExpressionResolver.allowGlobalWrite`
+for the application, a constructor option `allowGlobalWrite` per resolver, and a fifth argument on
+the static `resolve` / `resolveText` per call — with the application level defaulting to `false`.
+What its *off* state can mean is bounded by the paragraphs above: it can only redirect the writes
+the executer in use is able to intercept, and under an executer that cannot intercept an assignment
+at all it means nothing. Whether it is still worth having on those terms is open; `BACKLOG.md`
+carries the question, along with the one case that has no interception point since 2026-08-30 — a
+resolver whose context *is* the global object is no longer proxied.
 
 ### 6.6 Reading and writing from outside
 
@@ -482,10 +485,11 @@ Builds a resolver over a **filtered copy** of the context, so that properties a 
 not want reachable never enter the evaluation. The motivating case is real: the template engine
 and this resolver run inside CMS systems where users author expressions.
 
-It filters the **context, not the globals**. `fetch`, `console` and `document` stay reachable
-from an expression through the mechanism of 6.4 — under `EsprimaExecuter` `fetch` and `console`
-are even explicitly protected. `buildSecure` is a way to hand over a cleaned context; it is not
-a sandbox and must not be documented as one.
+It filters the **context, not the globals**. `fetch`, `console` and `document` stay reachable from an
+expression through the mechanism of 6.4 — how far that reach goes is the executer's own and measured
+in 8.3, so under `EsprimaExecuter` `fetch` and `console` are reachable while `document` is not.
+`buildSecure` is a way to hand over a cleaned context; it is not a sandbox and must not be
+documented as one.
 
 `option` carries the filter's own `deep` together with the **full constructor option set**, which
 `buildSecure` hands on unchanged. `allowGlobalWrite` matters here more than anywhere else, because
@@ -557,44 +561,72 @@ resolves.
 grows the browser bundle from 11.5 KB to 355.6 KB. It is the least complete of the four; what it
 cannot do is in the table of 8.3.
 
-### 8.3 Behaviour that is the executer's own
+### 8.3 Capabilities of an executer
 
-An executer chooses how a statement reaches the global object (6.4), whether a write can be
-caught (6.5), and **how a statement addresses a value of the context**. All three differ between
-the implementations. Everything else in this document holds regardless of the executer in use:
-a **rule** is not something an implementation may decline.
+An executer has **capabilities and nothing else**. Beyond the interface of 8.1 and the promise to
+execute a statement, this document demands nothing of it: how a statement addresses a value of the
+context, how it reaches the global object (6.4), whether a write can be contained (6.5) and how much
+of JavaScript runs at all are its own. Everything else in this document is a **behaviour of the
+resolver** and holds under every executer — the chain and which resolver answers a lookup (5), the
+context as a snapshot of names (6.2), the error policy (7). Those are not something an
+implementation may decline, and they are not capabilities.
 
-Everything below is a point where the four answer differently today. Every other rule of this
-document holds under all of them, which is why only the differences are listed:
+A capability measures **how far an executer supports JavaScript over a dynamic context**. There are
+six, and what each implementation supports was measured on 2026-09-05:
 
-| | `with-scoped` | `context-object` | `context-deconstruction` | `esprima` |
-|---|---|---|---|---|
-| reaches a global that no resolver carries (8.3) | yes | yes | yes | **no** |
-| makes a write to a name the context carries readable afterwards (6.5) | yes | yes | **no** | **no** |
-| executes a statement carrying an assignment (8.2) | yes | yes | yes | **no** |
-| keeps a write to a name no resolver carries out of the global object (6.5) | *defect* | yes | *defect* | yes |
-| reaches a context value from inside a function written in the statement (8.3) | yes | yes | yes | *defect* |
+| Capability | What it asks | `with-scoped` | `context-object` | `context-deconstruction` | `esprima` |
+|---|---|---|---|---|---|
+| `syntax` (3.4) | which constructs run at all | 25/27 | 25/27 | 25/27 | 21/27 |
+| `context-scope` (8.3) | whether a construct carrying a context name still reaches it | 26/26 | 26/26 | 25/26 | 12/26 |
+| `context-shape` (6.1) | which structures work as a context | 19/19 | 19/19 | 15/19 | 19/19 |
+| `context-write` (6.5) | whether a write is readable afterwards | 10/11 | 11/11 | 4/11 | 3/11 |
+| `global-scope` (6.4) | which globals are reachable, and whether a write is contained | 14/17 | 16/17 | 14/17 | 10/17 |
+| `cache` (8.4) | whether it keeps answering in every state of its code cache | 5/5 | 5/5 | 5/5 | 5/5 |
+| **All six** | | **99/105** | **102/105** | **88/105** | **70/105** |
 
-**`no` and *defect* are not the same statement.** `no` is a freedom this section grants: the
-implementations may differ there and neither answer is wrong. *defect* means this document
-demands it and that implementation does not keep it yet — the last two rows are rules, not
-choices, and `BACKLOG.md` carries their fixes. A consumer picking an executer has to read both
-columns for that reason.
+**Two capabilities no implementation has**, so they are missing from every column above: a statement
+is a single expression, so two statements separated by a semicolon are not one statement; and every
+generated body runs in **sloppy mode**, which is what makes an unqualified assignment able to create
+a global at all (6.5).
 
-The complete table — every case the suite asks of all four, not only the ones they answer
-differently — is `MATRIX` in `test/ExecuterCapabilities.js`, and every row of it is read by a
-test: a state that stops being true turns the gate red, and so does one that starts being true.
-That file is the authority; this one is written from it by hand, because the suite runs in a
-browser and cannot read a document.
+What a consumer picking an implementation has to know, beyond the counts:
 
-The dialect is no row of the table, because it is not a yes or no - but it is the difference that
-changes how an expression is written, so it is spelled out here.
-`WithScopedExecuter`, `ContextDeconstructorExecuter` and `EsprimaExecuter` put the properties of
-the context into scope: the property `value` is addressed as `${value}`. `ContextObjectExecuter`
-does not — it hands the context to the statement as the object `ctx`, and the same property is
-addressed as `${ctx.value}`. An executer may make such a demand; what it may not do is change
-which resolver of the chain answers a lookup, or any other rule of this document. Switching executer
-can therefore mean rewriting expressions, and that is intended, not a defect.
+- **`with-scoped-executer`** — a write to a name no resolver of the chain carries is neither
+  contained nor readable afterwards: it falls out of the `with` block onto the global object. Its
+  cost is elsewhere, in the chain walk a `with` block performs; see the note on the default in 8.2.
+- **`context-object-executer`** — the most complete of the four, and the only one that contains an
+  unqualified write to an unknown name, because its dialect writes through the context proxy. The
+  price is the dialect itself: every expression addresses the context as `ctx.value`.
+- **`context-deconstruction-executer`**, the default — it **reads every name of a context before it
+  runs anything**, so a context whose accessor throws breaks every statement over it and a getter is
+  evaluated even where the statement never touches it. It **loses `this`** inside a method of the
+  context called without naming its object. And a write from inside a statement does not survive it
+  in any form but one: a *mutation* of an object the context holds. A plain assignment, a counting
+  one, an inherited name, one made in a nested function — none is readable afterwards.
+- **`esprima-executer`** — the least complete, and the differences are not scattered: its rewrite
+  never enters a **function body**, so no context value is reachable inside an arrow, a function
+  expression, a default parameter or a callback; it never walks into an **object or array literal, a
+  ternary, a computed key, a spread or a tagged template**, so a context name in any of those is
+  lost; it cannot run an **assignment** of any form whose target is a context name; it reaches only
+  the globals its own list names (`Object`, `Array`, `Map`, `Set`, `console`, `fetch`, `window`) and
+  not `Math`, `JSON`, `Date`, `Promise`, `document`, or anything the application itself put there;
+  and it cannot execute a **class field**, which is a limit of its code generator rather than of the
+  rewrite.
+
+The complete catalogue — 105 rows, every one read by a test under all four implementations — is
+`CAPABILITIES` in `test/ExecuterCapabilities.js`. **That file is the authority and this table is
+written from it by hand**, because the suite runs in a browser and cannot read a document. Both
+directions are guarded there: a capability that stops working turns the gate red, and so does one
+that starts working.
+
+**The dialect is not a capability**, because it is not a yes or no — but it is the difference that
+changes how an expression is written, so it is spelled out here. `WithScopedExecuter`,
+`ContextDeconstructorExecuter` and `EsprimaExecuter` put the properties of the context into scope:
+the property `value` is addressed as `${value}`. `ContextObjectExecuter` does not — it hands the
+context to the statement as the object `ctx`, and the same property is addressed as `${ctx.value}`.
+An executer may make such a demand; what it may not do is change which resolver of the chain answers
+a lookup, or any other behaviour of the resolver. Switching executer can therefore mean rewriting
+expressions, and that is intended, not a defect.
 
 ### 8.4 Tuning
 
@@ -630,5 +662,5 @@ Every rule above that the code does not keep today, in one place:
 | 4.1 the configuration form of the static calls | The static entry points take no configuration object |
 | 4.2 `context` defaults to the executer's default context | The executer's `defaultContext` has no reader left |
 | 6.3 leaving `context` out differs from `context: null` | The executer's `defaultContext` has no reader left |
-| 6.5 no write reaches the global object | A write to an unknown name inside an expression lands on `globalThis` |
+| 6.5 the `allowGlobalWrite` switch, at all three levels | A write to an unknown name inside an expression lands on `globalThis` |
 | 6.7 `allowGlobalWrite` as an option of `buildSecure` | A write to an unknown name inside an expression lands on `globalThis` |

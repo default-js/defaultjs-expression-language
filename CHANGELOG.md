@@ -55,7 +55,35 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   than a capability, and it is marked as such. 8.2 no longer describes the limits of
   `esprima-executer` in prose; the table carries them.
 
+  **Revised again on 2026-09-05**: section 8.3 is now **Capabilities of an executer** and describes
+  the whole surface instead of the differences — six capabilities, measured across 105 cases per
+  implementation, with a count per capability and per executer and a paragraph on what each one
+  cannot do. The vocabulary is settled with it: *behaviour* is what the resolver does and holds under
+  every executer, *capability* is what an executer supports. **An executer has capabilities and
+  nothing else**, so the distinction between a difference and a broken rule is gone from that
+  section; where an implementation lacks something that ought to arrive, `BACKLOG.md` says so.
+  What the measurement changed for a reader picking an executer: `esprima-executer` reaches a context
+  value in far fewer places than the old table showed — never inside a function body, and not inside
+  an object or array literal, a ternary, a computed key, a spread or a tagged template — and
+  `context-deconstruction-executer`, the default, loses `this` inside a method of the context and
+  keeps no write from an expression except a mutation of an object the context already holds.
+
 ### Changed
+
+- **The specification no longer promises that a write from inside an expression stays off the global
+  object.** `SPECIFICATION.md` 6.5 carried that as a guarantee, conditional on a switch that was
+  never implemented. It is **withdrawn** and restated as a capability of the executer in use,
+  measured per implementation in 8.3, because the package cannot keep it: only an executer can
+  intercept an assignment, and three of the four shipped today let an unqualified one reach the
+  global object in at least one shape. Nothing about the code changed here — what changed is that
+  the document now says what the code does. Concretely, and worth knowing for anyone who read the
+  guarantee: under `with-scoped-executer` and `context-deconstruction-executer` (the default) a write
+  to a name no resolver of the chain carries creates a global; under `esprima-executer` it does so
+  from inside a function written in the statement; only `context-object-executer` contains it. An
+  explicit `globalThis.x = 1` reaches the global object under every one of them. **This package does
+  not sandbox the global object**, and `buildSecure` (6.7) never claimed to. The `allowGlobalWrite`
+  switch stays in the document as pending, with its reach bounded by what the executer can intercept;
+  `BACKLOG.md` carries the open question of whether it is still worth having on those terms.
 
 - **`resolve` no longer catches an error — it logs it and hands it on.** A statement that fails
   used to answer `undefined`, or the default value where one was passed, and the caller had no way

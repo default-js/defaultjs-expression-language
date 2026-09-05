@@ -229,6 +229,16 @@ Entries here are independent of each other. An undertaking whose steps depend on
   tail of the deepest. Note that the same file's own comment explains why the tail is reused: a
   bench file has nowhere to put setup. Found 2026-08-29 while measuring the whole cycle for goal 5.
 
+- [ ] **Coverage as of 2026-09-05, and why it is not comparable to the line below.**
+  Statements **91.65 %** (516/563), branches **90.35 %** (253/280), functions **90.26 %** (102/113),
+  lines **93.90 %** (462/492), measured after the capability catalogue was finished — 732 cases where
+  436 ran before it. **The percentages fell while 296 cases were added**, and the reason is not the
+  suite: `30e5623` added 20 statements and 18 lines to `ContextDeconstructorExecuter.js`, nine of them
+  unreachable (`generate` and `getOrCreateFunction`, which nothing calls since the draft took over).
+  Until that draft is finished or reverted, no comparison against the 2026-09-01 numbers below says
+  anything — **re-measure then**, and expect the uncovered set to be the list below minus nothing:
+  the catalogue covers behaviour, not lines, and every item that was uncovered on 2026-09-01 still is.
+
 - [ ] **Coverage as of 2026-09-01, and the four things still uncovered.**
   Statements **92.81 %** (504/543), branches **91.00 %** (253/278), functions **91.58 %** (98/107),
   lines **95.56 %** (453/474). Measured after the executer conformance work; the numbers before it
@@ -346,7 +356,15 @@ Entries here are independent of each other. An undertaking whose steps depend on
   descriptor hands out a getter rather than a value (6.2), so this is the executer's doing alone.
 
 - [ ] **A write to an unknown name inside an expression lands on `globalThis`.**
-  Target: `SPECIFICATION.md` 6.5 — the negative guarantee and the three-level switch.
+  **Not a broken rule since 2026-09-05 — a capability three of the four executers lack.**
+  `SPECIFICATION.md` 6.5 carried this as a negative guarantee until that day; the guarantee is
+  withdrawn, because only an executer can keep it and the package cannot require it of one (see
+  `DECISIONS.md`, same day). What is left here is two things: **whether the three that leak should
+  gain the containment**, which is what the rest of this entry describes, and **whether the
+  `allowGlobalWrite` switch is still worth having** now that its *off* state can only mean *under the
+  executers able to intercept an assignment* — under one that cannot, it means nothing at all. Decide
+  the second before implementing the first; the rest of the entry was written while 6.5 still
+  promised the containment, and reads as a fix for a defect rather than as a capability to add.
   Verified 2026-08-22 against `src/` under node 24.19 with both executers: `${brandNew = 1}`
   leaves the resolver's own context untouched and sets `globalThis.brandNew`. Under
   `WithScopedExecuter` the `has` trap answers false for a name the chain does not carry
@@ -659,3 +677,21 @@ Entries here are independent of each other. An undertaking whose steps depend on
   Consumer-visible, so the outcome belongs in `CHANGELOG.md`. One boundary belongs in the same
   note: a name the context does **not** carry is not destructured either, so nothing is written
   back for it - `${ x = 5 }` stays the global-write case of 6.5 and is not covered by this.
+  **The draft committed as `30e5623` does not work, verified 2026-09-05.** It writes back only where
+  `Object.getOwnPropertyDescriptor(ctx, name)?.writable` is true, but the context is the proxy of
+  `ResolverContextHandle`, whose `getOwnPropertyDescriptor` trap answers an **accessor** descriptor
+  (`get`, `enumerable`, `configurable`). `writable` is `undefined` there, so nothing is ever copied
+  back. Shown by the gate rather than argued: `makes a write to a name the context carries readable
+  afterwards` is `no` for this executer and runs as `it.fails` — with the draft in the tree it still
+  fails, and a working write-back would have turned the gate red with `Expect test to fail`. The
+  draft described above used a **comparison** guard (`if (counter !== context.counter)`), which does
+  not depend on a descriptor; that is the difference. Two more things the same commit brought, both
+  with entries of their own above: a context key named `ctx` now breaks every statement, and nine
+  lines of the file are unreachable.
+  **What the write-back has to achieve is measured since 2026-09-05**, as ten rows of
+  `test/executer/capabilities/context-write.Test.js`: today this executer keeps exactly one of them,
+  a *mutation* of an object the context holds, and misses a plain write, a counting one across two
+  occurrences, an inherited name, one made inside a nested function, one made before the statement
+  threw, a rebinding, and a name no resolver carries. Those rows are the acceptance criteria, and two
+  of them decide questions the draft left open — where an inherited name lands, and whether a write
+  survives a statement that throws.
