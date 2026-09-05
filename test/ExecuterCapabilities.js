@@ -349,7 +349,9 @@ export const CAPABILITIES = {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
 			"keeps resolving with the cache switched off":                             [ YES,         YES,            YES,            YES ],
 			"caches again after being switched back on":                               [ YES,         YES,            YES,            YES ],
-			"serves a cached expression to a different context":                        [ YES,         YES,            YES,            YES ]
+			"serves a cached expression to a different context":                        [ YES,         YES,            YES,            YES ],
+			"serves a statement to a context that did not carry its name before":      [ YES,         YES,            YES,            YES ],
+			"keeps answering while its cache evicts":                                  [ YES,         YES,            YES,            YES ]
 		}
 	}
 };

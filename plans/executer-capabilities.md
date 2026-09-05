@@ -453,7 +453,33 @@ Each stage is green before the next one starts, and no stage changes a source fi
      a destructuring assignment both pass, because the rewrite never reaches *their* targets. The
      second of those passes while leaking the name onto the global object, which is now a
      `BACKLOG.md` line of its own.
-4. **`cache`**, and the contract tests of 8.1/8.2 as plain cases.
+4. **`cache` and the contract — done 2026-09-05, gate green.** `cache` went from 3 rows to 5; 2 new
+   rows, 8 new cases. Before: 724 cases, 67 expected fails. After: **732 cases, 67 expected fails** —
+   both new rows are `yes` under all four, so the failure count does not move.
+
+   **The contract half produced no cases at all, deliberately.** Everything this stage was to add is
+   already pinned, each in exactly one place, and a per-executer copy would be the same fact in a
+   second place — which `TESTING.md` §4 forbids:
+
+   - *is reachable through `getExecuter` by its registered name* is the **same assertion** as
+     `registers itself on import of its module`, which already reads
+     `getExecuter(name) instanceof Executer` — and that one assertion is the whole contract: an
+     instance of `Executer` has `defaultContext` and `execute` by construction.
+   - *is accepted as an instance by the constructor* is a rule of the **resolver**, pinned once in
+     `test/spec/4.2-the-instance-entry-points.Test.js`. Asking it of four implementations would ask
+     the resolver the same question four times.
+   - the interface itself (`defaultContext`, `execute`, the registry) is pinned once in
+     `test/spec/8.1-the-interface.Test.js` against an ad-hoc executer, and the module exports
+     (`EXECUTERNAME`, `setupExecuter`, `setDebug`) per module in
+     `test/spec/9-the-public-surface.Test.js`.
+
+   **One of the two cache facets was sharpened rather than written as planned.** *Serves a cached
+   expression to a context carrying different names* would have repeated the existing row, which
+   already widens the context. What it became instead asks what that row cannot: the **first** context
+   does not carry the name the statement reads and the second one does, so an executer that compiles
+   context names into its code has to key its cache on them or serve code that never looks the name
+   up. The other facet, eviction, asks the executer side of what `test/general/CodeCacheTest.js` pins
+   on the cache alone — an evicted entry is compiled again and answers the same.
 5. **The documents.** `SPECIFICATION.md` in three places: 8.3 rewritten from the finished catalogue by
    hand under a capability heading — the suite runs in a browser and cannot read a document, so both
    sides move together — the vocabulary carried through, and **6.5 rewritten** so the containment is a
