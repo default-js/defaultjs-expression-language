@@ -30,11 +30,83 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(await resolver.resolveText("${ window.Math.round(1.5) }")).toBe("2");
 		});
 
-		// Where the executer does not reach the global, the statement raises and the expression stands
-		// as written (7) - a different answer, not an error the caller sees.
-		capabilityIt("reaches a global that no resolver carries", async () => {
+		// **One case per global.** For three of the four a global is an ordinary free identifier and
+		// the whole block below answers alike; the esprima executer decides name by name, because its
+		// rewrite leaves alone only what `RESERVED_NAMES` lists and turns everything else into
+		// `ctx?.name`. Where it does not reach one, the statement raises and the expression stands as
+		// written (7) - a different answer, not an error the caller sees.
+		capabilityIt("reaches the global Math", async () => {
 			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
 			expect(await resolver.resolveText("${ Math.round(1.5) }")).toBe("2");
+		});
+
+		capabilityIt("reaches the global JSON", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ JSON.stringify(1) }")).toBe("1");
+		});
+
+		capabilityIt("reaches the global Date", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ Date.now() > 0 }")).toBe(true);
+		});
+
+		capabilityIt("reaches the global Promise", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve('${ await Promise.resolve("resolved") }')).toBe("resolved");
+		});
+
+		// The four `RESERVED_NAMES` carries by name, read through `.name` so that the case says
+		// nothing but whether the identifier arrived.
+		capabilityIt("reaches the global Object", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ Object.name }")).toBe("Object");
+		});
+
+		capabilityIt("reaches the global Array", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ Array.name }")).toBe("Array");
+		});
+
+		capabilityIt("reaches the global Map", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ Map.name }")).toBe("Map");
+		});
+
+		capabilityIt("reaches the global Set", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ Set.name }")).toBe("Set");
+		});
+
+		// `console` and `fetch` are the two the esprima rewrite treats through a second list
+		// (`CALLEXPRESSION__RESERVED__CALLEES`), so they are worth a row apart from the four above.
+		// Asked with `typeof` rather than by calling them: a case must not depend on the network, and
+		// a case must not write to the console.
+		capabilityIt("reaches the global console", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ typeof console }")).toBe("object");
+		});
+
+		capabilityIt("reaches the global fetch", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ typeof fetch }")).toBe("function");
+		});
+
+		capabilityIt("reaches the global document", async () => {
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			expect(await resolver.resolve("${ document.body.tagName }")).toBe("BODY");
+		});
+
+		// Not a builtin but a name the application put there - the shape a consumer of this package
+		// actually meets, and the one a hand-written list of reserved names can never carry.
+		capabilityIt("reaches a global the caller planted", async () => {
+			const planted = `planted_${executer.replace(/-/g, "_")}`;
+			globalThis[planted] = "from global";
+			try {
+				const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+				expect(await resolver.resolve(`\${ ${planted} }`)).toBe("from global");
+			} finally {
+				delete globalThis[planted];
+			}
 		});
 
 		// The leak is read and cleaned up before the assertion, because a failing case stops at the

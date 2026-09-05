@@ -398,6 +398,17 @@ Entries here are independent of each other. An undertaking whose steps depend on
      `esprima-executer`. The negative guarantee is therefore about the *accidental* leak of an
      unqualified name, never about sandboxing a statement that asks for the global object by name.
      6.5 has to say that, or a reader takes it for a sandbox.
+  4. **A third leak under `esprima-executer`, found 2026-09-05 while measuring the syntax forms:**
+     the rewrite does not walk into the elements of an array pattern either, so
+     `${ [name] = ["hit"] }` leaves `name` a free identifier and the sloppy assignment creates a
+     global. The case that found it deletes the name again
+     (`executes a destructuring assignment`, `test/executer/capabilities/syntax.Test.js`) — the leak
+     itself is this entry's business.
+  5. **No executer runs its statement in strict mode**, pinned as `runs the statement in strict mode`
+     with `no` in all four columns. That is the property the agreed fix leans on — the deconstructor's
+     protected state was to be a strict-mode body — so it is worth knowing that today not one of the
+     four is strict: `new Function` produces a sloppy body, and the `with`-based executer could not be
+     strict at all.
 
 - [ ] **`EsprimaExecuter` cannot reach a context value from inside a nested function.**
   Its rewrite turns an identifier into `ctx?.name`, but only where the identifier stands in the
@@ -428,6 +439,19 @@ Entries here are independent of each other. An undertaking whose steps depend on
   them - `${ {a: 4}.a }` - so they pin the parser rather than the rewrite. This strengthens the case
   already made in the entry above: one pass over the rewrite, not one fix per shape. Found while
   working out the fine-grained capability catalogue, `plans/executer-capabilities.md`.
+  **All of it measured on 2026-09-05** and pinned in `test/executer/capabilities/context-scope.Test.js`
+  - every predicted shape answers as predicted, and five function shapes join them: an arrow with
+  either body, a function expression, a default parameter and an async function, all from
+  `IGNORED_TYPES`. What the rewrite *does* reach is pinned too, because that was equally unwritten:
+  both sides of `??`, a deep member access and an optional chain.
+  **A third cause turned up beside the rewrite: the code generator.** `escodegen` 2.1.0 has no
+  generator for a class field - `(class { static value = 7; })` raises `this[type] is not a function`
+  before anything runs, while a class expression carrying a method regenerates cleanly. Verified
+  against the library directly, not only through the suite. So this executer's limits come from three
+  places, and a pass over the rewrite closes only two of them: what the traversal does not visit,
+  what `ctx?.name` cannot be (an assignment target, a `new` callee), and what escodegen cannot write
+  back out. Pinned as `evaluates a class field` in
+  `test/executer/capabilities/syntax.Test.js`.
 
 - [ ] **`RESERVED_NAMES` in the esprima executer misspells `global`.**
   Related to `SPECIFICATION.md` 6.4, because it decides what an expression can reach.
@@ -459,6 +483,12 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `await`, `async`, `this`, `typeof`, `instanceof`, `undefined` — are syntax, not identifiers, and
   have to survive the change. Consumer-visible, so the outcome belongs in `DECISIONS.md` and in
   `CHANGELOG.md`.
+  **The whole reach is measured since 2026-09-05**, one row per global in
+  `test/executer/capabilities/global-scope.Test.js`, so the decision no longer rests on `Math` alone.
+  Reachable: `Object`, `Array`, `Map`, `Set`, `console`, `fetch`, and `window` — which is the list,
+  read back out. Not reachable: `Math`, `JSON`, `Date`, `Promise`, `document`, and **any global the
+  application itself planted**, which is the case a hand-written list can never carry and the
+  strongest argument for deriving it. The other three executers answer all twelve.
 
 - [ ] **The static entry points take no configuration object.**
   Target: `SPECIFICATION.md` 4.1.

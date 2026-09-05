@@ -103,7 +103,44 @@ export const CAPABILITIES = {
 			// `x = 5` is rewritten to `ctx?.x = 5` by the esprima executer, which is not a legal
 			// assignment target, so it cannot run an assignment at all - independent of where the
 			// value would land, which is `context-write`.
-			"executes a statement carrying an assignment":                            [ YES,         YES,            YES,            NO ]
+			"executes a statement carrying an assignment":                            [ YES,         YES,            YES,            NO ],
+			// The assignment forms are the exception to "constants only" - an assignment needs a
+			// target, and a target is a binding. Three of the four fail under esprima for one cause,
+			// `ctx?.name` as a target; the two that pass do so because the rewrite never reaches their
+			// target at all - a member of a literal, and the elements of an array pattern.
+			"executes a compound assignment":                                         [ YES,         YES,            YES,            NO ],
+			"executes an increment":                                                  [ YES,         YES,            YES,            NO ],
+			"executes a member assignment on an object literal":                      [ YES,         YES,            YES,            YES ],
+			"executes a destructuring assignment":                                    [ YES,         YES,            YES,            YES ],
+			"evaluates a function expression":                                        [ YES,         YES,            YES,            YES ],
+			"evaluates a class expression":                                           [ YES,         YES,            YES,            YES ],
+			// Not the rewrite this time but the code generator: escodegen 2.1.0 has no generator for
+			// a class field and raises before anything runs. Verified against the library directly on
+			// 2026-09-05, which is why the class expression above is a separate row and `yes`.
+			"evaluates a class field":                                                [ YES,         YES,            YES,            NO ],
+			"evaluates a new expression":                                             [ YES,         YES,            YES,            YES ],
+			"evaluates an array spread":                                              [ YES,         YES,            YES,            YES ],
+			"evaluates an object spread":                                             [ YES,         YES,            YES,            YES ],
+			"evaluates an optional chain":                                            [ YES,         YES,            YES,            YES ],
+			"evaluates a nullish coalescing operator":                                [ YES,         YES,            YES,            YES ],
+			"evaluates a logical operator":                                           [ YES,         YES,            YES,            YES ],
+			"evaluates a ternary":                                                    [ YES,         YES,            YES,            YES ],
+			"evaluates a comma sequence":                                             [ YES,         YES,            YES,            YES ],
+			"evaluates typeof":                                                       [ YES,         YES,            YES,            YES ],
+			"evaluates instanceof against a class expression":                        [ YES,         YES,            YES,            YES ],
+			"evaluates the in operator":                                              [ YES,         YES,            YES,            YES ],
+			"evaluates delete":                                                       [ YES,         YES,            YES,            YES ],
+			"evaluates an exponentiation":                                            [ YES,         YES,            YES,            YES ],
+			// **Two rows nobody keeps**, and both are worth having. A statement stands in expression
+			// position, so two of them are not one statement - and note that three of the four do not
+			// raise: their body is `return <statement>`, where `1; 2` parses as a return of 1 followed
+			// by a second statement, so the answer is 1 rather than an error.
+			"executes two statements separated by a semicolon":                       [ NO,          NO,             NO,             NO ],
+			// Every generated body is sloppy - `new Function` produces one, and the `with`-based
+			// executer could not be strict at all. This is the row the containment of a global write
+			// hangs on (6.5): in sloppy mode an undeclared assignment creates a global and a bare call
+			// has `globalThis` as its receiver. Measured 2026-09-05.
+			"runs the statement in strict mode":                                      [ NO,          NO,             NO,             NO ]
 		}
 	},
 
@@ -252,9 +289,30 @@ export const CAPABILITIES = {
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
 			"reaches a global through window":                                         [ YES,         YES,            YES,            YES ],
-			// the esprima rewrite leaves only the identifiers of RESERVED_NAMES alone, so `Math`
-			// becomes `ctx?.Math` and the call raises. BACKLOG.md carries the rework of that list.
-			"reaches a global that no resolver carries":                               [ YES,         YES,            YES,            NO ],
+			// **One row per global, decided by Frank on 2026-09-05.** For three executers a global is
+			// just a free identifier and the whole group answers alike; for the esprima executer the
+			// answer is decided name by name, because its rewrite leaves alone only what
+			// `RESERVED_NAMES` lists and turns everything else into `ctx?.name`. A single row saying
+			// "reaches a global" hid that it reaches some and not others - which is what the list is
+			// really worth to a consumer of that executer. `Math` is the case that was that single
+			// row until this stage.
+			// **The list, read out one name at a time.** The esprima column below *is*
+			// `RESERVED_NAMES` (EsprimaExecuter.js:27): what it names is reachable, everything else
+			// becomes `ctx?.name` and answers undefined. Measured 2026-09-05, and this is the reach a
+			// consumer of that executer actually gets.
+			"reaches the global Math":                                                 [ YES,         YES,            YES,            NO ],
+			"reaches the global JSON":                                                 [ YES,         YES,            YES,            NO ],
+			"reaches the global Date":                                                 [ YES,         YES,            YES,            NO ],
+			"reaches the global Promise":                                              [ YES,         YES,            YES,            NO ],
+			"reaches the global Object":                                               [ YES,         YES,            YES,            YES ],
+			"reaches the global Array":                                                [ YES,         YES,            YES,            YES ],
+			"reaches the global Map":                                                  [ YES,         YES,            YES,            YES ],
+			"reaches the global Set":                                                  [ YES,         YES,            YES,            YES ],
+			"reaches the global console":                                              [ YES,         YES,            YES,            YES ],
+			"reaches the global fetch":                                                [ YES,         YES,            YES,            YES ],
+			"reaches the global document":                                             [ YES,         YES,            YES,            NO ],
+			// The shape a consumer actually meets, and the one a hand-written list can never carry.
+			"reaches a global the caller planted":                                     [ YES,         YES,            YES,            NO ],
 			// A capability since 2026-09-05, not a broken rule: with-scoped lets an assignment to an
 			// unknown name fall out of the `with` block into global scope, the deconstructor generates
 			// a sloppy-mode body where an undeclared assignment does the same. `SPECIFICATION.md` 6.5

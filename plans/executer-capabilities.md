@@ -428,7 +428,31 @@ Each stage is green before the next one starts, and no stage changes a source fi
    - **The getter pair** — one that throws, one that counts its reads — is `no` for the deconstructor
      twice, which is the cost of reading every name before running anything, now observable rather
      than inferred from the `arguments` shape.
-3. **`global-scope` (the reachability half) and `syntax`.**
+3. **`global-scope` (the reachability half) and `syntax` — done 2026-09-05, gate green.** `syntax`
+   went from 5 rows to 27, `global-scope` from 6 to 17; 33 new rows, 132 new cases. Before: 592
+   cases, 51 expected fails. After: **724 cases, 67 expected fails** — the 16 new `no` cells, counted
+   against the table. One row was renamed: `reaches a global that no resolver carries` is now
+   `reaches the global Math`, so that it is not the one member of its group without a name.
+
+   - **The esprima column of `global-scope` is `RESERVED_NAMES`, read back out.** Reachable:
+     `Object`, `Array`, `Map`, `Set`, `console`, `fetch`, `window`. Not reachable: `Math`, `JSON`,
+     `Date`, `Promise`, `document`, and **any global the application planted** — the case a
+     hand-written list can never carry, and the argument for deriving it that the `BACKLOG.md` entry
+     was missing. The other three answer all twelve.
+   - **A third cause of the esprima limits turned up, and it is not the rewrite**: `escodegen` 2.1.0
+     has no generator for a class field. `(class { static value = 7; })` raises before anything runs,
+     while a class expression with a method regenerates cleanly — verified against the library
+     directly, which is why `evaluates a class expression` and `evaluates a class field` are two rows
+     and answer differently. A pass over the rewrite closes two of the three causes, not all.
+   - **Two rows nobody keeps**, both worth having: two statements separated by a semicolon (and three
+     of the four do not even raise — their body is `return <statement>`, so `1; 2` answers 1), and
+     **strict mode**, which no executer runs. The second is the property the agreed fix for the
+     global write leans on.
+   - **The assignment forms split four ways**, where 8.2 had one case: `=`, `+=` and `++` are `no`
+     under esprima for one cause, `ctx?.name` as a target — while a member assignment on a literal and
+     a destructuring assignment both pass, because the rewrite never reaches *their* targets. The
+     second of those passes while leaking the name onto the global object, which is now a
+     `BACKLOG.md` line of its own.
 4. **`cache`**, and the contract tests of 8.1/8.2 as plain cases.
 5. **The documents.** `SPECIFICATION.md` in three places: 8.3 rewritten from the finished catalogue by
    hand under a capability heading — the suite runs in a browser and cannot read a document, so both
