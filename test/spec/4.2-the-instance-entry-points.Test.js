@@ -7,10 +7,10 @@ import Executer from "../../src/Executer.js";
 /**
  * SPECIFICATION.md 4.2 - the constructor and the instance entry points.
  *
- * What an omitted context means (6.3, 6.4) and allowGlobalWrite (6.5) are deliberately not pinned
+ * What an omitted context means (6.2, 6.4) is deliberately not pinned
  * here: both are only observable through section 6 and both are carried in BACKLOG.md.
  * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
+ * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();

@@ -4,7 +4,7 @@ import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
 
 /**
  * Capability `context-write` - whether a write from inside a statement is readable afterwards.
- * Read against SPECIFICATION.md 6.5.
+ * Read against SPECIFICATION.md 9.7; where a write lands once it is let through is 6.5.
  *
  * 6.5 promises nothing about a written value being readable, so an executer that loses a write says
  * `no` and is not wrong. What the facets separate is *what kind* of write survives: a plain one, a

@@ -1,7 +1,7 @@
 # How tests are written here
 
 The rules a new test case follows, and the reasons in one line each. The reasoning in full is in
-`DECISIONS.md` (2026-09-01, four entries); `SPECIFICATION.md` says what is true, this file says where
+`DECISIONS.md` (four entries of 2026-09-01, four of 2026-09-05); `SPECIFICATION.md` says what is true, this file says where
 a case saying it belongs and what it may assert.
 
 Four things are tested, and each has one place:
@@ -39,12 +39,12 @@ implements and the promise to execute an expression, nothing is demanded of it �
 becomes a capability if the executer is the component that does the work. If the resolver would keep
 the rule no matter which implementation ran the statement, it is step 4.
 
-A rule with halves in `test/spec/` and `test/executer/` gets a file on each — 6.1, 6.5, 7 and 8.2 are
+A rule with halves in `test/spec/` and `test/executer/` gets a file on each — 6.4, 6.5, 7 and 9.2 are
 the ones today. The directory is the answer to "how is this tested", the file name is the answer to
 "which capability or which rule is it".
 
 **The marker for a case in the wrong place:** you have to teach `TestExecuter` something specific to
-keep it in `test/spec/`. What an executer decides for itself (8.3 — reaching a global, intercepting
+keep it in `test/spec/`. What an executer decides for itself (9.3 — reaching a global, intercepting
 a write, the dialect) is never asserted there.
 
 ## 2. Files
@@ -115,10 +115,10 @@ entry — but that is a plan, not a state of the table.
 - **`context-scope`** — does it still see the context? The same construct, carrying one.
 
 A case that puts a context name inside a construct answers both at once, and a failure then does not
-say which broke. Which is why `evaluates an object literal` reads `yes` for all four today: it uses
-`{a: 4}`, so it pins the parser rather than the rewrite — and whether `{a: value}` answers under
-every executer is a question nothing in the suite asks yet. `BACKLOG.md` carries what reading the
-esprima traversal predicts about that.
+say which broke. That is not a hypothetical: `evaluates an object literal` used `{a: 4}` and read
+`yes` for all four, while `reaches a context value inside an object literal` — the same construct
+carrying a name — reads `no` for one of them. Splitting the question found 13 such gaps in a suite
+that had been green over them.
 
 **Never write a case that pins what an executer answers instead.** A `no` says everything; a second
 case asserting the other answer is the same fact in a second place, and the day the capability

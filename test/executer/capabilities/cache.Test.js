@@ -4,7 +4,7 @@ import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
 
 /**
  * Capability `cache` - whether the executer keeps answering in every state of its code cache.
- * Read against SPECIFICATION.md 8.4.
+ * Read against SPECIFICATION.md 9.9, and 9.10 for `setupExecuter` itself.
  *
  * `setupExecuter` is the only way a consumer reaches the code cache of an executer, and it is the
  * path both cache defects of 2026-08-21 sat behind. What it cannot do is change a result: a cache

@@ -114,6 +114,31 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(leaf.getData("leafOnly")).toBe("replaced");
 	});
 
+	// A resolver keeps the object it was handed rather than a copy, so the three methods that write
+	// write into it and code outside the resolver sees the change. Written down on 2026-09-05 after
+	// the code said one thing and AGENTS.md another; one case per method, because a caller who shares
+	// a context has to be able to rely on all three and not on whichever one was measured.
+	it("updateData writes into the object the caller handed over", async () => {
+		const handed = { value: "before" };
+		const resolver = new ExpressionResolver({ context: handed, name: "root" });
+		resolver.updateData("value", "after");
+		expect(handed.value).toBe("after");
+	});
+
+	it("deleteData removes the key from the object the caller handed over", async () => {
+		const handed = { value: "before" };
+		const resolver = new ExpressionResolver({ context: handed, name: "root" });
+		resolver.deleteData("value");
+		expect("value" in handed).toBe(false);
+	});
+
+	it("mergeContext writes into the object the caller handed over", async () => {
+		const handed = { value: "before" };
+		const resolver = new ExpressionResolver({ context: handed, name: "root" });
+		resolver.mergeContext({ added: "a" });
+		expect(handed.added).toBe("a");
+	});
+
 	it("mergeContext is shallow - a merged object replaces rather than merges", async () => {
 		const resolver = new ExpressionResolver({ context: { holder: { keep: 1 } }, name: "root" });
 		resolver.mergeContext({ holder: { fresh: 2 } });

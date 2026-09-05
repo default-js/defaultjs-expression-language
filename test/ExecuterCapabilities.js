@@ -36,13 +36,13 @@ import { EXECUTERNAME as EsprimaExecuterName, setupExecuter as setupEsprimaExecu
  *   `ResolverContextHandle`, and every executer gets it for free. They stay in `test/executer/rules/`
  *   as plain `it`, asked of every implementation because `TestExecuter` evaluates nothing and they
  *   cannot be seen without a real one.
- * - **The interface contract** - `defaultContext` and `execution` (8.1), registering on import and
- *   being reachable by name (8.2). An implementation that fails it is not an executer, so it is no
+ * - **The interface contract** - `defaultContext` and `execution` (9.1), registering on import and
+ *   being reachable by name (9.2). An implementation that fails it is not an executer, so it is no
  *   yes/no axis.
  * - **The dialect** - a spelling is not a yes or no. It is carried as `variableName` on the executer
  *   entry below.
  *
- * `SPECIFICATION.md` 8.3 carries the same table for a human reader and is written from this one by
+ * `SPECIFICATION.md` 9.3 to 9.9 carry the same table for a human reader, written from this one by
  * hand: the suite runs in a browser and cannot read a document, so a change has to go into both.
  */
 
@@ -53,7 +53,7 @@ export const NO = "no";
  * Every registered executer, each with the name a statement has to use to reach a given property
  * of the context under it. Three of them put the context properties into scope, so the property
  * `value` is the variable `value`; ContextObjectExecuter hands the context to the statement as
- * the object `ctx`, so the same property is `ctx.value`. SPECIFICATION.md 8.3 grants an executer
+ * the object `ctx`, so the same property is `ctx.value`. SPECIFICATION.md 9.3 grants an executer
  * that freedom - see DECISIONS.md, 2026-08-24.
  *
  * The benchmarks loop over the same list, which is why each entry also carries its `setupExecuter`:
@@ -92,7 +92,7 @@ export const CAPABILITIES = {
 	 * it run, and does it still see the context) and a failure would not say which.
 	 */
 	syntax: {
-		specification: "3.4, 8.2",
+		specification: "9.4",
 		description: "Which JavaScript constructs the executer can run, with constants inside them.",
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
@@ -149,7 +149,7 @@ export const CAPABILITIES = {
 	 * is where the four differ most, and where the dialect applies without being a row.
 	 */
 	"context-scope": {
-		specification: "8.3",
+		specification: "9.5",
 		description: "Whether a construct carrying a context name still reaches that value.",
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
@@ -207,7 +207,7 @@ export const CAPABILITIES = {
 	 * accepts rather than by a rule nobody wrote.
 	 */
 	"context-shape": {
-		specification: "6.1",
+		specification: "9.6",
 		description: "Which context structures the executer can run a statement over.",
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
@@ -249,7 +249,7 @@ export const CAPABILITIES = {
 	 * written is there afterwards.
 	 */
 	"context-write": {
-		specification: "6.5",
+		specification: "9.7",
 		description: "Whether a write from inside a statement is readable afterwards.",
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
@@ -284,7 +284,7 @@ export const CAPABILITIES = {
 	 * carries can be caught before it reaches the global object.
 	 */
 	"global-scope": {
-		specification: "6.4, 6.5, 8.3",
+		specification: "9.8",
 		description: "Which globals a statement reaches, and whether a write can be contained.",
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
@@ -343,7 +343,7 @@ export const CAPABILITIES = {
 	 * state a consumer can put an executer into keeps resolving.
 	 */
 	cache: {
-		specification: "8.4",
+		specification: "9.9",
 		description: "Whether the executer keeps answering in every state of its code cache.",
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima

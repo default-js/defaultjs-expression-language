@@ -4,7 +4,7 @@ import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
 
 /**
  * Capability `context-shape` - which structures an executer can run a statement over.
- * Read against SPECIFICATION.md 6.1.
+ * Read against SPECIFICATION.md 9.6; what part A promises about a context is 6.1.
  *
  * `SPECIFICATION.md` says nothing about what a context may be, so this table is what answers it: by
  * writing down what each implementation accepts rather than by a rule nobody wrote. Every
@@ -94,7 +94,7 @@ for (const { name: executer, variableName } of EXECUTERS) {
 		});
 
 		// A Map keeps its entries inside itself rather than as properties, so no executer reaches
-		// them - the name of an entry behaves like a name no resolver carries, which 7 and 8.3 cover.
+		// them - the name of an entry behaves like a name no resolver carries, which 7 and 9.8 cover.
 		// What a context of that shape does offer is its prototype, and an accessor there is read
 		// through the proxy with the context as its receiver.
 		capabilityIt("reads an accessor of the prototype of a Map context", async () => {

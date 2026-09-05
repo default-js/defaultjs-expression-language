@@ -8,7 +8,7 @@ import { useTestExecuter, answersFromContext, answerWith, statements } from "../
  * Every case stays on the resolver the call is made on, so it pins the syntax and nothing else -
  * the walk to an ancestor is 5.3 and is asked of every executer.
  * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
+ * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();

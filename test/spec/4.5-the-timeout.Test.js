@@ -5,7 +5,7 @@ import { useTestExecuter, answersFromContext, answerWith } from "../TestExecuter
 /**
  * SPECIFICATION.md 4.5 - the timeout delays the start of the resolution.
  * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
+ * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();

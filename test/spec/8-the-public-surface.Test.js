@@ -7,7 +7,7 @@ import * as ContextDeconstructorModule from "../../src/executer/ContextDeconstru
 import * as EsprimaModule from "../../src/executer/EsprimaExecuter.js";
 
 /**
- * Conformance tests for SPECIFICATION.md section 9 - the public surface.
+ * Conformance tests for SPECIFICATION.md section 8 - the public surface.
  *
  * Existence and shape only. What each member does is pinned by the section that specifies it;
  * this file is the list a consumer can rely on being there, and it is what a removal has to trip
@@ -27,7 +27,7 @@ const EXECUTER_MODULES = [
 	["EsprimaExecuter", EsprimaModule]
 ];
 
-describe("Specification 9 - ExpressionResolver, the static surface", () => {
+describe("Specification 8 - ExpressionResolver, the static surface", () => {
 
 	for (const name of ["resolve", "resolveText", "buildSecure"]) {
 		it(`carries the static method ${name}`, async () => {
@@ -40,14 +40,9 @@ describe("Specification 9 - ExpressionResolver, the static surface", () => {
 		expect(typeof descriptor.get).toBe("function");
 		expect(typeof descriptor.set).toBe("function");
 	});
-
-	// not implemented, waits for BACKLOG.md "A write to an unknown name inside an expression lands on `globalThis`"
-	it.fails("carries allowGlobalWrite", async () => {
-		expect(typeof ExpressionResolver.allowGlobalWrite).toBe("boolean");
-	});
 });
 
-describe("Specification 9 - ExpressionResolver, the instance surface", () => {
+describe("Specification 8 - ExpressionResolver, the instance surface", () => {
 
 	const resolver = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 
@@ -70,15 +65,14 @@ describe("Specification 9 - ExpressionResolver, the instance surface", () => {
 			context: { value: 1 },
 			parent: root,
 			name: "leaf",
-			executer: WithScopedModule.EXECUTERNAME,
-			allowGlobalWrite: false
+			executer: WithScopedModule.EXECUTERNAME
 		});
 		expect(built.name).toBe("leaf");
 		expect(built.parent === root).toBe(true);
 	});
 });
 
-describe("Specification 9 - ExecuterRegistry", () => {
+describe("Specification 8 - ExecuterRegistry", () => {
 
 	for (const name of ["registrate", "getExecuter"]) {
 		it(`carries ${name}`, async () => {
@@ -87,7 +81,7 @@ describe("Specification 9 - ExecuterRegistry", () => {
 	}
 });
 
-describe("Specification 9 - Executer", () => {
+describe("Specification 8 - Executer", () => {
 
 	it("is a class an own implementation can build on", async () => {
 		expect(typeof Executer).toBe("function");
@@ -95,9 +89,9 @@ describe("Specification 9 - Executer", () => {
 	});
 });
 
-describe("Specification 9 - the executer modules", () => {
+describe("Specification 8 - the executer modules", () => {
 
-	// not every module has it, and 8.4 names only setupExecuter - but where a module exports a
+	// not every module has it, and 9.10 names only setupExecuter - but where a module exports a
 	// debug switch it is surface a consumer can reach, so it is pinned rather than left to chance.
 	it("exports setDebug where it has one", async () => {
 		expect(typeof EsprimaModule.setDebug).toBe("function");

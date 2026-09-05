@@ -11,7 +11,7 @@ import { catchError } from "../TestUtils.js";
  * resolver API. What a statement reads through it is asked of every executer in
  * test/executer/rules/6.1-the-proxy.Test.js.
  * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
+ * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();

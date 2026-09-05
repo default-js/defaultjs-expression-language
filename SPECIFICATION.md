@@ -1,18 +1,19 @@
 # Specification — `@default-js/defaultjs-expression-language`
 
-**Written 2026-08-22, for version 3.**
+**For version 3.**
 
-This document says **what the package does**, not why. The reasoning lives in `DECISIONS.md`,
-open work in `BACKLOG.md`, and `README.md` carries the part of this document a consumer needs to
-get started.
+This document says what the package does. `README.md` carries the part of it a consumer needs to get
+started.
 
-It was written from an interview with the author, not from reading the code. That is deliberate:
-the code has behaviour that is a regression rather than an intention, so it is not a reliable
-witness to what the package is meant to do. **Where the code disagrees with a rule below, the rule
-is the specification and the code is the defect.** Every such place is marked *Not yet
-implemented*, and section 10 lists them in one table.
+It has two parts. **Part A** is the resolver: what it does, what its API promises, and what holds no
+matter which executer runs a statement. **Part B** is the executers: what an implementation
+supports. An executer has capabilities and nothing else — beyond the interface of 9.1 and the promise
+to execute a statement, nothing in this document is demanded of it, and the four shipped with the
+package differ. A consumer picking one reads part B; everything else here holds for all of them.
 
 ---
+
+# Part A — The resolver
 
 ## 1. Purpose
 
@@ -60,11 +61,11 @@ Three rules bound that counting.
 template literal and for a regular expression literal, and it holds in both directions: neither an
 opening nor a closing brace inside a literal changes the count.
 
-Two limits of that rule are known and deliberate. **Comments are not examined** — a brace inside
-`/* … */` or behind `//` counts like any other. And whether a `/` opens a regular expression
-literal or divides is decided by the character before it, so a literal that legitimately follows
-`)` or `]` — `${ (() => { if (a) /x/.test(b) })() }` is the shape — is read as division. Neither
-matters unless the comment or the literal also carries a brace.
+The rule has two limits. **Comments are not examined** — a brace inside `/* … */` or behind `//`
+counts like any other. And whether a `/` opens a regular expression literal or divides is decided by
+the character before it, so a literal that follows `)` or `]` — `${ (() => { if (a) /x/.test(b) })() }`
+is the shape — is read as division. Neither matters unless the comment or the literal also carries a
+brace.
 
 **An opening `${` without a matching closing brace is not an expression.** The text stands as
 written, unchanged, and nothing is evaluated. There is no error and no partial replacement.
@@ -103,17 +104,18 @@ elsewhere in the text, and the other way round.
 
 The name is a label, not a JavaScript identifier. Allowed are **letters, digits, whitespace,
 `-` and `_`** — nothing else. The name is trimmed at both ends, so leading and trailing
-whitespace is not part of it. The character set is deliberately tight, so that scope and
-statement can always be separated cheaply and no quoted `::` inside a statement can be mistaken
-for a prefix.
+whitespace is not part of it. The character set is narrow enough that scope and statement can always
+be separated, and that a quoted `::` inside a statement cannot be read as a prefix.
 
-### 3.4 What a statement may contain
+### 3.4 The empty statement
 
-Arbitrary JavaScript, evaluated as such, `await` and asynchronous code included. There is no
-restricted grammar and none is intended.
+An **empty statement** answers `undefined`, the same as `return;` does in JavaScript. `${}` is a
+valid expression, a default value applies to it like to any other result, and it never reaches an
+executer: the resolver answers it.
 
-An **empty statement** answers `undefined`, the same as `return;` does in JavaScript. `${}` is
-therefore a valid expression, and a default value applies to it like to any other result.
+Otherwise a statement is arbitrary JavaScript, `await` and asynchronous code included. There is no
+restricted grammar. How much of it a given implementation runs is a capability: `syntax` (9.4) for
+the constructs, `context-scope` (9.5) for whether one carrying a context name reaches it.
 
 ## 4. Entry points
 
@@ -122,11 +124,11 @@ therefore a valid expression, and a default value applies to it like to any othe
 Two call forms, and a caller may use either.
 
 ```javascript
-ExpressionResolver.resolve(aExpression, aContext, aDefault, aTimeout, aAllowGlobalWrite)
-ExpressionResolver.resolveText(aText, aContext, aDefault, aTimeout, aAllowGlobalWrite)
+ExpressionResolver.resolve(aExpression, aContext, aDefault, aTimeout)
+ExpressionResolver.resolveText(aText, aContext, aDefault, aTimeout)
 
-ExpressionResolver.resolve({ expression, context, defaultValue, timeout, allowGlobalWrite })
-ExpressionResolver.resolveText({ text, context, defaultValue, timeout, allowGlobalWrite })
+ExpressionResolver.resolve({ expression, context, defaultValue, timeout })
+ExpressionResolver.resolveText({ text, context, defaultValue, timeout })
 ```
 
 Which form is in use is decided by the **first argument alone**: an expression is always a
@@ -135,9 +137,7 @@ that out, so a context object that happens to carry a key named `context` can ne
 for a configuration.
 
 Both forms answer a promise, build a single resolver over the context and delegate to the
-instance methods. `aTimeout` / `timeout` is described in 4.5, `aAllowGlobalWrite` /
-`allowGlobalWrite` is the switch of 6.5 for this one call; without it the static
-`ExpressionResolver.allowGlobalWrite` applies.
+instance methods. `aTimeout` / `timeout` is described in 4.5.
 
 Whether a default value was passed is what 4.4 turns on, and the two forms answer it
 differently. Positionally it is the third argument being present, so reaching the fifth means
@@ -145,17 +145,13 @@ passing the third and fourth — which costs nothing: `undefined` as the default
 behaves like passing none, and `undefined` as the timeout is no timeout. In the configuration
 form it is the presence of the key `defaultValue`, independent of everything else.
 
-The configuration form is the one to document as preferred as soon as more than a context and a
-default are involved — `resolve(e, ctx, undefined, undefined, true)` tells a reader nothing about
-what `true` means.
-
-*Not yet implemented* — only the positional form exists, and without its fifth argument; see
-`BACKLOG.md`.
+The configuration form is the preferred one as soon as more than a context and a default are
+involved: `resolve(e, ctx, undefined, 500)` does not say what `500` means.
 
 ### 4.2 Instance
 
 ```javascript
-new ExpressionResolver({ context, parent, name, executer, allowGlobalWrite })
+new ExpressionResolver({ context, parent, name, executer })
 resolver.resolve(aExpression, aDefault)                                    // → Promise<*>
 resolver.resolveText(aText, aDefault)                                      // → Promise<string>
 ```
@@ -168,8 +164,7 @@ resolver.resolveText(aText, aDefault)                                      // �
 **`Executer` instance**. A name is looked up in the registry and an unregistered one throws; an
 instance is taken as it is and needs no registration, because it already addresses the executer.
 Without the option the resolver uses `ExpressionResolver.defaultExecuter`, whose setter accepts
-either form as well. Anything that is neither is ignored and the default applies. `allowGlobalWrite` defaults to
-`ExpressionResolver.allowGlobalWrite` (6.5).
+either form as well. Anything that is neither is ignored and the default applies.
 
 The instance methods stay **positional** and get no configuration form of their own. Everything a
 configuration would carry beyond the default value — the context, the executer, the global-write
@@ -205,9 +200,8 @@ so `resolve("\${value}")` hands `\${value}` to the executer, which cannot compil
 
 A default value replaces a result of `null` **and** of `undefined`. It never covers an **error**,
 in neither entry point: whatever default was passed, `resolve` raises and `resolveText` leaves the
-expression standing (7). Whether it was passed
-at all is what counts, not what it holds: passing `undefined` as the default is a deliberate choice by
-the caller and is honoured, and it is indistinguishable in its effect from passing nothing.
+expression standing (7). Whether it was passed at all is what counts, not what it holds: passing `undefined` as the default is
+honoured, and its effect cannot be told from passing nothing.
 
 In `resolveText` the default applies per expression. Without a default, `undefined` and `null`
 are rendered as the literal texts `undefined` and `null`.
@@ -300,39 +294,38 @@ full path.
 
 ## 6. The context
 
-### 6.1 The proxy
+### 6.1 What a context answers
 
-A context is never touched directly. Every access goes through the proxy of
-`ResolverContextHandle`, which is what implements the chain walk of 5.2 and what makes a write
-land on a defined resolver rather than on the object the caller handed in.
+`getData()` without a key answers the context of the addressed resolver. That context is **not the
+object passed to the constructor** and it **answers for the whole chain**: reading a name on it
+follows 5.2, so it sees what the resolvers above carry.
 
-The proxy stands over a target of its own rather than over the context object, because it answers
-for more than that object holds — the names of the whole chain. A proxy may not speak that freely
-for a target that guarantees anything about its own keys, so building it that way is what makes
-**any** context object usable, a frozen or sealed one included.
+Enumerating it describes the chain rather than one resolver. `Object.keys`, a spread and
+`JSON.stringify` answer every name the chain carries, each with the enumerability it has where it is
+defined, so the members of a prototype stay out of `Object.keys` as they would on the object itself.
+`Object.getOwnPropertyNames` is the wider list and names them.
 
-Enumerating a context therefore describes the chain rather than one resolver: `Object.keys`, a
-spread and `JSON.stringify` answer every name the chain carries, each with the enumerability it has
-where it is defined — so the members of a prototype stay out of `Object.keys` exactly as they would
-on the object itself. `Object.getOwnPropertyNames` is the wider list an executer builds on and does
-name them. Values are read at the moment of the lookup (6.2). A write through the proxy lands on the
-resolver it was made on; where that resolver's context is frozen, the write fails as it would on the
-object itself.
+Three further rules hold for any context:
 
-**One exception**: a context that is the global object is used as it is, with no proxy in front of
-it — see 6.4.
+- **Values are read at the moment of the lookup** (6.2), never collected up front.
+- **A write lands on the resolver it was made on**, never on one nearer the root (1.3). Where that
+  resolver was built over a frozen object, the write fails as it would on the object itself.
+- **Any object works as a context**, a frozen or sealed one included, and so do an array, a `Map`, a
+  `Set`, a `NodeList` and a DOM element. Which of them a given implementation can run a statement
+  over is `context-shape` (9.6).
+
+A context that **is** the global object is the exception to all of this; see 6.4.
 
 ### 6.2 Names are a snapshot, values are live
 
 The set of keys a resolver contributes is captured when the resolver is built. Adding a key to the
-handed-in object afterwards has no effect until `contextHandle.resetCache()` runs — an accepted
-side effect, not a defect.
+handed-in object afterwards has no effect until `contextHandle.resetCache()` runs.
 
 Values are always read at the moment of the lookup, so mutating what a key holds
 (`data.user.name = "x"`, a `push` into an array) is visible immediately.
 
-Writing **through** the resolver — `updateData`, `mergeContext`, or an assignment through the
-proxy — keeps the set of keys in step.
+Writing **through** the resolver — `updateData`, `mergeContext`, or an assignment an executer let
+through (6.5) — keeps the set of keys in step.
 
 ### 6.3 A resolver without a context
 
@@ -343,83 +336,59 @@ takes the executer's default context (4.2).
 Such a resolver gains content like any other: through `updateData`, `mergeContext`, or a write from
 an expression evaluated on it (6.5).
 
-### 6.4 Reaching the global object
+### 6.4 The global object as a context
 
-Whether an expression can reach a global variable or function is **not decided by the resolver**
-but follows from how the executer executes the statement. The specification describes the
-mechanism; the details belong to the executer (section 8).
+Whether an expression can reach a global variable or function **is not the resolver's business** and
+follows from how the executer runs the statement. It is a capability, listed name by name in
+`global-scope` (9.8), and the four implementations differ: one of them reaches only the globals its
+own list carries. What follows from that here is a rule of the resolver: a name the chain does not
+carry may resolve against the global object, which is what makes a typo in an expression
+indistinguishable from an empty value — accepted, see section 7. A consumer who wants a name resolved
+locally puts it into the context, so it is found before the lookup walks out.
 
-- `WithScopedExecuter` and `ContextDeconstructorExecuter` run the statement as ordinary
-  JavaScript, so the engine's scoping applies and a name the chain does not carry is resolved
-  against the global object. Neither can prevent that. A consumer who wants a name resolved
-  locally puts it into the context, so the engine finds it before it walks out.
-- `EsprimaExecuter` rewrites identifiers onto one context variable; only the names on its
-  `RESERVED_NAMES` list stay untouched. That list is neither final nor complete.
-
-This is what makes a typo in an expression indistinguishable from an empty value, which is
-accepted (section 7).
-
-The global object may also be handed in as a context object; it is then an ordinary resolver of the
-chain. Three things follow from what such a resolver is, and all three are intended:
+The global object may also be handed in **as a context object**; it is then an ordinary resolver of
+the chain. Three things follow from what such a resolver is, and all three are intended:
 
 - It carries **every** name, so it answers every lookup that reaches it and no resolver below it is
   ever consulted. A resolver over the global object therefore belongs at the root of a chain, not in
   the middle of one.
-- It is **not proxied**. A proxy exists to flatten the chain and to catch writes, and neither has
-  anything to add in front of an object that already carries every name — while a proxy is not
-  free to hide what its target guarantees, so putting one there breaks every operation that
-  enumerates the context. `getData()` on such a resolver therefore answers the global object
-  itself, and a write through it is an ordinary global write.
-- An executer may treat it as its own case. `ContextDeconstructorExecuter` reads the names of a
-  context before it runs a statement; for the global object it skips that, because the statement
-  reaches a global through the ordinary scope chain anyway (8.3).
+- It is **not wrapped**. Every other context is answered for through something that flattens the
+  chain and catches writes; in front of an object that already carries every name that has nothing to
+  add, and it would break every operation that enumerates the context. `getData()` on such a resolver
+  therefore answers the global object itself, and a write through it is an ordinary global write —
+  the one case 6.5 cannot reach.
+- An executer may treat it as its own case, and one does: `ContextDeconstructorExecuter` reads the
+  names of a context before it runs a statement and skips that for the global object, because the
+  statement reaches a global through the ordinary scope chain anyway (9.8).
 
-### 6.5 Writing from inside an expression
+### 6.5 Where a write from an expression lands
 
-Writing from inside an expression is **not specified behaviour**, and it cannot be: what an
-assignment does is decided by the executer, not by this package. `updateData`, `mergeContext` and
-`deleteData` (6.6) are the supported way to change a context, and they are the only path with
-guaranteed behaviour.
+Writing from inside an expression is **not specified behaviour**: what an assignment does is decided
+by the executer. `updateData`, `mergeContext` and `deleteData` (6.6) are the supported way to change
+a context and the only path with guaranteed behaviour.
 
-**This document made a negative guarantee here until 2026-09-05** — that an assignment inside an
-expression could not create or change anything on the global object. It is withdrawn, because the
-package cannot keep it: only the executer can intercept an assignment, an executer is free to be
-written by anyone, and three of the four shipped today let an unqualified assignment reach the
-global object in at least one shape. A promise no implementation is required to keep is not a
-promise, so it is stated as what it is — **a capability, measured per executer in the table of
-8.3**. Pointing the promise at whichever executer happens to be the default was rejected on the same
-day: a consumer who picks another one would then read a guarantee that does not hold for them.
+Where a write goes once an executer lets it through is a rule:
 
-What is true today, measured rather than promised:
+- It lands in the context of the resolver the expression is evaluated on, **never in an ancestor's**
+  (1.3). A name an ancestor carries is shadowed from that resolver downwards, not changed where it
+  lives.
+- Where that resolver was built over a frozen object, the write fails as it would on the object
+  itself.
+- It lands in **the object the caller handed over** (6.6).
 
-- An **unqualified assignment to a name no resolver of the chain carries** reaches the global object
-  under `with-scoped-executer` and `context-deconstruction-executer`. `context-object-executer`
-  contains it, because its dialect writes through the context proxy; `esprima-executer` contains it
-  at the top level of a statement but **not** from inside a function written in the statement.
-- A **compound assignment** to such a name (`x += 1`) cannot create anything anywhere: it reads
-  before it writes and raises on the read.
-- An **explicit write through `globalThis`** reaches the global object under every executer but one,
-  and that one only because its rewrite cannot produce the assignment at all. Nothing here is a
-  sandbox: a statement that asks for the global object by name gets it.
-- Where an assignment *is* intercepted, it lands in the context of the resolver the expression is
-  evaluated on — never in an ancestor's, so 1.3 holds. Whether the written value is readable
-  afterwards is again a capability: under the default executer it is not, except for a mutation of
-  an object the context already holds.
+Everything else about such a write is a capability: whether an assignment runs at all, whether it is
+intercepted, whether the value is readable afterwards, and whether one to a name no resolver carries
+stays off the global object. `context-write` (9.7) and `global-scope` (9.8) carry it per
+implementation, and the four differ in all of it.
 
-A **switch that allows writing to the global object** was agreed on 2026-08-22 and is not
-implemented. It exists at three levels, each overriding the one above it — `ExpressionResolver.allowGlobalWrite`
-for the application, a constructor option `allowGlobalWrite` per resolver, and a fifth argument on
-the static `resolve` / `resolveText` per call — with the application level defaulting to `false`.
-What its *off* state can mean is bounded by the paragraphs above: it can only redirect the writes
-the executer in use is able to intercept, and under an executer that cannot intercept an assignment
-at all it means nothing. Whether it is still worth having on those terms is open; `BACKLOG.md`
-carries the question, along with the one case that has no interception point since 2026-08-30 — a
-resolver whose context *is* the global object is no longer proxied.
+**Reaching the global object is not sandboxed.** A statement that names `globalThis` gets it, and an
+unqualified assignment to a name no resolver carries creates a global under an executer that cannot
+intercept it. `buildSecure` (6.7) filters the context, not the globals.
 
 ### 6.6 Reading and writing from outside
 
 ```javascript
-resolver.getData(key, filter)             // → value, or the context proxy when key is empty
+resolver.getData(key, filter)             // → value, or the whole context when key is empty
 resolver.updateData(key, value, filter)
 resolver.deleteData(key, filter)
 resolver.mergeContext(context, filter)
@@ -428,11 +397,14 @@ resolver.mergeContext(context, filter)
 These four are the supported way to change a context, and unlike an assignment inside an
 expression (6.5) their behaviour is guaranteed and identical under every executer.
 
-They act **on the chain**, not on one isolated resolver, and how far each one reaches is a matter of
-convention per method, listed below. The rule of 1.3 — a value introduced further from the root
-never overwrites one nearer to it — describes the *expression* path and the stacking mechanism.
-It is not a general prohibition on these methods, and further methods that act on the whole chain
-are explicitly not ruled out.
+**The three that write, write into the object the caller handed over.** A resolver keeps that object
+rather than a copy, so `updateData`, `deleteData` and `mergeContext` add, replace and remove keys on
+it, and code outside the resolver holding the same reference sees the change. A caller who does not
+want that hands over a copy.
+
+They act **on the chain**, not on one isolated resolver, and how far each one reaches is per method,
+listed below. The rule of 1.3 — a value introduced further from the root never overwrites one nearer
+to it — describes the *expression* path; it is not a prohibition on these methods.
 
 `filter` is a scope name and selects **the one resolver** the call applies to, by the rule of 5.3.
 Without a filter it is the resolver the call was made on. A filter that matches no resolver in
@@ -441,8 +413,8 @@ the chain is an **error and throws** — unlike a scope prefix inside an express
 name in an expression is data and must never stop a render (7).
 
 `getData` reads along the chain by the rule of 5.2 — the resolver nearest to the addressed one that
-carries the key answers. Without a key it answers the **whole context** of the addressed resolver:
-the proxy, so every access on it still sees the chain. That is intended, not an accident of the
+carries the key answers. Without a key it answers the **whole context** of the addressed resolver,
+so every access on it still sees the chain (6.1). That is intended, not an accident of the
 signature.
 
 `updateData` changes the value **where the key lives**, and the filter decides how far the call
@@ -454,9 +426,8 @@ looks:
 - **With a filter** the addressed resolver is the target outright. The value is written there,
   whatever the rest of the chain holds.
 
-This is the deliberate counterpart to 1.3: the chain protects a resolver's value against being
-overwritten by an expression evaluated further from the root, while the data methods are the
-explicit path that may reach across resolvers on purpose.
+This is the counterpart to 1.3: the chain protects a resolver's value against an expression evaluated
+further from the root, while the data methods are the path that may reach across resolvers.
 
 `deleteData` removes a key from **one** resolver — the addressed one with a filter, and without one
 the first resolver carrying it, counting from the resolver the call was made on towards the root.
@@ -478,7 +449,7 @@ object; there is no separate method for it and none is planned.
 
 ```javascript
 ExpressionResolver.buildSecure({ context, propFilter,
-                                 option : { deep, name, parent, executer, allowGlobalWrite } })
+                                 option : { deep, name, parent, executer } })
 ```
 
 Builds a resolver over a **filtered copy** of the context, so that properties a consumer does
@@ -487,16 +458,12 @@ and this resolver run inside CMS systems where users author expressions.
 
 It filters the **context, not the globals**. `fetch`, `console` and `document` stay reachable from an
 expression through the mechanism of 6.4 — how far that reach goes is the executer's own and measured
-in 8.3, so under `EsprimaExecuter` `fetch` and `console` are reachable while `document` is not.
+in 9.8, so under `EsprimaExecuter` `fetch` and `console` are reachable while `document` is not.
 `buildSecure` is a way to hand over a cleaned context; it is not a sandbox and must not be
 documented as one.
 
 `option` carries the filter's own `deep` together with the **full constructor option set**, which
-`buildSecure` hands on unchanged. `allowGlobalWrite` matters here more than anywhere else, because
-the CMS case that motivates this method is exactly the case the switch of 6.5 was invented for.
-
-*Not yet implemented* — `allowGlobalWrite` is not forwarded, because the constructor option of 6.5
-does not exist yet; see `BACKLOG.md`.
+`buildSecure` hands on unchanged.
 
 ## 7. Errors
 
@@ -526,9 +493,30 @@ is not an expression is text and no error arises at all (3.1).
 A statement that takes longer than one second produces a warning naming it. The resolution is
 not affected.
 
-## 8. Executers
+## 8. Public surface
 
-### 8.1 The interface
+Everything listed here is public and may be used, the purely informative parts included: they
+exist so a consumer can build their own debug output.
+
+**`ExpressionResolver`** — static `resolve`, `resolveText`, `buildSecure`, `defaultExecuter`;
+constructor `{ context, parent, name, executer }`;
+instance `resolve`, `resolveText`, `getData`, `updateData`, `deleteData`, `mergeContext`; getters `name`, `parent`, `context`, `contextHandle`,
+`chain`, `effectiveChain`, `contextChain`.
+
+**`ExecuterRegistry`** — `registrate`, `getExecuter`.
+
+**`Executer`** — the interface an own implementation builds on.
+
+**Each executer module** — `EXECUTERNAME`, `setupExecuter`, its default export, and `setDebug`
+where it exists.
+
+`chain`, `effectiveChain` and `contextChain` are specified in 5.5.
+
+# Part B — The executers
+
+## 9. Executers
+
+### 9.1 The interface
 
 ```javascript
 new Executer({ defaultContext, execution })
@@ -543,7 +531,7 @@ registers it.
 `ExpressionResolver.defaultExecuter` reads and writes the default; the setter takes a registered
 name or an `Executer` instance.
 
-### 8.2 The implementations
+### 9.2 The implementations
 
 | Name | Module | How it executes |
 |---|---|---|
@@ -558,109 +546,158 @@ registered and reachable by name, and announces its own deprecation on the first
 resolves.
 
 `esprima-executer` is registered only when its module is imported explicitly, because `espree`
-grows the browser bundle from 11.5 KB to 355.6 KB. It is the least complete of the four; what it
-cannot do is in the table of 8.3.
+grows the browser bundle from 11.5 KB to 355.6 KB. It is the least complete of the four — 70 of 105
+capabilities against 88 for the default — and what it cannot do is in 9.3 to 9.9.
 
-### 8.3 Capabilities of an executer
+### 9.3 What a capability is
 
-An executer has **capabilities and nothing else**. Beyond the interface of 8.1 and the promise to
-execute a statement, this document demands nothing of it: how a statement addresses a value of the
-context, how it reaches the global object (6.4), whether a write can be contained (6.5) and how much
-of JavaScript runs at all are its own. Everything else in this document is a **behaviour of the
-resolver** and holds under every executer — the chain and which resolver answers a lookup (5), the
-context as a snapshot of names (6.2), the error policy (7). Those are not something an
-implementation may decline, and they are not capabilities.
+A **capability** measures how far an executer supports JavaScript over a dynamic context: which
+constructs run, how much of the language's scoping survives, which structures work as a context,
+whether a write behaves the way an assignment does, which globals stay reachable, and whether it
+keeps answering in every state of its code cache. There are six, one per subsection below.
 
-A capability measures **how far an executer supports JavaScript over a dynamic context**. There are
-six, and what each implementation supports was measured on 2026-09-05:
+An implementation either has a capability or it does not, and neither answer is wrong: this document
+demands nothing of an executer beyond 9.1.
+
+What each implementation supports, over 105 cases asked of all four:
 
 | Capability | What it asks | `with-scoped` | `context-object` | `context-deconstruction` | `esprima` |
 |---|---|---|---|---|---|
-| `syntax` (3.4) | which constructs run at all | 25/27 | 25/27 | 25/27 | 21/27 |
-| `context-scope` (8.3) | whether a construct carrying a context name still reaches it | 26/26 | 26/26 | 25/26 | 12/26 |
-| `context-shape` (6.1) | which structures work as a context | 19/19 | 19/19 | 15/19 | 19/19 |
-| `context-write` (6.5) | whether a write is readable afterwards | 10/11 | 11/11 | 4/11 | 3/11 |
-| `global-scope` (6.4) | which globals are reachable, and whether a write is contained | 14/17 | 16/17 | 14/17 | 10/17 |
-| `cache` (8.4) | whether it keeps answering in every state of its code cache | 5/5 | 5/5 | 5/5 | 5/5 |
+| 9.4 `syntax` | which constructs run at all | 25/27 | 25/27 | 25/27 | 21/27 |
+| 9.5 `context-scope` | whether a construct carrying a context name still reaches it | 26/26 | 26/26 | 25/26 | 12/26 |
+| 9.6 `context-shape` | which structures work as a context | 19/19 | 19/19 | 15/19 | 19/19 |
+| 9.7 `context-write` | whether a write is readable afterwards | 10/11 | 11/11 | 4/11 | 3/11 |
+| 9.8 `global-scope` | which globals are reachable, and whether a write is contained | 14/17 | 16/17 | 14/17 | 10/17 |
+| 9.9 `cache` | whether it keeps answering in every state of its code cache | 5/5 | 5/5 | 5/5 | 5/5 |
 | **All six** | | **99/105** | **102/105** | **88/105** | **70/105** |
 
-**Two capabilities no implementation has**, so they are missing from every column above: a statement
-is a single expression, so two statements separated by a semicolon are not one statement; and every
-generated body runs in **sloppy mode**, which is what makes an unqualified assignment able to create
-a global at all (6.5).
+The complete catalogue, 105 rows against four implementations, is `CAPABILITIES` in
+`test/ExecuterCapabilities.js`. It is the source these subsections are written from.
 
-What a consumer picking an implementation has to know, beyond the counts:
+**Every construct is asked twice**, which is why the first two capabilities are separate: `syntax`
+asks whether a construct runs, with constants inside it, and `context-scope` asks whether the same
+construct reaches a context value.
 
-- **`with-scoped-executer`** — a write to a name no resolver of the chain carries is neither
-  contained nor readable afterwards: it falls out of the `with` block onto the global object. Its
-  cost is elsewhere, in the chain walk a `with` block performs; see the note on the default in 8.2.
-- **`context-object-executer`** — the most complete of the four, and the only one that contains an
-  unqualified write to an unknown name, because its dialect writes through the context proxy. The
-  price is the dialect itself: every expression addresses the context as `ctx.value`.
-- **`context-deconstruction-executer`**, the default — it **reads every name of a context before it
-  runs anything**, so a context whose accessor throws breaks every statement over it and a getter is
-  evaluated even where the statement never touches it. It **loses `this`** inside a method of the
-  context called without naming its object. And a write from inside a statement does not survive it
-  in any form but one: a *mutation* of an object the context holds. A plain assignment, a counting
-  one, an inherited name, one made in a nested function — none is readable afterwards.
-- **`esprima-executer`** — the least complete, and the differences are not scattered: its rewrite
-  never enters a **function body**, so no context value is reachable inside an arrow, a function
-  expression, a default parameter or a callback; it never walks into an **object or array literal, a
-  ternary, a computed key, a spread or a tagged template**, so a context name in any of those is
-  lost; it cannot run an **assignment** of any form whose target is a context name; it reaches only
-  the globals its own list names (`Object`, `Array`, `Map`, `Set`, `console`, `fetch`, `window`) and
-  not `Math`, `JSON`, `Date`, `Promise`, `document`, or anything the application itself put there;
-  and it cannot execute a **class field**, which is a limit of its code generator rather than of the
-  rewrite.
+**The dialect is not a capability** but a spelling. `WithScopedExecuter`,
+`ContextDeconstructorExecuter` and `EsprimaExecuter` put the properties of the context into scope, so
+the property `value` is addressed as `${value}`. `ContextObjectExecuter` hands the context to the
+statement as the object `ctx`, and the same property is addressed as `${ctx.value}`. An executer may
+make such a demand; it may not change which resolver of the chain answers a lookup, or any other rule
+of part A. Switching executer can therefore mean rewriting expressions.
 
-The complete catalogue — 105 rows, every one read by a test under all four implementations — is
-`CAPABILITIES` in `test/ExecuterCapabilities.js`. **That file is the authority and this table is
-written from it by hand**, because the suite runs in a browser and cannot read a document. Both
-directions are guarded there: a capability that stops working turns the gate red, and so does one
-that starts working.
+### 9.4 `syntax` — which constructs run
 
-**The dialect is not a capability**, because it is not a yes or no — but it is the difference that
-changes how an expression is written, so it is spelled out here. `WithScopedExecuter`,
-`ContextDeconstructorExecuter` and `EsprimaExecuter` put the properties of the context into scope:
-the property `value` is addressed as `${value}`. `ContextObjectExecuter` does not — it hands the
-context to the statement as the object `ctx`, and the same property is addressed as `${ctx.value}`.
-An executer may make such a demand; what it may not do is change which resolver of the chain answers
-a lookup, or any other behaviour of the resolver. Switching executer can therefore mean rewriting
-expressions, and that is intended, not a defect.
+Asked with constants inside the construct, so that a failure means the construct itself. 27 cases:
+the operators, a call on a member, an object literal, an arrow body, a template literal, a regular
+expression literal, `await`, a function expression, a class expression, `new`, both spreads, an
+optional chain, `??`, the logical operators, a ternary, a comma sequence, `typeof`, `instanceof`,
+`in`, `delete`, `**`, and the five assignment forms.
 
-### 8.4 Tuning
+The **assignment forms are the exception to "constants only"**: an assignment needs a target, and a
+target is a binding. They split four ways under `esprima-executer` — `=`, `+=` and `++` do not run,
+because its rewrite makes the target `ctx?.name`, which is not a legal one, while a member assignment
+on a literal and a destructuring assignment do run, because the rewrite does not reach their targets.
+It also cannot execute a **class field**, a limit of its code generator rather than of the rewrite.
+
+**Two rows no implementation keeps:**
+
+- **Two statements separated by a semicolon are not one statement.** A statement stands in expression
+  position. Three of the four do not raise — their generated body is `return <statement>`, so
+  `${ 1; 2 }` answers 1.
+- **No executer runs its statement in strict mode.** Every generated body is sloppy: `new Function`
+  produces one, and the `with`-based implementation cannot be strict at all. That is what lets an
+  unqualified assignment create a global (9.8).
+
+### 9.5 `context-scope` — whether a construct still reaches the context
+
+The same constructs as 9.4, each carrying a context name. 26 cases, and the capability that separates
+the implementations most.
+
+`with-scoped-executer` and `context-object-executer` answer all of them.
+`context-deconstruction-executer` misses one: it **loses `this`** when a method of the context is
+called without naming its object, because it binds the method to a local and calls it bare, while a
+`with` block and a member access both leave the context as the receiver.
+
+`esprima-executer` answers 12 of 26, and the 14 it misses fall into two groups with one cause each:
+
+- **Every function body.** Its rewrite does not enter one, so a context value is out of reach inside
+  an arrow with either body, a function expression, a default parameter, a callback handed to a
+  builtin, and an async function.
+- **Every position its traversal does not visit**: an object literal, an array literal, a computed
+  key, a spread, both branches of a ternary, the key of a computed member access, a tagged template,
+  and the constructor of `new Cls()`.
+
+What it does reach: both sides of `??`, a deep member access, an optional chain, and a value read
+twice in one statement.
+
+### 9.6 `context-shape` — which structures work as a context
+
+Part A promises that any object works as a context (6.1). What an implementation can actually run a
+statement over is this capability, and 19 cases cover it: a plain object, an array, a `Map`, a `Set`,
+a `NodeList`, a DOM element, an `arguments` object, a frozen context, one without a prototype, one
+carrying a symbol key, a key that is not a variable name, a key named like a reserved word, a numeric
+key beside a named one, an accessor on a prototype, many keys at once, and a key named `ctx` or
+`context`.
+
+Three implementations answer all 19. `context-deconstruction-executer` misses four. Three of them
+have one cause: **it reads every name of a context before it runs anything**, so an accessor that
+throws breaks every statement over that context, including one that touches no name, and an accessor
+that only costs is evaluated on every execution. An `arguments` object is that shape, its `callee`
+being a poisoned accessor. The fourth is unrelated: a context key named `ctx` collides with the name
+its generated code uses for itself.
+
+### 9.7 `context-write` — whether a write survives
+
+11 cases. `context-object-executer` keeps all of them, `with-scoped-executer` all but one.
+
+`context-deconstruction-executer`, **the default**, keeps one: a **mutation** of an object the
+context holds (`holder.name = "after"`), which needs nothing carried back because the statement and
+the context hold the same object. Everything that needs a value carried back is lost — a plain write,
+a counting one across two occurrences of the same expression, a write to a name only an ancestor
+carries, one made inside a nested function, one made before the statement threw, and a rebinding of a
+context name.
+
+`esprima-executer` keeps three: it cannot run an assignment whose target is a context name at all
+(9.4).
+
+The one case `with-scoped-executer` misses is a write to a name **no resolver of the chain carries**.
+It falls out of the `with` block, so it is neither readable afterwards nor contained (9.8).
+`context-object-executer` is the only implementation that puts such a write into the context, because
+its dialect writes through the context rather than into a binding.
+
+### 9.8 `global-scope` — which globals are reachable, and whether a write is contained
+
+Two halves, 17 cases. The first is reach: `with-scoped-executer`, `context-object-executer` and
+`context-deconstruction-executer` run the statement as ordinary JavaScript, so every global is
+reachable and none of them can prevent that. `esprima-executer` rewrites identifiers onto its context
+variable and leaves alone only what its own list names, so it reaches `Object`, `Array`, `Map`,
+`Set`, `console`, `fetch` and `window` — and **not** `Math`, `JSON`, `Date`, `Promise`, `document`,
+or any global the application itself planted.
+
+The second half is containment:
+
+- A write to a name **no resolver carries** creates a global under `with-scoped-executer` and
+  `context-deconstruction-executer`. `context-object-executer` contains it.
+  `esprima-executer` contains it at the top level of a statement — its rewrite makes the target
+  illegal, so the statement raises before creating anything — but **not from inside a function
+  written in the statement**, where the rewrite does not go.
+- A **compound assignment** to such a name cannot create anything under any of them: it reads before
+  it writes and raises on the read.
+- An **explicit `globalThis.x = 1`** reaches the global object under every implementation but the one
+  whose rewrite cannot produce the assignment.
+
+### 9.9 `cache` — tuning the compiled code cache
+
+5 cases, and all four implementations answer all of them: resolving with the cache switched off,
+caching again after it is switched back on, serving a cached expression to a different context, to a
+context that did not carry the name the statement reads, and while entries are evicted under a size
+limit.
+
+A cache hit and a fresh compilation answer the same value, so what the capability states is that
+every state a consumer can put an executer into keeps answering correctly.
+
+### 9.10 Tuning
 
 Each executer module exports `setupExecuter(options)`, which configures that executer's compiled
 code cache — `{ size }`, where `0` or less disables caching. Reaching it means importing the
 module directly, which is the intended usage and the reason the package publishes its sources.
-
-## 9. Public surface
-
-Everything listed here is public and may be used, the purely informative parts included: they
-exist so a consumer can build their own debug output.
-
-**`ExpressionResolver`** — static `resolve`, `resolveText`, `buildSecure`, `defaultExecuter`,
-`allowGlobalWrite`; constructor `{ context, parent, name, executer, allowGlobalWrite }`;
-instance `resolve`, `resolveText`, `getData`, `updateData`, `deleteData`, `mergeContext`; getters `name`, `parent`, `context`, `contextHandle`,
-`chain`, `effectiveChain`, `contextChain`.
-
-**`ExecuterRegistry`** — `registrate`, `getExecuter`.
-
-**`Executer`** — the interface an own implementation builds on.
-
-**Each executer module** — `EXECUTERNAME`, `setupExecuter`, its default export, and `setDebug`
-where it exists.
-
-`chain`, `effectiveChain` and `contextChain` are specified in 5.5.
-
-## 10. Index of what is not yet implemented
-
-Every rule above that the code does not keep today, in one place:
-
-| Rule | `BACKLOG.md` entry |
-|---|---|
-| 4.1 the configuration form of the static calls | The static entry points take no configuration object |
-| 4.2 `context` defaults to the executer's default context | The executer's `defaultContext` has no reader left |
-| 6.3 leaving `context` out differs from `context: null` | The executer's `defaultContext` has no reader left |
-| 6.5 the `allowGlobalWrite` switch, at all three levels | A write to an unknown name inside an expression lands on `globalThis` |
-| 6.7 `allowGlobalWrite` as an option of `buildSecure` | A write to an unknown name inside an expression lands on `globalThis` |

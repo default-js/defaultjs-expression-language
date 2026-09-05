@@ -49,7 +49,7 @@ describe("The capability catalogue", () => {
 	});
 
 	// The section is what a reader follows from a row back to the rule it was read against, and
-	// `SPECIFICATION.md` 8.3 is written from this table by hand - a capability without one leaves the
+	// `SPECIFICATION.md` 9.3 to 9.9 are written from this table by hand - a capability without one leaves the
 	// person doing that writing guessing.
 	it("names the specification section of every capability", async () => {
 		const nameless = Object.entries(CAPABILITIES)

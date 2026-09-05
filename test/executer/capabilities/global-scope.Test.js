@@ -4,9 +4,9 @@ import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
 
 /**
  * Capability `global-scope` - which globals a statement reaches, and whether a write to a name no
- * resolver carries can be contained. Read against SPECIFICATION.md 6.4, 6.5 and 8.3.
+ * resolver carries can be contained. Read against SPECIFICATION.md 9.8.
  *
- * Both halves are the executer's own, and 8.3 says so for both: how a statement reaches the global
+ * Both halves are the executer's own, and 9.3 says so for both: how a statement reaches the global
  * object, and whether a write can be caught. The containment carried the label `defect` until
  * 2026-09-05, when it became a capability like the rest - `SPECIFICATION.md` 6.5 promised something
  * the package cannot keep for every implementation, so the document is what gets corrected.

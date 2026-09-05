@@ -26,9 +26,8 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 - **`SPECIFICATION.md` ships with the package.** It states what the resolver does, rule by
   rule — expression syntax, the resolver chain and its scopes, the context and what it
-  guarantees, error handling, the executers, and the whole public surface. Where the code does
-  not keep a rule yet, the specification says so and section 10 lists every such place, so the
-  document is usable as a reference before those fixes land.
+  guarantees, error handling, the executers, and the whole public surface. It describes the
+  released package: every rule in it holds by 3.0.0, and it carries no index of pending work.
 
   Revised on 2026-08-24, while every rule was being written out as a test. Six rules changed or
   were added, none of them describing behaviour that exists yet — they say what the pending fixes
@@ -39,7 +38,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   implementation does, not a promise. **5.3**: where two links carry the same name, the first one
   found climbing towards the root answers. **5.5**: a link provides a context when the caller
   handed one to the constructor or a value has been written to it since; what the context holds
-  no longer decides anything, so an empty object counts. **8.3**: how a statement addresses a
+  no longer decides anything, so an empty object counts. **8.3, today 9.3**: how a statement addresses a
   context value is the executer's own — `ContextObjectExecuter` requires `ctx.value` where the
   other three take `value`, so switching executer can mean rewriting expressions.
 
@@ -47,15 +46,15 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   **resolver** — section 2 no longer defines a second word for the same thing, and the rules read
   in one vocabulary.
 
-  **Revised again on 2026-09-01**: section 8.3 carries a **capability table** — one row per point
+  **Revised again on 2026-09-01**: section 8.3 — today 9.3 to 9.9 — carries a **capability table** — one row per point
   where the four executers legitimately differ, one column per executer. A consumer can now see,
   before picking one, whether a write from an expression persists, whether a global is reachable,
   whether a context value survives into a callback written in the statement, and whether an
   assignment executes at all. One row is a *rule* that two implementations do not keep yet rather
-  than a capability, and it is marked as such. 8.2 no longer describes the limits of
+  than a capability, and it is marked as such. 8.2 — today 9.2 — no longer describes the limits of
   `esprima-executer` in prose; the table carries them.
 
-  **Revised again on 2026-09-05**: section 8.3 is now **Capabilities of an executer** and describes
+  **Revised again on 2026-09-05**: the section on what an executer decides is now **part B**, and describes
   the whole surface instead of the differences — six capabilities, measured across 105 cases per
   implementation, with a count per capability and per executer and a paragraph on what each one
   cannot do. The vocabulary is settled with it: *behaviour* is what the resolver does and holds under
@@ -68,12 +67,28 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `context-deconstruction-executer`, the default, loses `this` inside a method of the context and
   keeps no write from an expression except a mutation of an object the context already holds.
 
+  **Restructured the same day, and the section numbers moved with it.** The document now has two
+  parts: **part A** is the resolver, its API and everything that holds no matter which executer runs
+  a statement; **part B** is the executers and their capabilities, one section per capability. The
+  numbering follows: the public surface is section 8 where it was 9, the executers are section 9
+  where they were 8, and what was 8.1 to 8.4 is now 9.1 to 9.10. Within part A, 6.1 stopped
+  describing the context proxy — an implementation detail that does not belong in a specification —
+  and describes **what a context answers** instead; 6.4 and 6.5 kept their numbers and gave their
+  executer halves to part B. Two statements were added that the document had never made: **the three
+  data methods write into the object the caller handed over** (6.6), and a statement may be arbitrary
+  JavaScript while how much of it runs is a capability (3.4, 9.4). No rule changed meaning; every
+  external link into this document by section number does.
+
+  **And it says only what the package does.** The dates, the decision history, the pointers into
+  `BACKLOG.md` and the index of pending work are gone — those belong to the records that carry them.
+  Every rule is written as holding, so the document describes 3.0.0 rather than the work in progress.
+
 ### Changed
 
 - **The specification no longer promises that a write from inside an expression stays off the global
   object.** `SPECIFICATION.md` 6.5 carried that as a guarantee, conditional on a switch that was
   never implemented. It is **withdrawn** and restated as a capability of the executer in use,
-  measured per implementation in 8.3, because the package cannot keep it: only an executer can
+  measured per implementation in 9.7 and 9.8, because the package cannot keep it: only an executer can
   intercept an assignment, and three of the four shipped today let an unqualified one reach the
   global object in at least one shape. Nothing about the code changed here — what changed is that
   the document now says what the code does. Concretely, and worth knowing for anyone who read the
@@ -82,8 +97,10 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   from inside a function written in the statement; only `context-object-executer` contains it. An
   explicit `globalThis.x = 1` reaches the global object under every one of them. **This package does
   not sandbox the global object**, and `buildSecure` (6.7) never claimed to. The `allowGlobalWrite`
-  switch stays in the document as pending, with its reach bounded by what the executer can intercept;
-  `BACKLOG.md` carries the open question of whether it is still worth having on those terms.
+  switch that was to make the containment configurable is **not part of the specification**: its
+  *off* state could only ever mean *under the executers able to intercept an assignment*, so whether
+  it is worth having is undecided, and the document does not describe undecided features. With it go
+  the fifth argument of the static calls and the constructor option of the same name.
 
 - **`resolve` no longer catches an error — it logs it and hands it on.** A statement that fails
   used to answer `undefined`, or the default value where one was passed, and the caller had no way
@@ -116,7 +133,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   destructured local binding, so `getData("known")` keeps answering `"before"` — and a text
   carrying `${ counter++ }` twice no longer counts across the two occurrences. Under
   `with-scoped-executer` the write landed in the context. `SPECIFICATION.md` 6.5 promises nothing
-  here, because this is the executer's own (8.3), so both behaviours are conformant — which also
+  here, because this is the executer's own (9.5), so both behaviours are conformant — which also
   means nothing raises. A caller who wrote through an expression writes through `mergeContext` or
   `updateData` instead, or keeps the old behaviour with
   `ExpressionResolver.defaultExecuter = "with-scoped-executer"`: that executer stays registered

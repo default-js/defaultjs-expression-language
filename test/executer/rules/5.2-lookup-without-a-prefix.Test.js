@@ -6,7 +6,7 @@ import { EXECUTERS } from "../../ExecuterCapabilities.js";
  * SPECIFICATION.md 5.2 - which resolver of the chain answers a name, asked of every executer.
  *
  * A lookup runs a statement, so every implementation has to answer these. None of them is a
- * capability: 8.3 lets an executer decide how a statement reaches a context value, never which
+ * capability: 9.3 lets an executer decide how a statement reaches a context value, never which
  * resolver answers it. The spelling comes from the catalogue through `variableName`, so what is
  * measured is the chain and not the dialect.
  *

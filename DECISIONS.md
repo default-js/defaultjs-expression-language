@@ -19,15 +19,105 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-05 — Does the specification describe the code as it is, or the release?
+
+**Decision:** **The release.** `SPECIFICATION.md` is written as though every rule in it holds. It
+carries no *Not yet implemented* marker, no index of pending work, no date, no decision history and
+no pointer into `BACKLOG.md` or `DECISIONS.md`. It is a result artifact and reads as one.
+
+Two things follow, and the second is the price of the first:
+
+- **The specification is the release gate for 3.0.0.** While a rule in it is false, the package
+  cannot be released. That is a stronger commitment than the document made before, when it described
+  the work in progress and said which parts were missing.
+- **The gap between document and code lives in two places only**: `BACKLOG.md`, which says what is
+  left, and the `it.fails` markers in `test/spec/`, which pin each missing rule and turn the gate red
+  the day it arrives.
+
+**Reasoning:** Frank's, on 2026-09-05. The document had become four documents in one — a
+specification, a changelog (five dates, seven passages of decision prose), a backlog index (six
+pointers and a section listing them) and test documentation (four references into the suite). Each of
+those has its own file here, and a reader looking up what the package does had to step over the other
+three. The trim took it from 777 lines to 726 without dropping a single rule, which is the measure of
+how much of it was not specification.
+
+Writing it as though everything exists is the same argument from the other end: a specification that
+describes its own incompleteness is a status report, and status is what `BACKLOG.md` is for. The
+markers in `test/spec/` already carry that meaning per case, so nothing is lost by removing the prose
+version of it — and the loss would be real if the two ever disagreed.
+
+**Alternatives:** Keeping the *Not yet implemented* markers so a consumer cannot read about something
+that does not exist — rejected, but only because the document ships with 3.0.0 and not before: while
+the package is unreleased there is no consumer to mislead, and by release the markers would have to be
+gone anyway. Cutting the unimplemented features out of the document until they land — rejected: the
+specification would then say less than the project has decided, and the switch of 6.5 is exactly the
+kind of rule that has to be written down before it is built.
+
+**Consequences:** Section 10 is gone. `AGENTS.md` no longer promises that the disagreements are listed
+in the document, and names the release gate instead. Three `BACKLOG.md` entries that pointed at
+section 10 point at the rule they have to make true. The one thing to watch: a rule can now be added
+to the document that nothing implements and nothing pins, and the document will not say so — only a
+`BACKLOG.md` entry and a failing test will. A rule written without both is a rule that nobody is
+holding.
+
+## 2026-09-05 — How is the specification laid out?
+
+**Decision:** In **two parts**. Part A is the **resolver**: what it does, what its API promises, and
+everything that holds no matter which executer runs a statement — those are rules, and an
+implementation may not decline one. Part B is the **executers**: what an implementation supports, one
+section per capability. The numbering follows the split, so the public surface becomes section 8 and
+the executers section 9, with 9.1 to 9.10 where 8.1 to 8.4 were.
+
+Three consequences inside part A, all of them Frank's findings:
+
+- **6.1 stops describing the proxy.** How a context is answered for is an implementation detail and
+  does not belong in a specification. What was observable in that section stays, worded as behaviour:
+  a context answers for the whole chain, enumerating it describes the chain with the enumerability
+  each name has where it is defined, a write lands on the resolver it was made on, and a frozen
+  context behaves as the object itself would.
+- **6.4 and 6.5 keep their numbers and lose their executer halves.** Whether a global is reachable
+  and whether a write can be contained are capabilities; what stays is the resolver's share — the
+  global object handed in *as* a context, and where a write lands once an executer lets it through.
+- **6.6 gains a statement the document never made**: the three data methods write into the object the
+  caller handed over. Read off the code and then measured — `updateData` and `deleteData` through the
+  context, `mergeContext` through `Object.assign` on it — and pinned by three cases in `test/spec/`.
+  `AGENTS.md` had claimed the opposite.
+
+**Reasoning:** Section 6 mixed the two axes, and once the capability catalogue of the same day gave
+part B a table, the executer halves of 6.4 and 6.5 stood in the document twice. The split is the
+same distinction the catalogue made checkable: an executer has capabilities and nothing else, so a
+document that states rules and capabilities in one run of sections cannot say which is which. A
+reader picking an implementation now has one part to read, and a reader implementing one has the
+other.
+
+The two-questions structure of the catalogue carried into part B: each capability gets a section
+(9.4 to 9.9) rather than one shared table, because the `specification` field of a catalogue entry has
+to point at prose that defines *that* capability, and six entries pointing at one section say nothing.
+
+**Alternatives:** Regrouping without renumbering — rejected: sections out of order make a
+specification unusable for looking something up. Cutting the tie between a section number and a test
+file name, so that a restructure costs nothing next time — rejected by Frank: the tie is what leads
+from a case to the rule it pins, and a specification is not restructured often enough to pay for
+losing it. Keeping the proxy in the document as an appendix — rejected: it is not what the package
+promises, and the four promises that hang off it stand on their own.
+
+**Consequences:** Roughly 100 citations by section number moved with the document — 29 test file
+names, the `specification` fields of the catalogue, and the records. The one failure mode is a
+citation that still parses: `(6.1)` used to mean *the proxy* and now means *what a context answers*,
+so a missed one stays readable and says the wrong thing. That is why the sweep went by number rather
+than by file. Every external link into the published document by section number breaks, which is what
+the `CHANGELOG.md` entry is for. `TESTING.md` §2 stands unchanged for the rules half of the suite,
+because only the capability files are named after something other than a section.
+
 ## 2026-09-05 — What does an executer owe this package, and what is its own?
 
-**Decision:** **An executer has capabilities and nothing else.** Beyond the interface of 8.1 and the
+**Decision:** **An executer has capabilities and nothing else.** Beyond the interface of 9.1 and the
 promise to execute a statement, `SPECIFICATION.md` demands nothing of it. A **capability** measures
 how far an executer supports JavaScript over a dynamic context — which constructs run, how much of
 the language's scoping survives, which values stay reachable, whether a write behaves the way an
 assignment does. A **behaviour** is what the *resolver* does, and it holds under every executer. The
 two words separate by subject, not by rank: `SPECIFICATION.md` says *behaviour* for the resolver and
-*capability* for the executer, and 8.3 is renamed accordingly. This **supersedes the vocabulary half
+*capability* for the executer, and the whole of part B is written from it. This **supersedes the vocabulary half
 of the entry of 2026-09-01** below, which made *capability* the name of a difference between
 implementations.
 
@@ -61,9 +151,9 @@ file whose name carries the word, and `CHANGELOG.md` described the document with
 document did not use.
 
 **Consequences:** `test/ExecuterCapabilities.js` keeps its name and exports `CAPABILITIES` with two
-states. `SPECIFICATION.md` 8.3 is *Capabilities of an executer* and carries the six capabilities with
-one column per implementation, written by hand from the catalogue because the suite runs in a browser
-and cannot read a document. The `it.fails` marker regains one meaning per directory — *not implemented
+states. `SPECIFICATION.md` carries the six capabilities in part B, one subsection each with one column per
+implementation, written by hand from the catalogue because the suite runs in a browser and cannot
+read a document. The `it.fails` marker regains one meaning per directory — *not implemented
 yet* in `test/spec/`, *this executer does not support this* in `test/executer/capabilities/` — which
 is a paragraph `AGENTS.md` no longer has to spend on the ambiguity. What is lost is the ability to say
 "this implementation is wrong" in the table; that statement now lives in `BACKLOG.md`, where the
@@ -83,8 +173,10 @@ inside it, and `context-scope` asks whether the same construct still reaches a c
 that puts a context name inside a construct answers both at once, and a failure then does not say
 which broke.
 
-**Reasoning:** A capability spans sections — `syntax` reads 3.4 and 8.2, `global-scope` reads 6.4, 6.5
-and 8.3 — so naming its file after one section would have to pick a winner. The rules do not span
+**Reasoning:** A capability spanned sections when this was decided — `syntax` read 3.4 and 8.2,
+`global-scope` read 6.4, 6.5 and 8.3 — so naming its file after one section would have had to pick a
+winner. The restructure of the same day gave each capability a section of its own (9.4 to 9.9), which
+is the shape this decision asked for. The rules do not span
 anything, so nothing is gained by renaming them.
 
 The two-questions rule was not a theory but a repair. Every case of 3.4 put a constant inside its
@@ -108,7 +200,7 @@ every stage of this undertaking.
 an expression could not reach the global object while a switch was off. Only an executer can keep that
 promise, an executer may be written by anyone, and three of the four shipped today break it in at
 least one shape — so the promise is withdrawn and restated as a **capability**, measured per
-implementation in the table of 8.3. The `allowGlobalWrite` switch stays in the document as pending,
+implementation in 9.7 and 9.8. The `allowGlobalWrite` switch stays in the document as pending,
 but its *off* state is bounded by what the executer in use can intercept.
 
 **Reasoning:** Frank's, on 2026-09-05: where we find that we promise something we cannot keep, the
@@ -132,7 +224,7 @@ first and deciding afterwards — rejected: the specification would have kept a 
 keep for however long that takes, and the switch's own reach is what the measurement calls into
 question.
 
-**Consequences:** Section 10 loses its 6.5 row — there is no rule left there for the code to break —
+**Consequences:** Section 10 loses its row for the negative guarantee — there is no rule left there for the code to break —
 and keeps the two that name the unimplemented switch. `BACKLOG.md` carries the write-to-globalThis
 entry as a capability gap rather than a defect, with the open question of whether the switch is worth
 having on these terms. `CHANGELOG.md` records the withdrawal, because a consumer may have read the
@@ -236,7 +328,7 @@ of 2026-09-01 below**, which describe stages of the same day's work rather than 
 | the **implementations** — every rule only observable through a statement | `test/executer/rules/` | all four registered executers |
 | **which implementation answers what** | `MATRIX` in `test/ExecuterCapabilities.js` | data only — no test logic |
 
-`TestExecuter` (`test/TestExecuter.js`) is a small implementation of 8.1: it executes a statement
+`TestExecuter` (`test/TestExecuter.js`) is a small implementation of 9.1: it executes a statement
 against a context, lets errors through, and **records the statements handed to it**. It is never
 registered by `src/executer/index.js` and never a default. A file that needs it calls
 `useTestExecuter()`, which moves `ExpressionResolver.defaultExecuter` for that file and puts the
@@ -270,7 +362,7 @@ freedom, and a broken rule are told apart at a glance. That third state is what 
 table could not say, and it is the more useful half: `defect` names a rule with a backlog entry,
 `no` names a difference nobody has to fix.
 
-*`SetupExecuterTest` was 8.4 under another name.* Asking the same subject twice, once per executer
+*`SetupExecuterTest` was 8.4, today 9.9, under another name.* Asking the same subject twice, once per executer
 and once in the general suite, is how a suite grows a duplicate that nobody reconciles. It is one
 file now, and the general half is gone.
 
@@ -289,7 +381,7 @@ executer cannot touch it — the case that pins which one is the default is the 
 notices. `capabilityIt`, `RULE_GROUPS`, `defaultExecuterEntry` and the generated `CapabilityTest.js`
 are gone; `MatrixTest.js` checks the table's shape instead of running cases from it. The gate went
 from 415 to 409 cases: seven added where a rule is now stated directly, thirteen dropped as
-duplicates of what 5.2 and 8.4 already ask. Coverage is unchanged at 92.81 % of statements — twice
+duplicates of what 5.2 and 8.4 (today 9.9) already ask. Coverage is unchanged at 92.81 % of statements — twice
 measured, because a rebuild that moves this much has to prove it lost nothing. What the matrix
 cannot check is a row no case reads any more: Vitest isolates each file, so nothing can see which
 rows were looked up. That is written into `MatrixTest.js` rather than papered over.
@@ -309,7 +401,7 @@ nowhere else. This **replaces the `RULE_GROUPS` half of the entry below**, taken
   pins no rule of `SPECIFICATION.md` at all — the code cache, the shape a context may have, the
   helpers of the suite itself.
 - **The file name is the rule.** One file per section, `<section>-<slug>.Test.js`. A section with
-  halves in both groups — 6.1, 6.5, 7, 8.2 — has a file in each, and that is the whole answer to
+  halves in both groups — 6.1, 6.5, 7, 8.2 (today 6.4, 6.5, 7, 9.2) — has a file in each, and that is the whole answer to
   what the `both` state of the old table tried to express.
 - **The catalogue is what an executer may decline.** `test/ExecuterCapabilities.js` carries, per
   capability, the case that decides it (`context`, `run`, `expected`) and a matrix of one row per
@@ -357,7 +449,7 @@ cannot read the document. Every file that loops over `EXECUTERS` now lives under
 which moved `ContextShapeTest`, `StackedContextTest` and `SetupExecuterTest` out of `test/general/`
 (all three were dissolved into section files later the same day);
 what is left there pins no rule and loops over nothing. Two cases still loop over the executers from
-inside `test/spec/` — 8.2 and 8.4 — and they are the one open question this structure does not
+inside `test/spec/` — 8.2 and 8.4, today 9.2 and 9.9 — and they are the one open question this structure does not
 answer; `BACKLOG.md` carries it. Measured across the rebuild: 415 cases before and after the moves,
 coverage unchanged at 92.81 % of statements.
 
@@ -461,7 +553,7 @@ holding the default back for it would mean holding it back indefinitely.
 
 **Consequences:** A write from inside an expression stops persisting for everyone who did not pick
 an executer — conformant per 6.5, silent, and the reason the entry in `CHANGELOG.md` carries a
-migration note rather than a line. `SPECIFICATION.md` 8.2 loses its *Open* note and section 10 its
+migration note rather than a line. `SPECIFICATION.md` 8.2 — today 9.2 — loses its *Open* note and section 10 its
 row, so the specification and the code now say the same thing about the default. The conformance
 suite pins the default by name (`test/spec/ExecuterTest.js`), so the next change of default turns
 the gate red instead of announcing itself through unrelated failures — which is how this one was

@@ -52,7 +52,7 @@ const buildText = (expression) => {
 
 /**
  * The four texts, spelled for one executer - `ContextObjectExecuter` addresses a context value as
- * `ctx.value` where the other three take `value` (SPECIFICATION.md 8.3).
+ * `ctx.value` where the other three take `value` (SPECIFICATION.md 9.3).
  */
 const buildTexts = (variableName) => {
 	const word = variableName("word");

@@ -4,7 +4,7 @@ import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
 
 /**
  * Capability `context-scope` - whether a construct carrying a context name still reaches that value.
- * Read against SPECIFICATION.md 8.3.
+ * Read against SPECIFICATION.md 9.5.
  *
  * The second of the two questions this catalogue asks about every construct: `syntax` asks whether it
  * runs, with constants inside it; this file asks whether the same construct still sees the context.

@@ -6,7 +6,7 @@ import { useTestExecuter, answersFromContext, answerWith, statements } from "../
 /**
  * SPECIFICATION.md 4.3 - resolve answers a value, resolveText answers a text.
  * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
+ * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();
@@ -47,7 +47,7 @@ describe("Specification 4.3 - resolve answers a value, resolveText answers a tex
 	});
 
 	// Counted through a getter rather than through "${counter++} ${counter++}": whether a write
-	// from an expression persists is the executer's own (8.3), so a counting write would pin this
+	// from an expression persists is the executer's own (9.7), so a counting write would pin this
 	// rule to the executers that keep one. Reading does not. Verified 2026-09-01 against all four:
 	// each answers "0 1" and reads the getter exactly twice.
 	// The rule from the executer side: the same expression standing twice is handed over twice, not

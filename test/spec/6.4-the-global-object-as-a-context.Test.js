@@ -5,7 +5,7 @@ import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/exec
 /**
  * SPECIFICATION.md 6.4 - the global object as an ordinary context object.
  *
- * How a name that no resolver carries reaches the global object is the executer's own (8.3) and is
+ * How a name that no resolver carries reaches the global object is the executer's own (9.8) and is
  * a row of the capability catalogue. What is here is the global object handed in as a context.
  */
 

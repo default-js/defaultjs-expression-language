@@ -28,7 +28,7 @@ describe("Specification 6.7 - buildSecure", () => {
 	});
 
 	// That a statement can still reach a global - buildSecure is no sandbox - is not a rule of 6.7
-	// but a freedom of 8.3, and it is in the matrix as `reaches a global that no resolver carries`.
+	// but a capability of 9.8, and it is in the catalogue as `reaches the global Math`.
 	// It cannot be asserted here without evaluating something, and it would say nothing about
 	// buildSecure if it were.
 

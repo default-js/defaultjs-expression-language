@@ -4,7 +4,7 @@ import { EXECUTERS, casesOf } from "../../ExecuterCapabilities.js";
 
 /**
  * Capability `syntax` - which JavaScript constructs an executer can run at all.
- * Read against SPECIFICATION.md 3.4 and 8.2.
+ * Read against SPECIFICATION.md 9.4; the empty statement is the resolver's and stays in 3.4.
  *
  * **Constants only.** A context name never appears in a case of this file: a construct carrying one
  * asks two questions at once - does it run, and does it still see the context - and a failure would

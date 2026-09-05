@@ -5,13 +5,13 @@ import getExecuter, { registrate, getExecuter as namedGetExecuter } from "../../
 import * as ContextObjectModule from "../../src/executer/ContextObjectExecuter.js";
 
 /**
- * SPECIFICATION.md 8.1 - the Executer interface and the registry, plus which implementation is the
+ * SPECIFICATION.md 9.1 - the Executer interface and the registry, plus which implementation is the
  * default. None of it runs an expression through an executer of its own choosing.
  */
 
 const ContextObjectExecuterName = ContextObjectModule.EXECUTERNAME;
 
-describe("Specification 8.1 - the interface", () => {
+describe("Specification 9.1 - the interface", () => {
 
 	it("answers the default context it was built with", async () => {
 		const context = { marker: 1 };
@@ -61,7 +61,7 @@ describe("Specification 8.1 - the interface", () => {
 	});
 });
 
-describe("Specification 8.1 - the default executer", () => {
+describe("Specification 9.1 - the default executer", () => {
 
 	const reset = ExpressionResolver.defaultExecuter;
 	afterAll(() => {

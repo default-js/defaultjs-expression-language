@@ -9,7 +9,7 @@ import { useTestExecuter } from "../TestExecuter.js";
  * `test/executer/rules/3.4-…`. What is left here is the one half of 3.4 that never reaches an
  * executer at all: the empty statement, which the resolver answers by itself.
  * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
+ * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();

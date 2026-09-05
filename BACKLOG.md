@@ -10,6 +10,8 @@ Anything that affects consumers of the package additionally belongs in the [issu
 
 Entries here are independent of each other. An undertaking whose steps depend on each other gets its own file under `plans/` instead, and that file is deleted once it is finished — as the toolchain modernization was on 2026-08-21.
 
+**`Blocks 3.0.0`** marks an entry that has to be closed before the release. Since 2026-09-05 `SPECIFICATION.md` is written as though every rule in it holds and carries no index of what is missing, so **this file is that index**: a rule the document asserts and the code does not keep is a release blocker, and the marker is the only place that says so. Three entries carry it today — the configuration form of the static calls, the executer's `defaultContext`, and the contradiction between 5.5 and 4.2. Adding a rule to the specification without either implementing it or marking an entry here is how the gate gets lost.
+
 ---
 
 > **The freeze is lifted (2026-08-22). `SPECIFICATION.md` is the reference now.**
@@ -248,7 +250,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   statements are uncovered where 34 were, and every one of them is on the list below. Nothing was
   lost when `test/ExecuterTests/` was dissolved: the one line its 117 cases covered that the new
   suite did not — the `TemplateLiteral` branch of the esprima rewrite — came along as a case of
-  `test/executer/rules/8.3-what-the-executer-decides.Test.js`, found by measuring rather than by
+  `test/executer/capabilities/context-scope.Test.js`, found by measuring rather than by
   counting tests.
   **`src/ExpressionResolver.js` is at 100 % of lines and functions**, the file that carried more
   than half of everything uncovered a week earlier.
@@ -328,7 +330,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   does. The deconstructor binds the method to a local and calls it bare, so `this` is `undefined`
   inside it and any method reading its own state raises. Measured 2026-09-05 and pinned as
   `keeps this bound to the context when a method is called bare` in
-  `test/executer/capabilities/context-scope.Test.js`. Not a broken rule — 8.3 lets an executer decide
+  `test/executer/capabilities/context-scope.Test.js`. Not a broken rule — 9.3 lets an executer decide
   how a statement reaches a context value — but it is the **default** executer and the loss is
   silent, so decide whether it stays a capability the default lacks or whether the generated code
   binds the receiver. Consumer-visible either way, so the outcome belongs in `CHANGELOG.md`. Found
@@ -345,7 +347,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   object as context`, `no` for the deconstructor - in `test/executer/rules/6.1-the-proxy.Test.js`.
   The same shape covers any context with a lazily computed or throwing getter, and note that
   destructuring also *runs* every getter on every execution, which is a cost the other executers do
-  not pay. To decide whether that is a defect of the executer or the price of its strategy (8.3).
+  not pay. To decide whether that is a defect of the executer or the price of its strategy (9.6).
   Found 2026-08-30 while checking how the executers treat unusual context shapes.
   **Both halves are pinned since 2026-09-05**, with a planted accessor rather than through an
   `arguments` object: `reads a context value beside a getter that throws` and `leaves a getter of the
@@ -361,10 +363,14 @@ Entries here are independent of each other. An undertaking whose steps depend on
   withdrawn, because only an executer can keep it and the package cannot require it of one (see
   `DECISIONS.md`, same day). What is left here is two things: **whether the three that leak should
   gain the containment**, which is what the rest of this entry describes, and **whether the
-  `allowGlobalWrite` switch is still worth having** now that its *off* state can only mean *under the
-  executers able to intercept an assignment* — under one that cannot, it means nothing at all. Decide
-  the second before implementing the first; the rest of the entry was written while 6.5 still
-  promised the containment, and reads as a fix for a defect rather than as a capability to add.
+  `allowGlobalWrite` switch is worth having at all** now that its *off* state can only mean *under
+  the executers able to intercept an assignment* — under one that cannot, it means nothing.
+  **The switch was taken out of `SPECIFICATION.md` the same day**, because the document is written as
+  though everything in it exists and would otherwise assert a feature nobody has decided to build.
+  Decide it before writing it back: if it comes, 6.5 gets the three levels again and this entry
+  becomes a release blocker; if it does not, nothing more has to happen to the document. The rest of
+  the entry was written while 6.5 still promised the containment and reads as a fix for a defect
+  rather than as a capability to add.
   Verified 2026-08-22 against `src/` under node 24.19 with both executers: `${brandNew = 1}`
   leaves the resolver's own context untouched and sets `globalThis.brandNew`. Under
   `WithScopedExecuter` the `has` trap answers false for a name the chain does not carry
@@ -394,7 +400,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   **`buildSecure` has to forward it in the same change.** Since 2026-08-29 it takes the
   constructor options inside its `option` argument and names them one by one
   (`src/ExpressionResolver.js:355`), so `allowGlobalWrite` has to be added to that destructuring
-  as well — `SPECIFICATION.md` 6.7 carries it as pending and section 10 points here. The CMS case
+  as well — `SPECIFICATION.md` 6.7 describes it as forwarded, so this is one of the entries that has to be closed before 3.0.0. The CMS case
   that motivates `buildSecure` is the case this switch was invented for, so the two belong
   together.
   Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
@@ -436,7 +442,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `ReferenceError: count is not defined`. Every other executer answers all four, because they put
   the context into scope (`with`), into the parameter list, or hand it over as an object - and a
   nested function closes over any of those. A callback is not an exotic thing to write in an
-  expression, so this is narrower than it looks only until someone writes `map`. §8.3 lets an
+  expression, so this is narrower than it looks only until someone writes `map`. §9.3 lets an
   executer decide how a statement reaches a context value, but not to lose it halfway through the
   statement. Read together with the `RESERVED_NAMES` entry above: both are about what the rewrite
   does and does not see, and one pass over that rewrite should answer both. Consumer-visible, so
@@ -486,7 +492,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   executer `${ Math.round(1.5) }` answers `undefined`, because `Math` is not on the list and is
   therefore rewritten to `ctx?.Math`. The same holds for every global the list does not name —
   `JSON`, `Date`, `Number`, `Promise`. The other three executers answer `2`. That is legal under
-  8.3, which lets an executer decide how a statement reaches the global object, and it is pinned
+  9.8, which lets an executer decide how a statement reaches the global object, and it is pinned
   as such in the capability catalogue — but it makes the list the whole surface a consumer of
   this executer gets, which is the argument for reviewing it rather than patching one typo.
   **Agreed 2026-08-24: rework the list as a whole, not the typo alone.** The direction to try
@@ -508,8 +514,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   application itself planted**, which is the case a hand-written list can never carry and the
   strongest argument for deriving it. The other three executers answer all twelve.
 
-- [ ] **The static entry points take no configuration object.**
-  Target: `SPECIFICATION.md` 4.1.
+- [ ] **The static entry points take no configuration object.** `Blocks 3.0.0`
+  Target: `SPECIFICATION.md` 4.1, which describes both call forms as available.
   `ExpressionResolver.resolve` and `resolveText` are positional only
   (`src/ExpressionResolver.js:298,322`), so every argument beyond the context has to be reached
   by passing the ones before it, and the call site says nothing about what a bare `true` at the
@@ -531,6 +537,18 @@ Entries here are independent of each other. An undertaking whose steps depend on
   answer the default after a `TypeError` inside the `catch`; the `TypeError` now reaches the caller,
   which is at least visible but still an accident rather than a rule. `SPECIFICATION.md` 4.1 says
   nothing about it either.
+
+- [ ] **`SPECIFICATION.md` needs another pass — Frank has a list.**
+  The document was restructured and trimmed on 2026-09-05: two parts, the resolver in part A and the
+  executer capabilities in part B, no dates, no pointers into the records, and every rule written as
+  though it holds. What that pass did **not** do is read every rule for whether it is still right —
+  it moved and shortened text and only touched content where a section was split. Frank found further
+  places that are not clean while reviewing the result; they are not written down yet, so **this entry
+  is the placeholder and the list belongs in it**. Two are already known from elsewhere: the
+  contradiction between 5.5 and 4.2, which has its own entry, and section 2, which still calls a chain
+  *the stacking context* although no other section uses the term. Anything found here that is a rule
+  the code does not keep gets the `Blocks 3.0.0` marker; anything that is only wording does not.
+  Found 2026-09-05.
 
 - [ ] **The JSDoc of the whole package needs one pass.**
   Agreed 2026-08-30, out of the naming review of the same day. What that review turned up, without
@@ -581,7 +599,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   the loudest part and the one with a price: renaming them changes what the gate prints.
   Found 2026-08-30.
 
-- [ ] **The executer's `defaultContext` has no reader left, so 4.2 and 6.3 are unimplemented.**
+- [ ] **The executer's `defaultContext` has no reader left, so 4.2 and 6.2 are unimplemented.** `Blocks 3.0.0`
   `SPECIFICATION.md` 4.2 says `context` defaults to the default context of the **executer in
   use**, and 6.3 leans on it: leaving `context` out is explicitly *not* the same as passing
   `context: null`, because the first takes that default — for `EsprimaExecuter` the global object.
@@ -591,10 +609,10 @@ Entries here are independent of each other. An undertaking whose steps depend on
   executer, not the one this resolver was built with — so the rule as written was never
   implemented either; the change removed the approximation. A `grep` for `defaultContext` over
   `src/` now finds only the definition in `Executer.js` and the four executers setting it, and no
-  reader at all, which leaves half of the `Executer` interface of 8.1 dead in production while
+  reader at all, which leaves half of the `Executer` interface of 9.1 dead in production while
   section 9 lists it as public. To decide: implement 4.2 with the executer of the instance, or
   change 4.2 and 6.3 and drop `defaultContext` from the interface. No test covers the rule, which
-  is why the gate stayed green through the change, and unlike the other entries of section 10 this
+  is why the gate stayed green through the change, and unlike the other rules the code does not keep yet, this
   one carries no `fails` marker yet. Consumer-visible, so the outcome belongs in `DECISIONS.md`
   and in `CHANGELOG.md`. Found 2026-08-30 while rebuilding `dist/` after the commit `some fixes`.
 
@@ -624,7 +642,10 @@ Entries here are independent of each other. An undertaking whose steps depend on
   resolver that has one behaves exactly like this. Keep it on record until that definition is
   written.
 
-- [ ] **5.5 and 4.2 now contradict each other over a resolver built without the `context` option.**
+- [ ] **5.5 and 4.2 contradict each other over a resolver built without the `context` option.** `Blocks 3.0.0`
+  A contradiction inside the specification is a release blocker of its own: the document asserts both
+  and, since 2026-09-05, no longer marks either as pending, so nothing but this entry says that one of
+  them is wrong.
   5.5 says a resolver provides a context when the caller *handed one to the constructor* — "any
   value that is neither `null` nor `undefined`" — and names three cases that provide none:
   `context: null`, `context: undefined`, and *the option left out*. 4.2 and 6.3 say the option left
@@ -647,7 +668,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
   from "the context a resolver gets when the caller passes none" and towards something like a
   *global* context, available in addition to the chain rather than in place of it. Frank is working
   out that definition; nothing about it is settled beyond the direction, and `Executer.js`,
-  `SPECIFICATION.md` 4.2, 6.3, 8.1 and section 10 all move with it. Until it is written, the
+  `SPECIFICATION.md` 4.2, 6.3 and 9.1 all move with it. Until it is written, the
   constructor stops reading `defaultContext` for a missing option, which is what makes
   `test/spec/5.5-inspecting-the-chain.Test.js` green again and what removes the shared-object
   defect above.

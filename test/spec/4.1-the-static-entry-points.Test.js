@@ -8,7 +8,7 @@ import { useTestExecuter, answersFromContext, answerWith } from "../TestExecuter
  * The configuration form is not implemented; its cases carry the marker and BACKLOG.md carries the
  * entry.
  * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (8.3) and no rule here.
+ * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();
