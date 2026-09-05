@@ -346,6 +346,23 @@ Entries here are independent of each other. An undertaking whose steps depend on
   together.
   Consumer-visible, so the outcome belongs in `CHANGELOG.md`.
   Found 2026-08-22 while working out the specification questions.
+  **Three measurements of 2026-09-05**, from splitting the containment into four cases
+  (`test/executer/capabilities/global-scope.Test.js`). They change the picture, and the rewrite of
+  6.5 has to be written against them rather than against the single case that existed before:
+  1. **`esprima-executer` leaks after all.** It kept the top-level write out of the global object
+     only by accident — its rewrite makes `x = 1` into `ctx?.x = 1`, an illegal assignment target, so
+     the statement raises before creating anything. **Inside a function body the rewrite does not
+     go**, the identifier stays bare, and the sloppy-mode assignment creates a global:
+     `${ (() => { leak = 1; })() }` leaves `leak` on `globalThis`. So three of the four leak, not two,
+     and the one that does not is `context-object-executer`, whose dialect writes through the proxy.
+     Read together with the entry on what the esprima traversal does not reach.
+  2. **A compound assignment cannot leak.** `x += 1` on an unknown name reads before it writes and
+     raises on the read, under every executer. Whatever 6.5 says about containment, it is about
+     `x = 1` and not about every assignment.
+  3. **Nothing contains an explicit `globalThis.x = 1`** except, by the same accident as above,
+     `esprima-executer`. The negative guarantee is therefore about the *accidental* leak of an
+     unqualified name, never about sandboxing a statement that asks for the global object by name.
+     6.5 has to say that, or a reader takes it for a sandbox.
 
 - [ ] **`EsprimaExecuter` cannot reach a context value from inside a nested function.**
   Its rewrite turns an identifier into `ctx?.name`, but only where the identifier stands in the

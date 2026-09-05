@@ -363,8 +363,39 @@ Each stage is green before the next one starts, and no stage changes a source fi
    91.47 % of statements (515/563) against 92.81 % (504/543), 90.00 % of branches against 91.00 %,
    90.26 % of functions against 91.58 %, 93.90 % of lines against 95.56 %. Re-measure once the draft
    is finished or reverted — see *Precondition*.
-1. **`context-write` and the containment half of `global-scope`.** The groups the parked draft
-   touches, so the catalogue is ready for it before it lands.
+1. **`context-write` and the containment half of `global-scope` — done 2026-09-05, gate green.**
+   `context-write` went from 1 row to 11, `global-scope` from 3 to 6; 13 new rows, 52 new cases.
+   Before: 436 cases, 14 expected fails. After: **488 cases, 34 expected fails** — the 20 new `no`
+   cells, counted one by one against the table.
+
+   **Every state was measured, none guessed.** The rows went in as `yes` across the board, the cases
+   ran, and the failures were read off the run per executer before the table was corrected. The
+   second run then had to be green in both directions, which is what a `no` cell means.
+
+   What the split shows, and none of it was visible while each was one case:
+
+   - **The deconstructor keeps exactly one of the ten write facets**: a *mutation* of a context
+     object (`holder.name = "after"`), because the statement and the context hold the same object and
+     nothing has to be carried back. Every facet that needs a value carried back — a plain write, a
+     counting one, an inherited name, one made in a nested function, one made before the statement
+     threw, a rebinding — is `no`.
+   - **`with-scoped` is `no` for a name no resolver carries**, in *both* capabilities at once: the
+     `has` trap answers false, so the assignment leaves the `with` block, and the value is neither
+     contained nor readable afterwards. `context-object` is the only executer that puts such a write
+     into the context.
+   - **`esprima` contains a global write only at the top level, and leaks from inside a function.**
+     Its rewrite makes `x = 1` an illegal assignment target, which is why it looked contained; inside
+     a function body the rewrite does not go and the sloppy assignment creates a global. The single
+     case that existed before could not see this. Written into `BACKLOG.md` the same turn.
+   - **Nothing contains an explicit `globalThis.x = 1`** but that same accident. The negative
+     guarantee of 6.5 is about an unqualified name, not about sandboxing — which the rewrite of 6.5
+     in stage 5 has to say.
+
+   Two rows are all-`yes` and worth keeping for what they fence off rather than for a difference: a
+   non-writable key and a frozen context both survive a write attempt under all four. One row,
+   `leaves the ancestor untouched when writing a name it carries`, is all-`yes` with two of the four
+   passing trivially because they wrote nothing at all — the case says so in its comment and is only
+   read together with the row above it.
 2. **`context-shape` and `context-scope`.**
 3. **`global-scope` (the reachability half) and `syntax`.**
 4. **`cache`**, and the contract tests of 8.1/8.2 as plain cases.

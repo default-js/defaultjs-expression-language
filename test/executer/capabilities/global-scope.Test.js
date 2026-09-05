@@ -38,11 +38,52 @@ for (const { name: executer, variableName } of EXECUTERS) {
 		});
 
 		// The leak is read and cleaned up before the assertion, because a failing case stops at the
-		// assertion and would otherwise leave the name on globalThis for every later test.
+		// assertion and would otherwise leave the name on globalThis for every later test. Every case
+		// below does the same, and each uses a name of its own so that one executer's leak cannot make
+		// another one pass.
 		capabilityIt("keeps a write to a name no resolver carries out of the global object", async () => {
 			const leakName = `leaked_${executer.replace(/-/g, "_")}`;
 			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
 			await resolver.resolveText(`\${${variableName(leakName)} = 1}`);
+			const leaked = leakName in globalThis;
+			delete globalThis[leakName];
+
+			expect(leaked).toBe(false);
+		});
+
+		// The same write one function deeper. Not the same question: an executer that rewrites the
+		// statement before running it sees the identifier at the top level and may not see it inside
+		// a function body - and a callback is an ordinary thing to write in an expression.
+		capabilityIt("keeps a write from inside a nested function out of the global object", async () => {
+			const leakName = `leaked_nested_${executer.replace(/-/g, "_")}`;
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			await resolver.resolveText(`\${ (() => { ${variableName(leakName)} = 1; })() }`);
+			const leaked = leakName in globalThis;
+			delete globalThis[leakName];
+
+			expect(leaked).toBe(false);
+		});
+
+		// A compound assignment reads before it writes, so an unknown name raises on the read and
+		// never gets as far as creating anything. The row is here because that is a boundary worth
+		// writing down rather than rediscovering: `x = 1` and `x += 1` do not leak alike.
+		capabilityIt("keeps a compound assignment to an unknown name out of the global object", async () => {
+			const leakName = `leaked_compound_${executer.replace(/-/g, "_")}`;
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			await resolver.resolveText(`\${${variableName(leakName)} += 1}`);
+			const leaked = leakName in globalThis;
+			delete globalThis[leakName];
+
+			expect(leaked).toBe(false);
+		});
+
+		// Written through `globalThis` on purpose, and spelled the same under every executer because
+		// `globalThis` is no context name. This is not the accidental leak the rows above are about -
+		// it is a statement asking for the global object by name, and nothing here sandboxes it.
+		capabilityIt("keeps an explicit write through globalThis out of the global object", async () => {
+			const leakName = `leaked_explicit_${executer.replace(/-/g, "_")}`;
+			const resolver = new ExpressionResolver({ context: { known: 1 }, name: "root", executer });
+			await resolver.resolveText(`\${ globalThis.${leakName} = 1 }`);
 			const leaked = leakName in globalThis;
 			delete globalThis[leakName];
 

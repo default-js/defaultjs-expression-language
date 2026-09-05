@@ -169,7 +169,26 @@ export const CAPABILITIES = {
 			// The deconstructor writes into a destructured local binding and nothing carries it back;
 			// the esprima executer cannot run an assignment at all. BACKLOG.md carries the write-back
 			// that would close the first of the two.
-			"makes a write to a name the context carries readable afterwards":         [ YES,         YES,            NO,             NO ]
+			"makes a write to a name the context carries readable afterwards":         [ YES,         YES,            NO,             NO ],
+			"counts across two occurrences of a counting write in one text":           [ YES,         YES,            NO,             NO ],
+			"makes a write to a name only an ancestor carries readable afterwards":    [ YES,         YES,            NO,             NO ],
+			// all four, and two of them for the reason that they wrote nothing at all - see the
+			// comment on the case, which is why this row is only read together with the one above
+			"leaves the ancestor untouched when writing a name it carries":            [ YES,         YES,            YES,            YES ],
+			"makes a write from inside a nested function readable afterwards":         [ YES,         YES,            NO,             NO ],
+			"makes a write readable after the statement threw":                        [ YES,         YES,            NO,             NO ],
+			"leaves a non-writable key of the context unchanged":                      [ YES,         YES,            YES,            YES ],
+			"leaves a key of a frozen context unchanged":                              [ YES,         YES,            YES,            YES ],
+			// the only row of this capability the deconstructor keeps: a mutation needs nothing
+			// carried back, because the statement and the context hold the same object. The esprima
+			// rewrite turns the target into `ctx?.holder.name`, which is not a legal one.
+			"makes a mutation of a context object visible afterwards":                 [ YES,         YES,            YES,            NO ],
+			"makes a rebinding of a context name readable afterwards":                 [ YES,         YES,            NO,             NO ],
+			// `with-scoped` is `no` here and `no` on containment as well: the name is unknown to the
+			// chain, so the `has` trap answers false, the assignment leaves the `with` block and
+			// lands on the global object - neither contained nor readable. `context-object` is the
+			// only one that puts it in the context, because its dialect writes through the proxy.
+			"makes a write to a name no resolver carries readable afterwards":         [ NO,          YES,            NO,             NO ]
 		}
 	},
 
@@ -192,7 +211,21 @@ export const CAPABILITIES = {
 			// promised the containment and is being rewritten, because a promise the package cannot
 			// keep is corrected in the document. BACKLOG.md, "A write to an unknown name inside an
 			// expression lands on globalThis".
-			"keeps a write to a name no resolver carries out of the global object":    [ NO,          YES,            NO,             YES ]
+			"keeps a write to a name no resolver carries out of the global object":    [ NO,          YES,            NO,             YES ],
+			// **esprima flips between this row and the one above**, which is the whole reason the two
+			// exist apart: at the top level its rewrite turns the name into `ctx?.name`, an illegal
+			// assignment target, so the statement raises before anything is created - it contains the
+			// write by accident. Inside a function body the rewrite does not go, the identifier stays
+			// bare, and the sloppy-mode assignment creates a global. Measured 2026-09-05.
+			"keeps a write from inside a nested function out of the global object":    [ NO,          YES,            NO,             NO ],
+			// A compound assignment reads before it writes, so an unknown name raises on the read and
+			// never creates anything - under every executer, including the two that leak `x = 1`.
+			"keeps a compound assignment to an unknown name out of the global object": [ YES,         YES,            YES,            YES ],
+			// Nothing here is a sandbox: a statement that asks for the global object by name gets it.
+			// The one that says `yes` does so by accident again - `globalThis` is not in the esprima
+			// rewrite's list of names to leave alone, so the target becomes `ctx?.globalThis.name` and
+			// the statement raises. Measured 2026-09-05.
+			"keeps an explicit write through globalThis out of the global object":     [ NO,          NO,             NO,             YES ]
 		}
 	},
 
