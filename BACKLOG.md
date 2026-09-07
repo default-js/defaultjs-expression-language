@@ -538,16 +538,19 @@ Entries here are independent of each other. An undertaking whose steps depend on
   which is at least visible but still an accident rather than a rule. `SPECIFICATION.md` 4.1 says
   nothing about it either.
 
-- [ ] **`SPECIFICATION.md` needs another pass — Frank has a list.**
+- [ ] **`SPECIFICATION.md` has not been read rule by rule since it was written.**
   The document was restructured and trimmed on 2026-09-05: two parts, the resolver in part A and the
   executer capabilities in part B, no dates, no pointers into the records, and every rule written as
-  though it holds. What that pass did **not** do is read every rule for whether it is still right —
-  it moved and shortened text and only touched content where a section was split. Frank found further
-  places that are not clean while reviewing the result; they are not written down yet, so **this entry
-  is the placeholder and the list belongs in it**. Two are already known from elsewhere: the
-  contradiction between 5.5 and 4.2, which has its own entry, and section 2, which still calls a chain
-  *the stacking context* although no other section uses the term. Anything found here that is a rule
-  the code does not keep gets the `Blocks 3.0.0` marker; anything that is only wording does not.
+  though it holds. **That pass verified nothing.** It moved and shortened text and touched content
+  only where a section was split, so a rule that was wrong on 2026-08-22 is still wrong today and now
+  reads as though it holds — which is the whole risk of the style the document was given.
+  The work does not wait for anyone's notes: **read every rule against the code and against the
+  suite**, and decide per rule whether it is still true, still wanted, and pinned by a test. Two
+  places are already known — the contradiction between 5.5 and 4.2, which has its own entry, and
+  section 2, which still calls a chain *the stacking context* although no other section uses the term.
+  Frank has further points from reviewing the restructure; they are not written down, and when they
+  come they are added here rather than being what starts this. Anything found that is a rule the code
+  does not keep gets the `Blocks 3.0.0` marker; anything that is only wording does not.
   Found 2026-09-05.
 
 - [ ] **The JSDoc of the whole package needs one pass.**

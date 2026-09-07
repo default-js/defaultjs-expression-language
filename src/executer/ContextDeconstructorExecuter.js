@@ -3,7 +3,7 @@ import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 
-let DEBUG = true;
+let DEBUG = false;
 export const EXECUTERNAME = "context-deconstruction-executer";
 const EXPRESSION_CACHE = new CodeCache({ size: 5000 });
 const blockedPropertyNames = new Set([
@@ -11,8 +11,10 @@ const blockedPropertyNames = new Set([
 	"__defineGetter__",
 	"__defineSetter__",
 	"__lookupGetter__",
-	"__lookupSetter__"
+	"__lookupSetter__",
 ]);
+
+const MAX_CONTEXTNAME_RETRIES = 100;
 
 /**
  *
@@ -31,15 +33,16 @@ export const setupExecuter = (options) => {
 
 const getPropertyNames = (aContext) => {
 	if (GLOBAL === aContext) return [];
-	const result = Reflect.ownKeys(aContext).filter((key) => !blockedPropertyNames.has(key));
-	
+	const result = Reflect.ownKeys(aContext).filter(
+		(key) => !blockedPropertyNames.has(key),
+	);
 
-	if(result.length > 10)
-		console.warn(`High count of properties at first level, can be decrease the performence! count: ${result.length}`);
+	if (result.length > 10)
+		console.warn(
+			`High count of properties at first level, can be decrease the performence! count: ${result.length}`,
+		);
 	return result;
 };
-
-
 
 /**
  *
@@ -70,8 +73,7 @@ return (async ({${contextProperties}}) => {
     }
 })(context || {});`;
 
-	if (DEBUG)
-		console.log("genererated code: \n", code);
+	if (DEBUG) console.log("genererated code: \n", code);
 
 	return new Function("context", code);
 };
@@ -92,25 +94,39 @@ const getOrCreateFunction2 = (aStatement, contextProperties) => {
  * @returns {Function}
  */
 const generate2 = (aStatement, contextProperties) => {
+	const contextName = getContextName(contextProperties);
 	const code = `
-return (async (ctx) => {
-${contextProperties.map((prop) => `\tlet ${prop} = ctx.${prop};`).join("\n")}
-
+return (async (${contextName}) => {
+${contextProperties.map((prop) => `\tlet ${prop} = ${contextName}.${prop};`).join("\n")}
     try{
        return ${aStatement}
     }catch(e){
         throw e;
     }finally{
-		if(!Object.isFrozen(ctx)){
-${contextProperties.map((prop) => `\t\t\tif(Object.getOwnPropertyDescriptor(ctx, '${prop}')?.writable) ctx.${prop} = ${prop};`).join("\n")}
-		}
+		
+${contextProperties.map((prop) => `\t\t\tif(Object.getOwnPropertyDescriptor(${contextName}, '${prop}')?.writable) ${contextName}.${prop} = ${prop};`).join("\n")}
+		
 	}
 })(context || {});`;
 
-	if (DEBUG)
-		console.log("genererated code: \n", code);
+	if (DEBUG) console.log("genererated code: \n", code);
 
 	return new Function("context", code);
+};
+
+function getRandomInt() {
+	return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+}
+
+const getContextName = (propertyNames) => {
+	const properties = new Set(propertyNames);
+	for (let i = 0; i < MAX_CONTEXTNAME_RETRIES; i++) {
+		const contextName = `ctx_${getRandomInt()}`;
+		if (!properties.has(contextName)) return contextName;
+	}
+	throw new Error(
+		`Could not find a unique context name after ${MAX_CONTEXTNAME_RETRIES} tries`,
+	);
 };
 
 const EXECUTER = new Executer({
@@ -125,9 +141,6 @@ const EXECUTER = new Executer({
 		return expression(aContext);
 	},
 });
-
-
-
 
 registrate(EXECUTERNAME, EXECUTER);
 

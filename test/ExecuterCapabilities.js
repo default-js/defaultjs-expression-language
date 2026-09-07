@@ -231,7 +231,7 @@ export const CAPABILITIES = {
 			// reads the binding it is declaring. A key called `context` is harmless, because the
 			// shadowing happens inside the generated arrow while the argument is evaluated outside it.
 			// Read off the code and measured 2026-09-05; BACKLOG.md carries it.
-			"runs a statement over a context carrying a key named ctx":                [ YES,         YES,            NO,             YES ],
+			"runs a statement over a context carrying a key named ctx":                [ YES,         YES,            YES,             YES ],
 			"runs a statement over a context carrying a key named context":            [ YES,         YES,            YES,            YES ],
 			"runs a statement over a context carrying a key named like a reserved word": [ YES,       YES,            YES,            YES ],
 			"runs a statement over a context carrying many keys":                      [ YES,         YES,            YES,            YES ],
