@@ -231,25 +231,17 @@ Entries here are independent of each other. An undertaking whose steps depend on
   tail of the deepest. Note that the same file's own comment explains why the tail is reused: a
   bench file has nowhere to put setup. Found 2026-08-29 while measuring the whole cycle for goal 5.
 
-- [ ] **Coverage as of 2026-09-05, and why it is not comparable to the line below.**
-  Statements **91.65 %** (516/563), branches **90.35 %** (253/280), functions **90.26 %** (102/113),
-  lines **93.90 %** (462/492), measured after the capability catalogue was finished — 732 cases where
-  436 ran before it. **The percentages fell while 296 cases were added**, and the reason is not the
-  suite: `30e5623` added 20 statements and 18 lines to `ContextDeconstructorExecuter.js`, nine of them
-  unreachable (`generate` and `getOrCreateFunction`, which nothing calls since the draft took over).
-  Until that draft is finished or reverted, no comparison against the 2026-09-01 numbers below says
-  anything — **re-measure then**, and expect the uncovered set to be the list below minus nothing:
-  the catalogue covers behaviour, not lines, and every item that was uncovered on 2026-09-01 still is.
-
-- [ ] **Coverage as of 2026-09-01, and the four things still uncovered.**
-  Statements **92.81 %** (504/543), branches **91.00 %** (253/278), functions **91.58 %** (98/107),
-  lines **95.56 %** (453/474). Measured after the executer conformance work; the numbers before it
-  were 93.28 % / 91.85 % / 90.81 % / 95.69 % (472/506) on 2026-08-29. **The percentages fell while
-  the tests did not**: the package grew from 506 to 543 statements over the same days — the name
-  check moved into `ContextDeconstructorExecuter`, the constructor and the handle changed — so 39
-  statements are uncovered where 34 were, and every one of them is on the list below. Nothing was
-  lost when `test/ExecuterTests/` was dissolved: the one line its 117 cases covered that the new
-  suite did not — the `TemplateLiteral` branch of the esprima rewrite — came along as a case of
+- [ ] **Coverage as of 2026-09-07, and the four things still uncovered.**
+  Statements **93.07 %** (524/563), branches **91.36 %** (254/278), functions **92.10 %** (105/114),
+  lines **95.70 %** (468/489), over 737 cases. Measured after the write-back of
+  `ContextDeconstructorExecuter` was finished and the two generators the draft had left dead were
+  deleted — which is what the 2026-09-05 entry was waiting for, and that entry is gone with it. The
+  numbers before were 92.81 % / 91.00 % / 91.58 % / 95.56 % (504/543) on 2026-09-01 and
+  91.65 % / 90.35 % / 90.26 % / 93.90 % (516/563) on 2026-09-05, the second of those depressed by
+  the nine unreachable lines of the draft. So this is the first figure since 2026-08-29 that is
+  comparable to anything, and it is above both. Nothing was lost when `test/ExecuterTests/` was
+  dissolved: the one line its 117 cases covered that the new suite did not — the `TemplateLiteral`
+  branch of the esprima rewrite — came along as a case of
   `test/executer/capabilities/context-scope.Test.js`, found by measuring rather than by
   counting tests.
   **`src/ExpressionResolver.js` is at 100 % of lines and functions**, the file that carried more
@@ -257,8 +249,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   What is left is four items, and none of them is "write more tests for a rule":
   1. `src/Utils.js`, 0 %, all nine lines — dead code, its own entry above. Deleting it is what
      closes this, not a test.
-  2. The `setDebug` bodies of `ContextDeconstructorExecuter.js:14` and `EsprimaExecuter.js:13`,
-     plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:42`. The public
+  2. The `setDebug` bodies of `ContextDeconstructorExecuter.js:24` and `EsprimaExecuter.js:13`,
+     plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:103`. The public
      surface test asserts both exports exist but never flips them, deliberately: a debug switch
      has no observable effect to assert on.
   3. The `set` and `delete` of `createGlobalCacheWrapper` (`ResolverContextHandle.js`). Since a
@@ -271,7 +263,7 @@ Entries here are independent of each other. An undertaking whose steps depend on
      to settle it, noted 2026-08-30: `updateData(data)` replaces the data and rebuilds the cache,
      but the proxy is decided in the constructor, so it cannot move a handle between the global
      shape and the ordinary one.
-  `src/version.js` is generated, so its 0 % stays noise. The 25 branches still open are spread over
+  `src/version.js` is generated, so its 0 % stays noise. The 24 branches still open are spread over
   the scanner's state machine and `EsprimaExecuter`; they are combinations of literal states, not
   rules without a test. Update these numbers when the picture changes rather than adding another
   baseline.
@@ -307,21 +299,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   last of the three is what the falsy half does today. `SPECIFICATION.md` says nothing about what a
   context may be, which is the other half of the entry. Found 2026-08-30 while checking how the
   executers treat unusual context shapes.
-
-- [ ] **A context key named `ctx` breaks `ContextDeconstructorExecuter` for every statement.**
-  **A regression of `30e5623` (2026-09-05), not an old defect.** The write-back draft committed that
-  day generates a prologue of `let <name> = ctx.<name>;` per context key inside an arrow whose
-  parameter is `ctx`, so a context carrying a key called `ctx` produces `let ctx = ctx.ctx;` — the
-  binding is declared twice in the same scope and the generated function does not compile. Every
-  expression fails, not only one that touches the key. The version before the draft destructured the
-  names in the parameter list (`async ({ctx, known}) => …`), where a key called `ctx` is an ordinary
-  binding and nothing collides — so this arrived with the draft. A key called `context` is harmless:
-  the shadowing happens inside the generated arrow while `context || {}` is evaluated outside it.
-  Measured 2026-09-05, pinned as `runs a statement over a context carrying a key named ctx` in
-  `test/executer/capabilities/context-shape.Test.js`, `no` for the deconstructor and `yes` for the
-  other three. This hits the **default** executer, so it is consumer-visible: whatever happens to the
-  write-back, the generated names have to be ones a context cannot collide with. Found while
-  measuring the context shapes for the capability catalogue.
 
 - [ ] **`ContextDeconstructorExecuter` loses `this` inside a method of the context.**
   A context that is a class instance — the shape a template engine hands in most often — answers
@@ -676,46 +653,88 @@ Entries here are independent of each other. An undertaking whose steps depend on
   `test/spec/5.5-inspecting-the-chain.Test.js` green again and what removes the shared-object
   defect above.
 
-- [ ] **A write from an expression can be made to persist under `ContextDeconstructorExecuter`.**
-  Raised by Frank on 2026-08-30 with the switch of the default: `${counter++} ${counter++}` answers
-  `"0 0"` there, because the assignment hits a destructured local binding and nothing carries it
-  back. A write-back closes it, verified the same day under node 24 against a real resolver context:
-  keep the destructured names as `let` bindings inside the generated function instead of in the
-  parameter list, and copy each one back in a `finally`, guarded by a comparison —
-  `if (counter !== context.counter) context.counter = counter;`. Two runs then answer `0` and `1`,
-  and `getData("counter")` answers `2`. **The generated code never looks at the expression**: the
-  names come from `contextProperties`, the list the generator already builds for the destructuring,
-  so the write-back is emitted from the same source and works for any name - verified with `i++`
-  and `test = test + "!"` on 2026-08-30. **The guard is not an optimization, it is the correctness
-  half**: destructuring pulls the values of the whole chain into locals, so an unguarded write-back
-  would copy every inherited name into the own context of the resolver the expression runs on and
-  shadow the resolvers above it from then on. With the guard, a leaf built with `{ counter: 0 }`
-  under a root carrying `inherited` holds exactly `{"counter":2}` after two runs — measured, not
-  assumed. What is left to decide before this is implemented: the cost, one comparison per context
-  property per execution on top of the destructuring that already reads them all, which
-  `npm run bench` can measure per executer since 2026-08-30; whether the write-back also runs when
-  the statement throws, which `finally` does by default; and whether a getter that answers a fresh
-  object on every read turns the comparison into a spurious write. `SPECIFICATION.md` 6.5 promises
-  nothing about a written value being readable afterwards, so this widens what the executer can do
-  rather than fixing a broken rule - which is why it is a capability with a state, not a defect.
-  Consumer-visible, so the outcome belongs in `CHANGELOG.md`. One boundary belongs in the same
-  note: a name the context does **not** carry is not destructured either, so nothing is written
-  back for it - `${ x = 5 }` stays the global-write case of 6.5 and is not covered by this.
-  **The draft committed as `30e5623` does not work, verified 2026-09-05.** It writes back only where
-  `Object.getOwnPropertyDescriptor(ctx, name)?.writable` is true, but the context is the proxy of
-  `ResolverContextHandle`, whose `getOwnPropertyDescriptor` trap answers an **accessor** descriptor
-  (`get`, `enumerable`, `configurable`). `writable` is `undefined` there, so nothing is ever copied
-  back. Shown by the gate rather than argued: `makes a write to a name the context carries readable
-  afterwards` is `no` for this executer and runs as `it.fails` — with the draft in the tree it still
-  fails, and a working write-back would have turned the gate red with `Expect test to fail`. The
-  draft described above used a **comparison** guard (`if (counter !== context.counter)`), which does
-  not depend on a descriptor; that is the difference. Two more things the same commit brought, both
-  with entries of their own above: a context key named `ctx` now breaks every statement, and nine
-  lines of the file are unreachable.
-  **What the write-back has to achieve is measured since 2026-09-05**, as ten rows of
-  `test/executer/capabilities/context-write.Test.js`: today this executer keeps exactly one of them,
-  a *mutation* of an object the context holds, and misses a plain write, a counting one across two
-  occurrences, an inherited name, one made inside a nested function, one made before the statement
-  threw, a rebinding, and a name no resolver carries. Those rows are the acceptance criteria, and two
-  of them decide questions the draft left open — where an inherited name lands, and whether a write
-  survives a statement that throws.
+- [ ] **Decide whether the write-back of `ContextDeconstructorExecuter` is worth what it costs.**
+  The write-back landed on 2026-09-07 and it is not free. This entry carries the measurement so the
+  question can be decided rather than re-argued, and it is Frank's to decide: this is the **default**
+  executer, so whatever it costs, every consumer who never picked one pays it.
+
+  **What it buys.** `context-write` (9.7) goes from 4 of 12 rows to 11 of 12 - a plain write, a
+  counting one across two occurrences, a write to a name only an ancestor carries, one made inside a
+  nested function, one made before the statement threw, and a rebinding all become readable
+  afterwards. The column is then identical to `with-scoped-executer`, the default up to 3.0.0, so the
+  write behaviour a consumer had before the default moved is restored rather than newly invented.
+
+  **What it costs on a cache miss**, which is where it hurts. `ColdResolve` at depth 10 with the code
+  cache switched off, four samples per variant - two runs, two describes each, measured 2026-09-07:
+
+  | what the generated function does | hz |
+  |---|---|
+  | destructures in the parameter list, no write-back (the shape before `30e5623`) | 202 226 / 201 876 / 204 634 / 233 839 |
+  | declares `let` + `const` per name in the body, no write-back | 36 785 / 42 956 / 40 338 / 41 196 |
+  | the same plus the write-back in a `finally` (today) | 22 638 / 25 014 / 25 376 / 25 530 |
+
+  So **about eight times slower in total: a factor of five for the prologue, another 1.6 for the
+  write-back.** The prologue arrived with the draft of `30e5623` and is not the write-back's doing,
+  but the two only exist together - the write-back needs the names as bindings in the body.
+
+  **What it costs once the cache is warm**, which is the shipped configuration - the cache holds 5000
+  entries. Full `npm run bench`, one run per variant, deconstructor column, hz:
+
+  | bench | parameter list | draft (`30e5623`) | with write-back |
+  |---|---|---|---|
+  | `WarmResolve` depth 10 | 269 856 | 198 992 | 264 647 |
+  | `WarmResolve` depth 1 000 | 13 014 | 12 986 | 11 234 |
+  | `WarmResolve` depth 100 000 | 93.4 | 57.8 | 88.1 |
+  | `WarmResolve` depth 1 000 000 | 10.32 | 8.03 | 10.15 |
+  | `ResolveText`, 20 distinct expressions | 15 795 | 9 636 | 14 529 |
+  | `ResolveText`, one expression 20 times | 16 712 | 10 576 | 15 119 |
+  | `ResolveText`, expressions carrying literals | 16 489 | 10 230 | 14 110 |
+  | `RandomScope` depth 1 000 | 2 416 | 1 886 | 2 209 |
+  | `RandomScope` depth 100 000 | 41.30 | 39.35 | 41.12 |
+
+  Warm the loss is **2 to 14 %** against the parameter list, and the write-back is faster than the
+  draft it replaces everywhere except on the cold path. So the decision is about the miss, not about
+  the hit.
+
+  **Why the source length is what drives it.** `new Function` parses the generated body on every
+  miss, and the body now grows by two lines per context name where it grew by one entry in a
+  parameter list - a declaration, a snapshot and a guard three times as long as the declaration.
+  **A context of two keys already produces eight names**, read off the generated code: the property
+  cache walks the prototype chain (5.2), so `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable`,
+  `toString`, `valueOf` and `toLocaleString` are declared, snapshotted and compared on every
+  execution of every statement.
+
+  **Three levers if it stays**, in the order of what they would save: emit the snapshot and the
+  write-back only for names the statement text actually contains - a local binding cannot be assigned
+  without its identifier standing in the source, `eval` aside; leave out the names that come from the
+  prototype chain, which a statement over an ordinary context does not read; and shorten the suffix,
+  which is `getRandomInt()` in decimal, up to 16 digits, and stands six times per name. The first two
+  would each cut the generated body of a typical statement by most of its length.
+
+  **Two caveats on the numbers.** `ColdResolve` is the file the bimodality entry above names, so treat
+  the factor as a direction rather than a decimal - the four samples per variant are tight, which is
+  why it is stated as a factor at all. And the warm table was taken before the declaration was split
+  into `let` plus `const` on 2026-09-07, one line per name more; the cold table was taken after.
+  Measured for goal 5, which makes a regression on a hot path a defect - this one is recorded rather
+  than accepted, and the decision is what closes the entry.
+
+- [ ] **The data methods of 6.6 raise a `TypeError` over a sealed or a frozen context, and nothing
+  says so.**
+  Measured 2026-09-07 under node 22, and it is the resolver's doing rather than any executer's:
+  `mergeData` writes with `Object.assign` and the `set` trap of `ResolverContextHandle` assigns, both
+  in module code and therefore in strict mode, where a write an object refuses raises instead of
+  failing silently. Over a **sealed** context `updateData` works for a key the context carries and
+  raises for a new one, `mergeContext` raises for a new key, and `deleteData` raises even for a key
+  it carries, because a sealed key is non-configurable. Over a **frozen** context all four raise.
+  6.6 calls these methods the supported way to change a context and the only path with guaranteed
+  behaviour, and says nothing about a context that cannot take the change. 6.5 does say it for a
+  write from an expression - "the write fails as it would on the object itself" - so the behaviour is
+  consistent with the neighbouring rule, but it is unwritten for the supported path and pinned
+  nowhere. **The suite has no sealed context at all**: `Object.freeze` stands in five cases - two
+  rows of the capability catalogue and three of `test/spec/6.1-what-a-context-answers.Test.js` -
+  while `Object.seal` and `Object.preventExtensions` appear in no test. To decide whether 6.6 gains
+  a sentence and the cases follow it, or whether a refused change is meant to be swallowed. No
+  `Blocks 3.0.0`: the specification asserts nothing here that the code breaks, so this is a gap for
+  the rule-by-rule pass rather than a broken rule. Found 2026-09-07 while checking what a sealed
+  context does to the write-back of `ContextDeconstructorExecuter` - which is unaffected, a sealed
+  key stays writable.

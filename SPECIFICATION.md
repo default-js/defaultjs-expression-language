@@ -546,8 +546,8 @@ registered and reachable by name, and announces its own deprecation on the first
 resolves.
 
 `esprima-executer` is registered only when its module is imported explicitly, because `espree`
-grows the browser bundle from 11.5 KB to 355.6 KB. It is the least complete of the four — 70 of 105
-capabilities against 88 for the default — and what it cannot do is in 9.3 to 9.9.
+grows the browser bundle from 11.5 KB to 355.6 KB. It is the least complete of the four — 71 of 106
+capabilities against 96 for the default — and what it cannot do is in 9.3 to 9.9.
 
 ### 9.3 What a capability is
 
@@ -559,19 +559,19 @@ keeps answering in every state of its code cache. There are six, one per subsect
 An implementation either has a capability or it does not, and neither answer is wrong: this document
 demands nothing of an executer beyond 9.1.
 
-What each implementation supports, over 105 cases asked of all four:
+What each implementation supports, over 106 cases asked of all four:
 
 | Capability | What it asks | `with-scoped` | `context-object` | `context-deconstruction` | `esprima` |
 |---|---|---|---|---|---|
 | 9.4 `syntax` | which constructs run at all | 25/27 | 25/27 | 25/27 | 21/27 |
 | 9.5 `context-scope` | whether a construct carrying a context name still reaches it | 26/26 | 26/26 | 25/26 | 12/26 |
-| 9.6 `context-shape` | which structures work as a context | 19/19 | 19/19 | 15/19 | 19/19 |
-| 9.7 `context-write` | whether a write is readable afterwards | 10/11 | 11/11 | 4/11 | 3/11 |
+| 9.6 `context-shape` | which structures work as a context | 19/19 | 19/19 | 16/19 | 19/19 |
+| 9.7 `context-write` | whether a write is readable afterwards | 11/12 | 12/12 | 11/12 | 4/12 |
 | 9.8 `global-scope` | which globals are reachable, and whether a write is contained | 14/17 | 16/17 | 14/17 | 10/17 |
 | 9.9 `cache` | whether it keeps answering in every state of its code cache | 5/5 | 5/5 | 5/5 | 5/5 |
-| **All six** | | **99/105** | **102/105** | **88/105** | **70/105** |
+| **All six** | | **100/106** | **103/106** | **96/106** | **71/106** |
 
-The complete catalogue, 105 rows against four implementations, is `CAPABILITIES` in
+The complete catalogue, 106 rows against four implementations, is `CAPABILITIES` in
 `test/ExecuterCapabilities.js`. It is the source these subsections are written from.
 
 **Every construct is asked twice**, which is why the first two capabilities are separate: `syntax`
@@ -639,31 +639,33 @@ carrying a symbol key, a key that is not a variable name, a key named like a res
 key beside a named one, an accessor on a prototype, many keys at once, and a key named `ctx` or
 `context`.
 
-Three implementations answer all 19. `context-deconstruction-executer` misses four. Three of them
+Three implementations answer all 19. `context-deconstruction-executer` misses three, and they
 have one cause: **it reads every name of a context before it runs anything**, so an accessor that
 throws breaks every statement over that context, including one that touches no name, and an accessor
 that only costs is evaluated on every execution. An `arguments` object is that shape, its `callee`
-being a poisoned accessor. The fourth is unrelated: a context key named `ctx` collides with the name
-its generated code uses for itself.
+being a poisoned accessor.
 
 ### 9.7 `context-write` — whether a write survives
 
-11 cases. `context-object-executer` keeps all of them, `with-scoped-executer` all but one.
+12 cases. `context-object-executer` keeps all of them, `with-scoped-executer` and
+`context-deconstruction-executer` all but one — and it is the same one for both.
 
-`context-deconstruction-executer`, **the default**, keeps one: a **mutation** of an object the
-context holds (`holder.name = "after"`), which needs nothing carried back because the statement and
-the context hold the same object. Everything that needs a value carried back is lost — a plain write,
-a counting one across two occurrences of the same expression, a write to a name only an ancestor
-carries, one made inside a nested function, one made before the statement threw, and a rebinding of a
-context name.
+`context-deconstruction-executer`, **the default**, runs the statement over local bindings
+destructured from the context and carries back the ones the statement changed. A plain write, a
+counting one across two occurrences of the same expression, a write to a name only an ancestor
+carries, one made inside a nested function, one made before the statement threw, and a rebinding of
+a context name are therefore all readable afterwards. A **mutation** of an object the context holds
+(`holder.name = "after"`) needs nothing carried back, because the statement and the context hold the
+same object.
 
-`esprima-executer` keeps three: it cannot run an assignment whose target is a context name at all
+`esprima-executer` keeps four: it cannot run an assignment whose target is a context name at all
 (9.4).
 
-The one case `with-scoped-executer` misses is a write to a name **no resolver of the chain carries**.
-It falls out of the `with` block, so it is neither readable afterwards nor contained (9.8).
-`context-object-executer` is the only implementation that puts such a write into the context, because
-its dialect writes through the context rather than into a binding.
+The one case `with-scoped-executer` and `context-deconstruction-executer` miss is a write to a name
+**no resolver of the chain carries**. Under the first it falls out of the `with` block, under the
+second there is no binding to carry back — so under both it is neither readable afterwards nor
+contained (9.8). `context-object-executer` is the only implementation that puts such a write into
+the context, because its dialect writes through the context rather than into a binding.
 
 ### 9.8 `global-scope` — which globals are reachable, and whether a write is contained
 

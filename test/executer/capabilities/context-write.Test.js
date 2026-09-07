@@ -71,6 +71,20 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(root.getData("inherited")).toBe("from root");
 		});
 
+		// **The case that guards the `NaN` half of the write-back.** An executer that carries a value
+		// back has to decide that the statement changed it, and `NaN !== NaN` - so a comparison that
+		// does not ask for `NaN` counts an untouched one as a change and copies it into the context
+		// the statement ran on, shadowing the ancestor that holds it from then on (1.3). Asserted
+		// against the object the caller handed over, because `getData` reads along the chain (5.2)
+		// and would answer `NaN` either way. Trivially kept by an executer that carries nothing back.
+		capabilityIt("carries no untouched NaN of an ancestor into the context it ran on", async () => {
+			const own = {};
+			const root = new ExpressionResolver({ context: { untouched: NaN }, name: "root", executer });
+			const leaf = new ExpressionResolver({ context: own, name: "leaf", parent: root, executer });
+			await leaf.resolveText(`\${ 1 + 1 }`);
+			expect(Object.keys(own).length).toBe(0);
+		});
+
 		capabilityIt("makes a write from inside a nested function readable afterwards", async () => {
 			const name = escapingName("nested");
 			const resolver = new ExpressionResolver({ context: { [name]: "before" }, name: "root", executer });

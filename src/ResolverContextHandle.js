@@ -194,7 +194,7 @@ export default class ResolverContextHandle {
 					return {
 						get: () => proxy.#data[property],
 						enumerable: descriptor ? descriptor.enumerable : true,
-						configurable: true,
+						configurable: true
 					};
 				},
 				ownKeys: (data) => {

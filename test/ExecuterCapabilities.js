@@ -253,24 +253,27 @@ export const CAPABILITIES = {
 		description: "Whether a write from inside a statement is readable afterwards.",
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
-			// The deconstructor writes into a destructured local binding and nothing carries it back;
-			// the esprima executer cannot run an assignment at all. BACKLOG.md carries the write-back
-			// that would close the first of the two.
-			"makes a write to a name the context carries readable afterwards":         [ YES,         YES,            NO,             NO ],
-			"counts across two occurrences of a counting write in one text":           [ YES,         YES,            NO,             NO ],
-			"makes a write to a name only an ancestor carries readable afterwards":    [ YES,         YES,            NO,             NO ],
-			// all four, and two of them for the reason that they wrote nothing at all - see the
+			// The deconstructor writes into a destructured local binding and carries it back in a
+			// `finally`, comparing against the value the binding was declared with (2026-09-07); the
+			// esprima executer cannot run an assignment at all.
+			"makes a write to a name the context carries readable afterwards":         [ YES,         YES,            YES,            NO ],
+			"counts across two occurrences of a counting write in one text":           [ YES,         YES,            YES,            NO ],
+			"makes a write to a name only an ancestor carries readable afterwards":    [ YES,         YES,            YES,            NO ],
+			// all four, and one of them for the reason that it wrote nothing at all - see the
 			// comment on the case, which is why this row is only read together with the one above
 			"leaves the ancestor untouched when writing a name it carries":            [ YES,         YES,            YES,            YES ],
-			"makes a write from inside a nested function readable afterwards":         [ YES,         YES,            NO,             NO ],
-			"makes a write readable after the statement threw":                        [ YES,         YES,            NO,             NO ],
+			// kept by all four, and by three of them because they carry nothing back at all - it is
+			// the deconstructor's write-back this row guards, see the comment on the case
+			"carries no untouched NaN of an ancestor into the context it ran on":      [ YES,         YES,            YES,            YES ],
+			"makes a write from inside a nested function readable afterwards":         [ YES,         YES,            YES,            NO ],
+			"makes a write readable after the statement threw":                        [ YES,         YES,            YES,            NO ],
 			"leaves a non-writable key of the context unchanged":                      [ YES,         YES,            YES,            YES ],
 			"leaves a key of a frozen context unchanged":                              [ YES,         YES,            YES,            YES ],
-			// the only row of this capability the deconstructor keeps: a mutation needs nothing
-			// carried back, because the statement and the context hold the same object. The esprima
-			// rewrite turns the target into `ctx?.holder.name`, which is not a legal one.
+			// a mutation needs nothing carried back, because the statement and the context hold the
+			// same object - which is why the deconstructor kept this row while it lost every other.
+			// The esprima rewrite turns the target into `ctx?.holder.name`, which is not a legal one.
 			"makes a mutation of a context object visible afterwards":                 [ YES,         YES,            YES,            NO ],
-			"makes a rebinding of a context name readable afterwards":                 [ YES,         YES,            NO,             NO ],
+			"makes a rebinding of a context name readable afterwards":                 [ YES,         YES,            YES,            NO ],
 			// `with-scoped` is `no` here and `no` on containment as well: the name is unknown to the
 			// chain, so the `has` trap answers false, the assignment leaves the `with` block and
 			// lands on the global object - neither contained nor readable. `context-object` is the

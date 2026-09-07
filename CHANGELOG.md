@@ -55,7 +55,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `esprima-executer` in prose; the table carries them.
 
   **Revised again on 2026-09-05**: the section on what an executer decides is now **part B**, and describes
-  the whole surface instead of the differences — six capabilities, measured across 105 cases per
+  the whole surface instead of the differences — six capabilities, measured across 106 cases per
   implementation, with a count per capability and per executer and a paragraph on what each one
   cannot do. The vocabulary is settled with it: *behaviour* is what the resolver does and holds under
   every executer, *capability* is what an executer supports. **An executer has capabilities and
@@ -64,8 +64,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   What the measurement changed for a reader picking an executer: `esprima-executer` reaches a context
   value in far fewer places than the old table showed — never inside a function body, and not inside
   an object or array literal, a ternary, a computed key, a spread or a tagged template — and
-  `context-deconstruction-executer`, the default, loses `this` inside a method of the context and
-  keeps no write from an expression except a mutation of an object the context already holds.
+  `context-deconstruction-executer`, the default, loses `this` inside a method of the context, and
+  reads every property of the context on every execution — a getter among them, whether or not the
+  statement touches it.
 
   **Restructured the same day, and the section numbers moved with it.** The document now has two
   parts: **part A** is the resolver, its API and everything that holds no matter which executer runs
@@ -128,16 +129,15 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   the switch itself. Why the default moved, and why it moved to this one rather than to
   `context-object-executer`, is in `DECISIONS.md`.
 
-  **What changes without an error: a write from inside an expression no longer reaches the
-  context.** `${ known = "after" }` still answers `"after"`, but the assignment lands on a
-  destructured local binding, so `getData("known")` keeps answering `"before"` — and a text
-  carrying `${ counter++ }` twice no longer counts across the two occurrences. Under
-  `with-scoped-executer` the write landed in the context. `SPECIFICATION.md` 6.5 promises nothing
-  here, because this is the executer's own (9.5), so both behaviours are conformant — which also
-  means nothing raises. A caller who wrote through an expression writes through `mergeContext` or
-  `updateData` instead, or keeps the old behaviour with
-  `ExpressionResolver.defaultExecuter = "with-scoped-executer"`: that executer stays registered
-  and reachable by its name.
+  **A write from inside an expression still reaches the context.** The new default runs the
+  statement over local bindings destructured from the context and carries back the ones the
+  statement changed, so `${ known = "after" }` leaves `getData("known")` answering `"after"`, and a
+  text carrying `${ counter++ }` twice still counts across the two occurrences. On all 11 cases of
+  `SPECIFICATION.md` 9.7 it answers exactly as `with-scoped-executer` did — the one they both miss
+  included: a write to a name **no resolver of the chain carries** does not land in the context, it
+  creates a global. `SPECIFICATION.md` 6.5 promises nothing here, because where an assignment lands
+  is the executer's own (9.7), so a default that lost the write would have been conformant too —
+  this one does not.
 
 - **Escaping is a rule of `resolveText` alone.** `resolve("\${value}")` used to answer the text
   `${value}`; it now hands `\${value}` to the executer as a statement, which cannot compile it, so
