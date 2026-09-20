@@ -19,6 +19,67 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-20 — Does `ContextDeconstructorExecuter` keep its write-back?
+
+**Decision:** **No.** The executer runs the statement over bindings destructured in the parameter
+list of the generated function and carries nothing back. A write from inside an expression is
+therefore not readable afterwards under the default executer, and `context-object-executer` is the
+implementation to pick where it has to be. The write-back that landed on 2026-09-07 is removed.
+
+**Reasoning:** Frank's, on 2026-09-20, against the measurement the entry in `BACKLOG.md` had been
+collecting since the write-back landed. This is the executer that exists for speed — that is why it
+is the default (2026-09-01) — and the write-back is what a cache miss pays for. Measured before and
+after on the same machine, `npm run bench`, deconstructor column, hz:
+
+| bench | with the write-back | without it |
+|---|---|---|
+| `ColdResolve` depth 10, links carry a non-matching context | 16 546 | **184 986** |
+| `ColdResolve` depth 10, links carry no context | 16 066 | **195 022** |
+| `ColdResolve` depth 1 000 | 6 283 / 5 540 | 11 054 / 12 046 |
+| `WarmResolve` depth 10 | 147 414 | 158 778 |
+| `WarmResolve` depth 1 000 | 8 091 | 8 890 |
+| `ResolveText`, 20 distinct expressions | 12 963 | 13 376 |
+| `ResolveText`, one expression 20 times | 11 512 | 10 034 |
+| `ResolveText`, expressions carrying literals | 9 794 | 10 280 |
+| `RandomScope` depth 1 000 | 1 827 | 1 968 |
+
+**A cache miss is about eleven times cheaper**; warm the two are within the noise of a single run, in
+both directions. The cause is the shape of the generated source rather than the work the write-back
+does at runtime: carrying a value back means every context name has to be a binding of the body — a
+declaration, a snapshot of the value it started with, and a guarded assignment back — where the
+parameter list spells it once. `new Function` parses that source on every miss, and **a context of
+two keys already produces eight names**, because the property cache walks the prototype chain (5.2)
+and `hasOwnProperty`, `toString` and the rest come with it. The deep depths of the table are the
+bimodal ones `BACKLOG.md` warns about and decide nothing here; the shallow cold figures are the
+measurement.
+
+The capability is not worth that to this implementation. `SPECIFICATION.md` 6.5 promises nothing
+about a write persisting — where an assignment lands is the executer's own — so nothing in the
+document breaks, and the package still offers the capability under an executer built for it.
+
+**Alternatives:** Keeping the write-back and paying the miss — rejected: it makes the default the
+slowest of the three non-`with` implementations on the path that hurts, which contradicts why it was
+made the default. Cutting the cost instead of the feature, by emitting the write-back only for names
+the statement text actually contains and leaving out the names inherited from the prototype chain —
+the two levers the backlog entry had worked out — rejected as well: both are real, but they buy back
+part of a factor of eleven at the price of a generator that has to reason about the statement it
+compiles, and the capability was not wanted enough to fund that. Moving the write-back to a fifth
+executer, so that the strategy exists under a name of its own — not taken, because
+`context-object-executer` already answers all twelve cases of `context-write` and a second
+implementation of one capability is not worth its maintenance.
+
+**Consequences:** Consumer-visible, and the loudest part of it is that the **default** executer
+changed behaviour: `${ known = "after" }` no longer leaves `getData("known")` answering `"after"`,
+and a text carrying `${ counter++ }` twice renders `0 0`. A **mutation** of an object the context
+holds still works, because nothing has to be carried back for it. `CHANGELOG.md` carries the
+migration note. Six cells of `context-write` move to `no` in `test/ExecuterCapabilities.js`, and the
+default drops from 96 to 90 of the 106 capabilities — `SPECIFICATION.md` 9.2, 9.3 and 9.7 are written
+against that. The row `carries no untouched NaN of an ancestor into the context it ran on` is now
+kept by all four trivially and guards nothing until an executer carries a value back again; it stays
+for that day. The random name suffix the generated prologue needed is gone with the prologue: the
+generated function declares no name of its own any more, so a context key can no longer collide with
+one.
+
 ## 2026-09-05 — Does the specification describe the code as it is, or the release?
 
 **Decision:** **The release.** `SPECIFICATION.md` is written as though every rule in it holds. It

@@ -129,15 +129,32 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   the switch itself. Why the default moved, and why it moved to this one rather than to
   `context-object-executer`, is in `DECISIONS.md`.
 
-  **A write from inside an expression still reaches the context.** The new default runs the
-  statement over local bindings destructured from the context and carries back the ones the
-  statement changed, so `${ known = "after" }` leaves `getData("known")` answering `"after"`, and a
-  text carrying `${ counter++ }` twice still counts across the two occurrences. On all 11 cases of
-  `SPECIFICATION.md` 9.7 it answers exactly as `with-scoped-executer` did — the one they both miss
-  included: a write to a name **no resolver of the chain carries** does not land in the context, it
-  creates a global. `SPECIFICATION.md` 6.5 promises nothing here, because where an assignment lands
-  is the executer's own (9.7), so a default that lost the write would have been conformant too —
-  this one does not.
+  **A write from inside an expression no longer reaches the context**, and this is the part to read
+  before upgrading. The new default runs the statement over local bindings destructured from the
+  context and carries nothing back, so the binding a statement assigns to is gone when the expression
+  is done: `${ known = "after" }` leaves `getData("known")` answering `"before"`, and a text carrying
+  `${ counter++ }` twice renders `0 0` where it rendered `0 1`. Under `with-scoped-executer`, the
+  default up to 3.0.0, both of those worked. Nothing warns about it — the write executes, it simply
+  has nowhere to land.
+
+  What still works is a **mutation** of an object the context holds: `${ holder.name = "after" }` is
+  visible afterwards, because the statement and the context hold the same object and nothing has to
+  be carried back. So a context of objects keeps behaving as it did; a context of primitives does
+  not.
+
+  **Two ways out.** `updateData` and `mergeContext` are the supported way to change a context and
+  behave identically under every executer (`SPECIFICATION.md` 6.6) — that is the path to move a write
+  onto. Where an expression really has to do the writing,
+  `ExpressionResolver.defaultExecuter = "context-object-executer"` restores it in every shape, at the
+  price of its dialect: that executer addresses a context property `value` as `${ctx.value}`, so the
+  expressions have to be rewritten with it.
+
+  The default is the fast implementation rather than the complete one, and the write-back is what a
+  cache miss paid for — about eleven times the cost at a shallow chain, measured both ways. Of the
+  106 capabilities it answers 90 where `context-object-executer` answers 103; `SPECIFICATION.md` 9.7
+  carries the twelve cases of `context-write` one by one, and `DECISIONS.md` (2026-09-20) the
+  reasoning. A write to a name **no resolver of the chain carries** was never kept by this executer
+  or by `with-scoped-executer` and still is not: it creates a global instead.
 
 - **Escaping is a rule of `resolveText` alone.** `resolve("\${value}")` used to answer the text
   `${value}`; it now hands `\${value}` to the executer as a statement, which cannot compile it, so

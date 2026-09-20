@@ -226,12 +226,13 @@ export const CAPABILITIES = {
 			"reads an accessor of the prototype of a Map context":                     [ YES,         YES,            YES,            YES ],
 			"runs a statement over a context without a prototype":                     [ YES,         YES,            YES,            YES ],
 			"runs a statement over a context carrying a symbol key":                   [ YES,         YES,            YES,            YES ],
-			// **A context key called `ctx` breaks the deconstructor entirely** - every statement, not
-			// only one that touches the key: its generated prologue emits `let ctx = ctx.ctx;`, which
-			// reads the binding it is declaring. A key called `context` is harmless, because the
-			// shadowing happens inside the generated arrow while the argument is evaluated outside it.
-			// Read off the code and measured 2026-09-05; BACKLOG.md carries it.
-			"runs a statement over a context carrying a key named ctx":                [ YES,         YES,            YES,             YES ],
+			// **Two keys that used to be dangerous, and no longer are.** Both name a binding the
+			// generated code of an executer could declare for itself, and the deconstructor declares
+			// none since 2026-09-20 - it destructures in its parameter list, so the only names inside
+			// the generated function are the context's own. A key called `context` was harmless even
+			// before: the shadowing happens inside the generated arrow while the argument is evaluated
+			// outside it.
+			"runs a statement over a context carrying a key named ctx":                [ YES,         YES,            YES,            YES ],
 			"runs a statement over a context carrying a key named context":            [ YES,         YES,            YES,            YES ],
 			"runs a statement over a context carrying a key named like a reserved word": [ YES,       YES,            YES,            YES ],
 			"runs a statement over a context carrying many keys":                      [ YES,         YES,            YES,            YES ],
@@ -253,27 +254,35 @@ export const CAPABILITIES = {
 		description: "Whether a write from inside a statement is readable afterwards.",
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
-			// The deconstructor writes into a destructured local binding and carries it back in a
-			// `finally`, comparing against the value the binding was declared with (2026-09-07); the
-			// esprima executer cannot run an assignment at all.
-			"makes a write to a name the context carries readable afterwards":         [ YES,         YES,            YES,            NO ],
-			"counts across two occurrences of a counting write in one text":           [ YES,         YES,            YES,            NO ],
-			"makes a write to a name only an ancestor carries readable afterwards":    [ YES,         YES,            YES,            NO ],
-			// all four, and one of them for the reason that it wrote nothing at all - see the
+			// **The deconstructor carries nothing back since 2026-09-20** - it writes into a local
+			// binding destructured in the parameter list, and that binding is gone when the generated
+			// function returns. It had the write-back from 2026-09-07 to 2026-09-20 and gave it up for
+			// the speed on a cache miss; the decision is in `DECISIONS.md`, so a cell that flips back
+			// here is a change of that decision rather than a fix. The esprima executer cannot run an
+			// assignment at all.
+			"makes a write to a name the context carries readable afterwards":         [ YES,         YES,            NO,             NO ],
+			"counts across two occurrences of a counting write in one text":           [ YES,         YES,            NO,             NO ],
+			"makes a write to a name only an ancestor carries readable afterwards":    [ YES,         YES,            NO,             NO ],
+			// all four, and two of them for the reason that they wrote nothing at all - see the
 			// comment on the case, which is why this row is only read together with the one above
 			"leaves the ancestor untouched when writing a name it carries":            [ YES,         YES,            YES,            YES ],
-			// kept by all four, and by three of them because they carry nothing back at all - it is
-			// the deconstructor's write-back this row guards, see the comment on the case
+			// **Kept by all four because not one of them carries a value back today**, so the row
+			// costs nothing and proves nothing until one does again. It stays for that day: an
+			// executer that decides a binding changed by comparing it against the value it started
+			// with counts an untouched `NaN` as a change, and copies it into the context the statement
+			// ran on. See the comment on the case.
 			"carries no untouched NaN of an ancestor into the context it ran on":      [ YES,         YES,            YES,            YES ],
-			"makes a write from inside a nested function readable afterwards":         [ YES,         YES,            YES,            NO ],
-			"makes a write readable after the statement threw":                        [ YES,         YES,            YES,            NO ],
+			"makes a write from inside a nested function readable afterwards":         [ YES,         YES,            NO,             NO ],
+			"makes a write readable after the statement threw":                        [ YES,         YES,            NO,             NO ],
 			"leaves a non-writable key of the context unchanged":                      [ YES,         YES,            YES,            YES ],
 			"leaves a key of a frozen context unchanged":                              [ YES,         YES,            YES,            YES ],
-			// a mutation needs nothing carried back, because the statement and the context hold the
-			// same object - which is why the deconstructor kept this row while it lost every other.
-			// The esprima rewrite turns the target into `ctx?.holder.name`, which is not a legal one.
+			// **The pair that says what the deconstructor still does and what it no longer does.** A
+			// mutation needs nothing carried back, because the statement and the context hold the same
+			// object, so it survives; a rebinding replaces what the local binding points at and is
+			// lost with it. The esprima rewrite turns the target into `ctx?.holder.name`, which is not
+			// a legal one, so it keeps neither.
 			"makes a mutation of a context object visible afterwards":                 [ YES,         YES,            YES,            NO ],
-			"makes a rebinding of a context name readable afterwards":                 [ YES,         YES,            YES,            NO ],
+			"makes a rebinding of a context name readable afterwards":                 [ YES,         YES,            NO,             NO ],
 			// `with-scoped` is `no` here and `no` on containment as well: the name is unknown to the
 			// chain, so the `has` trap answers false, the assignment leaves the `with` block and
 			// lands on the global object - neither contained nor readable. `context-object` is the

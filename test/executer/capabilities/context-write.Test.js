@@ -71,12 +71,13 @@ for (const { name: executer, variableName } of EXECUTERS) {
 			expect(root.getData("inherited")).toBe("from root");
 		});
 
-		// **The case that guards the `NaN` half of the write-back.** An executer that carries a value
-		// back has to decide that the statement changed it, and `NaN !== NaN` - so a comparison that
-		// does not ask for `NaN` counts an untouched one as a change and copies it into the context
-		// the statement ran on, shadowing the ancestor that holds it from then on (1.3). Asserted
-		// against the object the caller handed over, because `getData` reads along the chain (5.2)
-		// and would answer `NaN` either way. Trivially kept by an executer that carries nothing back.
+		// **The case that guards a write-back nobody has today**, and it is kept here for the day one
+		// comes back. An executer that carries a value back has to decide that the statement changed
+		// it, and `NaN !== NaN` - so a comparison that does not ask for `NaN` counts an untouched one
+		// as a change and copies it into the context the statement ran on, shadowing the ancestor that
+		// holds it from then on (1.3). Asserted against the object the caller handed over, because
+		// `getData` reads along the chain (5.2) and would answer `NaN` either way. All four keep it
+		// trivially since 2026-09-20, because none of them carries anything back.
 		capabilityIt("carries no untouched NaN of an ancestor into the context it ran on", async () => {
 			const own = {};
 			const root = new ExpressionResolver({ context: { untouched: NaN }, name: "root", executer });
@@ -97,8 +98,9 @@ for (const { name: executer, variableName } of EXECUTERS) {
 		});
 
 		// The assignment happens, then the statement raises - a text leaves the failing expression
-		// standing (7) and the question is whether the write before it survived. A write-back placed
-		// in a `finally` keeps it, one placed after the return does not.
+		// standing (7) and the question is whether the write before it survived. It asks something of
+		// an executer only where a write survives a statement that returns normally: the row above is
+		// what says that, and an executer answering `no` there answers `no` here as well.
 		capabilityIt("makes a write readable after the statement threw", async () => {
 			const name = escapingName("threw");
 			const resolver = new ExpressionResolver({ context: { [name]: "before" }, name: "root", executer });

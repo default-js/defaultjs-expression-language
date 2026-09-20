@@ -235,7 +235,10 @@ Entries here are independent of each other. An undertaking whose steps depend on
   Statements **93.07 %** (524/563), branches **91.36 %** (254/278), functions **92.10 %** (105/114),
   lines **95.70 %** (468/489), over 737 cases. Measured after the write-back of
   `ContextDeconstructorExecuter` was finished and the two generators the draft had left dead were
-  deleted — which is what the 2026-09-05 entry was waiting for, and that entry is gone with it. The
+  deleted — which is what the 2026-09-05 entry was waiting for, and that entry is gone with it.
+  **Not re-measured since the write-back was removed again on 2026-09-20**, which took the prologue,
+  the write-back and the name-suffix helper out of the same file — the denominators moved, so the
+  percentages above are the last figure rather than the current one. The
   numbers before were 92.81 % / 91.00 % / 91.58 % / 95.56 % (504/543) on 2026-09-01 and
   91.65 % / 90.35 % / 90.26 % / 93.90 % (516/563) on 2026-09-05, the second of those depressed by
   the nine unreachable lines of the draft. So this is the first figure since 2026-08-29 that is
@@ -249,8 +252,8 @@ Entries here are independent of each other. An undertaking whose steps depend on
   What is left is four items, and none of them is "write more tests for a rule":
   1. `src/Utils.js`, 0 %, all nine lines — dead code, its own entry above. Deleting it is what
      closes this, not a test.
-  2. The `setDebug` bodies of `ContextDeconstructorExecuter.js:24` and `EsprimaExecuter.js:13`,
-     plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:103`. The public
+  2. The `setDebug` bodies of `ContextDeconstructorExecuter.js:21` and `EsprimaExecuter.js:12`,
+     plus the `DEBUG`-guarded `console.log` at `ContextDeconstructorExecuter.js:92`. The public
      surface test asserts both exports exist but never flips them, deliberately: a debug switch
      has no observable effect to assert on.
   3. The `set` and `delete` of `createGlobalCacheWrapper` (`ResolverContextHandle.js`). Since a
@@ -652,71 +655,6 @@ Entries here are independent of each other. An undertaking whose steps depend on
   constructor stops reading `defaultContext` for a missing option, which is what makes
   `test/spec/5.5-inspecting-the-chain.Test.js` green again and what removes the shared-object
   defect above.
-
-- [ ] **Decide whether the write-back of `ContextDeconstructorExecuter` is worth what it costs.**
-  The write-back landed on 2026-09-07 and it is not free. This entry carries the measurement so the
-  question can be decided rather than re-argued, and it is Frank's to decide: this is the **default**
-  executer, so whatever it costs, every consumer who never picked one pays it.
-
-  **What it buys.** `context-write` (9.7) goes from 4 of 12 rows to 11 of 12 - a plain write, a
-  counting one across two occurrences, a write to a name only an ancestor carries, one made inside a
-  nested function, one made before the statement threw, and a rebinding all become readable
-  afterwards. The column is then identical to `with-scoped-executer`, the default up to 3.0.0, so the
-  write behaviour a consumer had before the default moved is restored rather than newly invented.
-
-  **What it costs on a cache miss**, which is where it hurts. `ColdResolve` at depth 10 with the code
-  cache switched off, four samples per variant - two runs, two describes each, measured 2026-09-07:
-
-  | what the generated function does | hz |
-  |---|---|
-  | destructures in the parameter list, no write-back (the shape before `30e5623`) | 202 226 / 201 876 / 204 634 / 233 839 |
-  | declares `let` + `const` per name in the body, no write-back | 36 785 / 42 956 / 40 338 / 41 196 |
-  | the same plus the write-back in a `finally` (today) | 22 638 / 25 014 / 25 376 / 25 530 |
-
-  So **about eight times slower in total: a factor of five for the prologue, another 1.6 for the
-  write-back.** The prologue arrived with the draft of `30e5623` and is not the write-back's doing,
-  but the two only exist together - the write-back needs the names as bindings in the body.
-
-  **What it costs once the cache is warm**, which is the shipped configuration - the cache holds 5000
-  entries. Full `npm run bench`, one run per variant, deconstructor column, hz:
-
-  | bench | parameter list | draft (`30e5623`) | with write-back |
-  |---|---|---|---|
-  | `WarmResolve` depth 10 | 269 856 | 198 992 | 264 647 |
-  | `WarmResolve` depth 1 000 | 13 014 | 12 986 | 11 234 |
-  | `WarmResolve` depth 100 000 | 93.4 | 57.8 | 88.1 |
-  | `WarmResolve` depth 1 000 000 | 10.32 | 8.03 | 10.15 |
-  | `ResolveText`, 20 distinct expressions | 15 795 | 9 636 | 14 529 |
-  | `ResolveText`, one expression 20 times | 16 712 | 10 576 | 15 119 |
-  | `ResolveText`, expressions carrying literals | 16 489 | 10 230 | 14 110 |
-  | `RandomScope` depth 1 000 | 2 416 | 1 886 | 2 209 |
-  | `RandomScope` depth 100 000 | 41.30 | 39.35 | 41.12 |
-
-  Warm the loss is **2 to 14 %** against the parameter list, and the write-back is faster than the
-  draft it replaces everywhere except on the cold path. So the decision is about the miss, not about
-  the hit.
-
-  **Why the source length is what drives it.** `new Function` parses the generated body on every
-  miss, and the body now grows by two lines per context name where it grew by one entry in a
-  parameter list - a declaration, a snapshot and a guard three times as long as the declaration.
-  **A context of two keys already produces eight names**, read off the generated code: the property
-  cache walks the prototype chain (5.2), so `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable`,
-  `toString`, `valueOf` and `toLocaleString` are declared, snapshotted and compared on every
-  execution of every statement.
-
-  **Three levers if it stays**, in the order of what they would save: emit the snapshot and the
-  write-back only for names the statement text actually contains - a local binding cannot be assigned
-  without its identifier standing in the source, `eval` aside; leave out the names that come from the
-  prototype chain, which a statement over an ordinary context does not read; and shorten the suffix,
-  which is `getRandomInt()` in decimal, up to 16 digits, and stands six times per name. The first two
-  would each cut the generated body of a typical statement by most of its length.
-
-  **Two caveats on the numbers.** `ColdResolve` is the file the bimodality entry above names, so treat
-  the factor as a direction rather than a decimal - the four samples per variant are tight, which is
-  why it is stated as a factor at all. And the warm table was taken before the declaration was split
-  into `let` plus `const` on 2026-09-07, one line per name more; the cold table was taken after.
-  Measured for goal 5, which makes a regression on a hot path a defect - this one is recorded rather
-  than accepted, and the decision is what closes the entry.
 
 - [ ] **The data methods of 6.6 raise a `TypeError` over a sealed or a frozen context, and nothing
   says so.**

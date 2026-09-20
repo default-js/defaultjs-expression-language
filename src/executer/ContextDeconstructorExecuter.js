@@ -14,8 +14,6 @@ const blockedPropertyNames = new Set([
 	"__lookupSetter__",
 ]);
 
-const MAX_UNIQUE_NAME_RETRIES = 100;
-
 /**
  *
  * @param {boolean} value
@@ -45,59 +43,50 @@ const getPropertyNames = (aContext) => {
 };
 
 const getOrCreateFunction = (aStatement, contextProperties) => {
-	const cacheKey = `${aStatement.length}::${contextProperties.join(",")}::${aStatement}`;
+	const propertyNames = contextProperties.join(",");
+	const cacheKey = `${aStatement.length}::${propertyNames}::${aStatement}`;
 	if (EXPRESSION_CACHE.has(cacheKey)) {
 		return EXPRESSION_CACHE.get(cacheKey);
 	}
-	const expression = generate(aStatement, contextProperties);
+	const expression = generate(aStatement, propertyNames);
 	EXPRESSION_CACHE.set(cacheKey, expression);
 	return expression;
 };
 
 /**
- * The generated function destructures the context into local bindings, runs the statement over
- * them, and carries back the ones the statement changed.
+ * The generated function destructures the context in its parameter list and runs the statement over
+ * the local bindings that produces.
  *
- * **What decides that a binding changed is a comparison against the value it was declared with**,
- * not a property descriptor of the context: the context is the proxy of `ResolverContextHandle`,
- * whose `getOwnPropertyDescriptor` answers an accessor for every name, so `writable` is `undefined`
- * there and nothing would ever be written back. Comparing against the declared value rather than
- * re-reading the context also reads each name once instead of twice, and leaves a getter that
- * answers a fresh object on every read alone.
+ * **Nothing is carried back.** A statement that assigns to a context name writes into a local
+ * binding, and that binding is gone when the function returns - so a write is not readable
+ * afterwards (`context-write`, SPECIFICATION.md 9.7). That is a decision rather than a gap: the
+ * write-back this executer carried between 2026-09-07 and 2026-09-20 cost a factor of eleven on a
+ * cache miss, because it needs every context name declared in the body instead of listed in the
+ * parameter list. Speed is what this executer is for, and a consumer who needs a write to persist
+ * picks `context-object-executer`. See `DECISIONS.md`, 2026-09-20.
  *
- * **The comparison is the correctness half, not an optimization.** The destructuring pulls the
- * values of the whole chain into locals, so writing all of them back would copy every inherited
- * name into the context of the resolver the statement ran on and shadow the resolvers above it
- * from then on (SPECIFICATION.md 1.3, 6.5).
+ * What still reaches the context is a **mutation**: `holder.name = "after"` changes an object the
+ * binding and the context both point at, and needs nothing carried back.
  *
- * **The second half of each guard, `(a === a || b === b)`, is the `NaN` test** - `x === x` is false
- * for `NaN` and for nothing else, and no global is used, because a context key can shadow any name
- * the generated code reaches for. Without it two `NaN` count as a change, since `NaN !== NaN`, and an
- * untouched one is carried into the context the statement ran on. `Object.is` would say the same in
- * one word and is not usable here: a context carrying a key called `Object` declares it as a binding
- * of this very function. Pinned by `carries no untouched NaN of an ancestor into the context it ran
- * on` in `test/executer/capabilities/context-write.Test.js`.
- *
- * The write-back stands in a `finally`, so a value written before the statement threw survives.
+ * The context is destructured in the parameter list rather than declared in the body so that the
+ * generated source stays one line per statement instead of one line per context name - `new Function`
+ * parses that source on every cache miss, and its length is what the miss costs. It also declares no
+ * name of its own: the statement can therefore never collide with a binding of this function, which
+ * is what the random suffix removed on 2026-09-20 used to guard.
  *
  * @param {string} aStatement
- * @param {string[]} contextProperties
+ * @param {string} thePropertyNameString the context names, comma separated, as the destructuring
+ *                 pattern spells them
  * @returns {Function}
  */
-const generate = (aStatement, contextProperties) => {
-	const suffix = getUniqueSuffix(contextProperties);
-	const contextName = `ctx${suffix}`;
+const generate = (aStatement, thePropertyNameString) => {
 	const code = `
-return (async (${contextName}) => {
-${contextProperties.map((prop) => `\tlet ${prop} = ${contextName}.${prop};
-\tconst ${prop}_init${suffix} = ${prop};`).join("\n")}
+return (async ({${thePropertyNameString}}) => {
     try{
        return ${aStatement}
     }catch(e){
         throw e;
-    }finally{
-${contextProperties.map((prop) => `\t\tif(${prop} !== ${prop}_init${suffix} && (${prop} === ${prop} || ${prop}_init${suffix} === ${prop}_init${suffix})) ${contextName}.${prop} = ${prop};`).join("\n")}
-	}
+    }
 })(context || {});`;
 
 	if (DEBUG) console.log("genererated code: \n", code);
@@ -105,38 +94,10 @@ ${contextProperties.map((prop) => `\t\tif(${prop} !== ${prop}_init${suffix} && (
 	return new Function("context", code);
 };
 
-function getRandomInt() {
-	return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-}
-
-/**
- * A suffix no name of the context ends with.
- *
- * The generated function declares bindings of its own - `ctx<suffix>` for the context, and
- * `<name>_init<suffix>` per context name for the value that name was declared with - and none of
- * them may be a name the statement can reach. The suffix keeps them apart from every context name,
- * and the `_init` marker keeps the two shapes apart from each other: without it a context carrying
- * a key called `ctx` would declare its own value binding under the name of the context itself.
- *
- * @param {string[]} propertyNames
- * @returns {string}
- */
-const getUniqueSuffix = (propertyNames) => {
-	for (let i = 0; i < MAX_UNIQUE_NAME_RETRIES; i++) {
-		const suffix = `_${getRandomInt()}`;
-		if (!propertyNames.some((name) => name.endsWith(suffix))) return suffix;
-	}
-	throw new Error(`Could not find a unique name suffix after ${MAX_UNIQUE_NAME_RETRIES} tries`);
-};
-
 const EXECUTER = new Executer({
 	defaultContext: {},
 	execution: (aStatement, aContext) => {
 		const propertyNames = getPropertyNames(aContext);
-
-		//const contextProperties = propertyNames.join(",");
-		//const expression = getOrCreateFunction(aStatement, contextProperties);
-
 		const expression = getOrCreateFunction(aStatement, propertyNames);
 		return expression(aContext);
 	},
