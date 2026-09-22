@@ -13,20 +13,15 @@ const ContextObjectExecuterName = ContextObjectModule.EXECUTERNAME;
 
 describe("Specification 9.1 - the interface", () => {
 
-	it("answers the default context it was built with", async () => {
-		const context = { marker: 1 };
-		const executer = new Executer({ defaultContext: context, execution: () => null });
-		expect(executer.defaultContext === context).toBe(true);
+	// a resolver without a context has none (4.2), so an executer has no context to offer
+	it("carries no default context", async () => {
+		const executer = new Executer({ execution: () => null });
+		expect("defaultContext" in executer).toBe(false);
 	});
 
 	it("runs the execution it was built with", async () => {
-		const executer = new Executer({ defaultContext: {}, execution: (aStatement, aContext) => `${aStatement}|${aContext.marker}` });
+		const executer = new Executer({ execution: (aStatement, aContext) => `${aStatement}|${aContext.marker}` });
 		expect(executer.execute("statement", { marker: "context" })).toBe("statement|context");
-	});
-
-	it("falls back to an empty default context", async () => {
-		const executer = new Executer();
-		expect(typeof executer.defaultContext).toBe("object");
 	});
 
 	it("throws when an executer without an execution is asked to execute", async () => {
@@ -41,7 +36,7 @@ describe("Specification 9.1 - the interface", () => {
 	});
 
 	it("keeps an implementation under a name and answers it again", async () => {
-		const own = new Executer({ defaultContext: {}, execution: () => "from own executer" });
+		const own = new Executer({ execution: () => "from own executer" });
 		registrate("conformance-probe-executer", own);
 		expect(getExecuter("conformance-probe-executer") === own).toBe(true);
 	});
@@ -75,7 +70,7 @@ describe("Specification 9.1 - the default executer", () => {
 	});
 
 	it("takes an Executer instance", async () => {
-		const own = new Executer({ defaultContext: {}, execution: () => "from own executer" });
+		const own = new Executer({ execution: () => "from own executer" });
 		ExpressionResolver.defaultExecuter = own;
 		expect(ExpressionResolver.defaultExecuter === own).toBe(true);
 		ExpressionResolver.defaultExecuter = reset;

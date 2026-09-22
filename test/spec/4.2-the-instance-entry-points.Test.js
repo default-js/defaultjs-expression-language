@@ -3,12 +3,13 @@ import { ExpressionResolver } from "../../index.js";
 import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/executer/ContextDeconstructorExecuter.js";
 import { useTestExecuter, answersFromContext, answerWith } from "../TestExecuter.js";
 import Executer from "../../src/Executer.js";
+import EsprimaExecuter from "../../src/executer/EsprimaExecuter.js";
 
 /**
  * SPECIFICATION.md 4.2 - the constructor and the instance entry points.
  *
- * What an omitted context means (6.2, 6.4) is deliberately not pinned
- * here: both are only observable through section 6 and both are carried in BACKLOG.md.
+ * What an omitted context means is pinned here only as far as the constructor decides it: the
+ * resolver has none, whichever executer it runs.
  * Where a statement reaches a context value, the name is spelled the way the default executer
  * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
@@ -19,6 +20,16 @@ useTestExecuter();
 answersFromContext();
 
 describe("Specification 4.2 - the instance entry points", () => {
+
+	// Carried over from the time an executer offered a default context, and green before
+	// defaultContext was removed: the constructor had stopped reading it already. EsprimaExecuter is
+	// the one whose default was the global object, so it is the executer that would show a relapse.
+	// Nothing is executed - getData reads the context the constructor built.
+	it("gives a resolver built without a context none, whichever executer it runs", async () => {
+		const resolver = new ExpressionResolver({ executer: EsprimaExecuter });
+		expect(resolver.getData("document")).toBeUndefined();
+		expect(resolver.effectiveChain).toBe("");
+	});
 
 	// The key exists and holds undefined, so the lookup succeeds and 4.4 applies. A key no link
 	// carries would raise instead, which is section 7 and not what this test is about.
@@ -45,7 +56,7 @@ describe("Specification 4.2 - the instance entry points", () => {
 	// An instance addresses an executer as unambiguously as a registered name does, and the static
 	// setter of defaultExecuter has always taken one - the constructor used to drop it silently.
 	it("takes an executer instance as well as a registered name", async () => {
-		const executer = new Executer({ defaultContext: {}, execution: () => "from the instance" });
+		const executer = new Executer({ execution: () => "from the instance" });
 		const resolver = new ExpressionResolver({ context: {}, executer });
 		expect(await resolver.resolve("${ anything }")).toBe("from the instance");
 	});
@@ -53,14 +64,14 @@ describe("Specification 4.2 - the instance entry points", () => {
 	// Identity rather than an answer: the rule is which executer the resolver holds, and whether it
 	// then hands a statement to that executer is a different rule (9.1).
 	it("takes the executer of its parent where the option is left out", async () => {
-		const executer = new Executer({ defaultContext: {}, execution: () => null });
+		const executer = new Executer({ execution: () => null });
 		const parent = new ExpressionResolver({ context: {}, executer });
 		const resolver = new ExpressionResolver({ context: {}, parent });
 		expect(resolver.executer === executer).toBe(true);
 	});
 
 	it("takes the executer of its parent through the whole chain", async () => {
-		const executer = new Executer({ defaultContext: {}, execution: () => null });
+		const executer = new Executer({ execution: () => null });
 		const root = new ExpressionResolver({ context: {}, executer });
 		const middle = new ExpressionResolver({ context: {}, parent: root });
 		const resolver = new ExpressionResolver({ context: {}, parent: middle });
@@ -68,14 +79,14 @@ describe("Specification 4.2 - the instance entry points", () => {
 	});
 
 	it("prefers an executer of its own over the one of its parent", async () => {
-		const parent = new ExpressionResolver({ context: {}, executer: new Executer({ defaultContext: {}, execution: () => null }) });
-		const executer = new Executer({ defaultContext: {}, execution: () => null });
+		const parent = new ExpressionResolver({ context: {}, executer: new Executer({ execution: () => null }) });
+		const executer = new Executer({ execution: () => null });
 		const resolver = new ExpressionResolver({ context: {}, parent, executer });
 		expect(resolver.executer === executer).toBe(true);
 	});
 
 	it("takes the executer of its parent where the option is neither a name nor an instance", async () => {
-		const executer = new Executer({ defaultContext: {}, execution: () => null });
+		const executer = new Executer({ execution: () => null });
 		const parent = new ExpressionResolver({ context: {}, executer });
 		const resolver = new ExpressionResolver({ context: {}, parent, executer: 42 });
 		expect(resolver.executer === executer).toBe(true);

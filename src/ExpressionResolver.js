@@ -98,6 +98,12 @@ const normalize = (value) => {
 	return null;
 };
 
+// 4.1: the first argument of a static entry point is a string, or a configuration object
+const isConfiguration = (aValue) => aValue !== null && typeof aValue === "object";
+
+// 4.1: a configuration counts as passing a default where it carries the key, whatever it holds
+const defaultOf = (aConfiguration) => ("defaultValue" in aConfiguration ? aConfiguration.defaultValue : DEFAULT_NOT_DEFINED);
+
 const toText = (aValue) => (typeof aValue === "undefined" ? "undefined" : aValue === null ? "null" : aValue);
 
 const startsRegex = (aText, aIndex) => {
@@ -261,7 +267,7 @@ export default class ExpressionResolver {
 	 *
 	 * @constructor
 	 * @param {{ context?: any; parent?: any; name?: any; executer?: (string|Executer); }} options
-	 * @param {object} [options.context=GLOBAL]
+	 * @param {object} [options.context] where none is passed, the resolver has no context of its own - 4.2
 	 * @param {ExpressionResolver} [options.parent=null]
 	 * @param {?string} [options.name=null] where none is passed, one is generated - 5.1
 	 * @param {(string|Executer)} [options.executer] the registered name of an executer, or an
@@ -531,15 +537,25 @@ export default class ExpressionResolver {
 	/**
 	 * resolve an expression string to data
 	 *
+	 * Takes the arguments positionally, or one configuration object
+	 * `{ expression, context, defaultValue, timeout }` - SPECIFICATION.md 4.1. A first argument
+	 * that is neither a string nor an object rejects with a `TypeError`.
+	 *
 	 * @static
 	 * @async
-	 * @param {string} aExpression
+	 * @param {string|{ expression: string, context?: object, defaultValue?: *, timeout?: number }} aExpression
 	 * @param {?object} aContext
 	 * @param {?*} aDefault
 	 * @param {?number} aTimeout
 	 * @returns {Promise<*>}
 	 */
 	static async resolve(aExpression, aContext, aDefault, aTimeout) {
+		if(arguments.length === 1 && isConfiguration(arguments[0])) {
+			const { expression, context, timeout } = arguments[0];
+			return ExpressionResolver.resolve(expression, context, defaultOf(arguments[0]), timeout);
+		}
+		if (typeof aExpression !== "string") throw new TypeError("ExpressionResolver.resolve takes a string or a configuration object!");
+
 		const resolver = new ExpressionResolver({ context: aContext });
 		const defaultValue = arguments.length > 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		if (typeof aTimeout === "number" && aTimeout > 0)
@@ -555,15 +571,25 @@ export default class ExpressionResolver {
 	/**
 	 * replace expression at text
 	 *
+	 * Takes the arguments positionally, or one configuration object
+	 * `{ text, context, defaultValue, timeout }` - SPECIFICATION.md 4.1. A first argument that is
+	 * neither a string nor an object rejects with a `TypeError`.
+	 *
 	 * @static
 	 * @async
-	 * @param {string} aText
+	 * @param {string|{ text: string, context?: object, defaultValue?: *, timeout?: number }} aText
 	 * @param {?object} aContext
 	 * @param {?*} aDefault
 	 * @param {?number} aTimeout
 	 * @returns {Promise<*>}
 	 */
-	static async resolveText(aText, aContext, aDefault, aTimeout) {
+	static async resolveText(aText, aContext, aDefault, aTimeout) {		
+		if(arguments.length === 1 && isConfiguration(arguments[0])) {
+			const { text, context, timeout } = arguments[0];
+			return ExpressionResolver.resolveText(text, context, defaultOf(arguments[0]), timeout);
+		}
+		if (typeof aText !== "string") throw new TypeError("ExpressionResolver.resolveText takes a string or a configuration object!");
+
 		const resolver = new ExpressionResolver({ context: aContext });
 		const defaultValue = arguments.length > 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		if (typeof aTimeout === "number" && aTimeout > 0)

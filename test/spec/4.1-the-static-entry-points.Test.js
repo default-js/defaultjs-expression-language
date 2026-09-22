@@ -3,10 +3,9 @@ import { ExpressionResolver } from "../../index.js";
 import { useTestExecuter, answersFromContext, answerWith } from "../TestExecuter.js";
 
 /**
- * SPECIFICATION.md 4.1 - the static entry points, in both call forms.
+ * SPECIFICATION.md 4.1 - the static entry points, in both call forms, and the rejection of a first
+ * argument that is neither.
  *
- * The configuration form is not implemented; its cases carry the marker and BACKLOG.md carries the
- * entry.
  * Where a statement reaches a context value, the name is spelled the way the default executer
  * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
@@ -37,26 +36,22 @@ describe("Specification 4.1 - the static entry points, positional form", () => {
 
 describe("Specification 4.1 - the static entry points, configuration form", () => {
 
-	// not implemented, waits for BACKLOG.md "The static entry points take no configuration object"
-	it.fails("resolve takes a configuration object", async () => {
+	it("resolve takes a configuration object", async () => {
 		const result = await ExpressionResolver.resolve({ expression: "${ value }", context: { value: "resolved" } });
 		expect(result).toBe("resolved");
 	});
 
-	// not implemented, waits for BACKLOG.md "The static entry points take no configuration object"
-	it.fails("resolveText takes a configuration object carrying the text", async () => {
+	it("resolveText takes a configuration object carrying the text", async () => {
 		const result = await ExpressionResolver.resolveText({ text: "a ${ value } b", context: { value: "resolved" } });
 		expect(result).toBe("a resolved b");
 	});
 
-	// not implemented, waits for BACKLOG.md "The static entry points take no configuration object"
-	it.fails("carries the default value under the key defaultValue", async () => {
+	it("carries the default value under the key defaultValue", async () => {
 		const result = await ExpressionResolver.resolve({ expression: "${ missing }", context: {}, defaultValue: "fallback" });
 		expect(result).toBe("fallback");
 	});
 
-	// not implemented, waits for BACKLOG.md "The static entry points take no configuration object"
-	it.fails("carries the timeout under the key timeout", async () => {
+	it("carries the timeout under the key timeout", async () => {
 		const start = Date.now();
 		const result = await ExpressionResolver.resolve({ expression: "${ value }", context: { value: "resolved" }, timeout: 100 });
 		expect(result).toBe("resolved");
@@ -66,4 +61,29 @@ describe("Specification 4.1 - the static entry points, configuration form", () =
 	// "a default value was passed" is the presence of the key defaultValue, independent of what it
 	// holds. That the key is honoured is shown above; that defaultValue: undefined counts as passed
 	// cannot be told from the outside - the answer is undefined either way. No test claims it.
+});
+
+describe("Specification 4.1 - the static entry points, a first argument of neither form", () => {
+
+	// the rejection is told apart from an accidental TypeError by its message: resolve(123) raised a
+	// TypeError before, thrown by a string method called on a number
+	const rejectionOf = (aPromise) => aPromise.then(() => null, (anError) => anError);
+
+	it("resolve rejects a first argument that is neither a string nor an object", async () => {
+		const error = await rejectionOf(ExpressionResolver.resolve(123, {}, "fallback"));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("configuration object")).toBe(true);
+	});
+
+	it("resolveText rejects a first argument that is neither a string nor an object", async () => {
+		const error = await rejectionOf(ExpressionResolver.resolveText(123, {}, "fallback"));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("configuration object")).toBe(true);
+	});
+
+	it("does not take null for a configuration object", async () => {
+		const error = await rejectionOf(ExpressionResolver.resolve(null, {}));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("configuration object")).toBe(true);
+	});
 });

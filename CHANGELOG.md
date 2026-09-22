@@ -15,6 +15,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Added
 
+- **The static entry points take a configuration object.**
+  `ExpressionResolver.resolve({ expression, context, defaultValue, timeout })` and
+  `ExpressionResolver.resolveText({ text, context, defaultValue, timeout })` sit beside the
+  positional form, which stays as it is. The first argument alone decides the form — a string or
+  an object — so a context carrying a key named `context` is never mistaken for a configuration.
+  A default counts as passed where the key `defaultValue` is present. See `SPECIFICATION.md` 4.1.
+
 - **The constructor takes an `Executer` instance, not only a registered name.**
   `new ExpressionResolver({ executer })` accepted a registered name and silently fell back to the
   default for anything else — an instance included, although the static setter
@@ -85,6 +92,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   Every rule is written as holding, so the document describes 3.0.0 rather than the work in progress.
 
 ### Changed
+
+- **The static entry points reject a first argument that is neither a string nor an object.**
+  `ExpressionResolver.resolve` and `resolveText` now reject a number, a boolean, a function,
+  `undefined` or `null` in first place with a `TypeError` that names the call.
+  Before, `resolve(123)` failed by accident inside a string method, and `resolveText(123)`
+  answered `123` unchanged. The instance method `resolveText` still hands a non-string back as it
+  is. See `SPECIFICATION.md` 4.1.
 
 - **A resolver without an executer of its own takes the one of its parent.** Until now a
   resolver built without the `executer` option used `ExpressionResolver.defaultExecuter`, whatever
@@ -224,6 +238,16 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `SPECIFICATION.md` 5.1 and 5.5.
 
 ### Removed
+
+- **`Executer` no longer has a default context.** The option `defaultContext` of
+  `new Executer({ … })` and the getter `executer.defaultContext` are gone. A resolver built without
+  a context has none of its own, whichever executer it runs: leaving `context` out is the same as
+  `context: null`. Before, leaving it out took the executer's default context — under
+  `EsprimaExecuter` the global object, under the other three a single object shared by every
+  resolver built that way, so a write to one of them showed up in all the others. An own executer
+  that still passes `defaultContext` keeps working; the option is ignored. A context shared by many
+  resolvers is the context of a resolver at the root of their chain. See `SPECIFICATION.md` 4.2,
+  6.3 and 9.1.
 
 - **`esprima` is no longer a declared runtime dependency.** It was never imported — the two
   references in `src/executer/EsprimaExecuter.js` are commented out, the executer parses with

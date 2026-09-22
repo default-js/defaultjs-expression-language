@@ -52,7 +52,7 @@ const getOrCreateFunction = (aStatement) => {
 
 
 
-const EXECUTER = new Executer({defaultContext: {}, execution: (aStatement, aContext) => {
+const EXECUTER = new Executer({execution: (aStatement, aContext) => {
 		if(initialCall){
 			initialCall = false;
 			console.warn(new Error(`With Scoped expression execution is marked as deprecated.`));

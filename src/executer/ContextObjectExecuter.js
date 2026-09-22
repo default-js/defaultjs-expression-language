@@ -50,7 +50,6 @@ const getOrCreateFunction = (aStatement) => {
 };
 
 const EXECUTER = new Executer({
-	defaultContext: {},
 	execution: (aStatement, aContext) => {
 		const expression = getOrCreateFunction(aStatement);
 	return expression(aContext);

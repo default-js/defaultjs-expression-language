@@ -42,14 +42,14 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | # | Goal | Status | Open entries |
 | --- | --- | --- | --- |
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 | B-28, B-29 (follow-up decisions) |
-| 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | B-01, B-02, and every `defect` |
+| 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
 | 4 | Documentation | `SPECIFICATION.md` written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-07, B-25, B-26, B-27 |
 
-**Markers, counted 2026-09-22** (`npm test`: 679 passed, 64 expected fail, 743 cases). The 4
-`it.fails` in `test/spec/` all sit in `4.1-the-static-entry-points.Test.js` and belong to B-01 —
-they say *the resolver does not keep this rule yet*. The 60 `no` cells in
+**Markers, counted 2026-09-22** (`npm test`: 686 passed, 60 expected fail, 746 cases). No
+`it.fails` is left in `test/spec/` and no entry carries `Blocks 3.0.0` — the resolver keeps every
+rule that has a test. B-21 is what can still add a blocker. The 60 `no` cells in
 `test/executer/capabilities/` say *this executer does not support this*, which is neither a defect
 nor a broken rule; whether one of them is meant to become a `yes` is an entry here. What blocks
 3.0.0 is the marker, not this count.
@@ -58,8 +58,6 @@ nor a broken rule; whether one of them is meant to become a `yes` is an entry he
 
 | ID | Title | Status | Kind | 3.0.0 |
 | --- | --- | --- | --- | --- |
-| B-01 | The static entry points take no configuration object | agreed | feature | **blocks** |
-| B-02 | The executer's `defaultContext` has to be redefined | decision | gap | **blocks** |
 | B-03 | A `parent` that is not an `ExpressionResolver` is silently dropped | decision | defect | |
 | B-04 | A context that is not an object throws from inside the property cache | decision | gap | |
 | B-05 | The data methods of 6.6 raise a `TypeError` over a sealed or a frozen context | decision | gap | |
@@ -88,48 +86,13 @@ nor a broken rule; whether one of them is meant to become a `yes` is an entry he
 | B-28 | What happens to Dependabot while the v3 cycle runs | decision | tooling | |
 | B-29 | Move the build from webpack to Vite? | decision | tooling | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | |
+| B-31 | `AGENTS.md` describes three benchmark files, there are four | agreed | docs | |
 
 ---
 
 ## Release blockers
 
-### B-01 · The static entry points take no configuration object
-
-- **Status:** agreed — not started
-- **Kind:** feature · **Blocks 3.0.0:** yes · **Spec:** 4.1
-- **Pinned by:** `test/spec/4.1-the-static-entry-points.Test.js`, four `it.fails`
-- **Records:** `CHANGELOG.md`
-
-`ExpressionResolver.resolve` and `resolveText` are positional only (`src/ExpressionResolver.js`,
-the two static methods). 4.1 describes a second form taking one object —
-`{ expression | text, context, defaultValue, timeout }` — chosen by the first argument alone
-(`typeof arguments[0] === "string"`), so no key is inspected and a context carrying a key named
-`context` is never mistaken for a configuration. In that form "a default was passed" is the presence
-of the key `defaultValue`, not an `arguments.length` check. Purely additive. **Open with it:** what a
-first argument that is neither a string nor an object does — today `resolve(123, {}, "fallback")`
-lets a `TypeError` reach the caller, which is visible but accidental, and 4.1 says nothing about it.
-If B-10 brings the global-write switch back, it joins the configuration as a key.
-
-### B-02 · The executer's `defaultContext` has to be redefined
-
-- **Status:** decision — Frank is working out the definition
-- **Kind:** gap · **Blocks 3.0.0:** yes · **Spec:** 4.2, 6.3, 9.1
-- **Pinned by:** nothing
-- **Records:** `DECISIONS.md`, `SPECIFICATION.md`, `CHANGELOG.md`
-
-Decided 2026-08-30: **a resolver without a context has no context**, so 5.5 stands and the
-constructor no longer reads `defaultContext` for a missing option. The specification was not moved
-with it: 4.2 and 6.3 still say that leaving `context` out takes the executer's default context and
-differs from `context: null`, and 9.1 still documents `defaultContext` as "the context a resolver
-gets when the caller passes none". The code gives both cases an empty context, and nothing in `src/`
-reads `defaultContext` any more — half of the public `Executer` interface is dead. The direction is
-to redefine it as something like a *global* context available in addition to the chain; nothing
-beyond the direction is settled. Two constraints for the definition: the default is **one object
-per executer module**, and `ResolverContextHandle` keeps a context by identity, so handing it to
-resolvers as their context makes every one of them write into every other one (verified 2026-08-30:
-`mergeContext` on one context-less resolver showed up in all later ones). And under
-`EsprimaExecuter` the default is the global object itself. No test pins the current rule, which is
-why the gate stayed green; the fix starts with one.
+None open.
 
 ## Resolver
 
@@ -256,7 +219,7 @@ Since 2026-09-05 this is not a broken rule: 6.5 no longer promises containment, 
 executer can keep it (`DECISIONS.md`). Two questions are open: **should the executers that leak gain
 the containment**, and **is an `allowGlobalWrite` switch worth having** — its *off* state could only
 mean something under an executer able to intercept the assignment. If the switch comes, 6.5 gets it
-back, B-01 and `buildSecure` (6.7) take it as an option, and this entry gets the release marker.
+back, the configuration form of 4.1 and `buildSecure` (6.7) take it as an option, and this entry gets the release marker.
 What is measured: an unqualified `x = 1` on a name no resolver carries creates a global under
 `with-scoped`, `context-deconstructor` and `esprima` — the last one only inside a function body or
 an array pattern (`${ [name] = ["hit"] }`), which its rewrite does not reach; `context-object`
@@ -401,7 +364,7 @@ wrong on 2026-08-22 now reads as though it holds. Read every rule against the co
 decide per rule whether it is true, still wanted, and pinned. A rule the code does not keep becomes
 an entry with `Blocks 3.0.0`; wording does not. Known so far: section 2 calls a chain *the stacking
 context*, a term no other section uses; the last paragraph of 4.2 names *the global-write switch*,
-which the document no longer has (B-10); 4.2, 6.3 and 9.1 on `defaultContext` (B-02). Frank has
+which the document no longer has (B-10). Frank has
 further points from reviewing the restructure; they are added here when they come.
 
 ### B-22 · The JSDoc of the whole package needs one pass
@@ -478,6 +441,16 @@ resolvers live for the whole file, and a collection that walks that set costs hu
 milliseconds; with `DEPTHS` cut to `[10, 1000]` it disappears. A property of the benchmark, not of
 the library. Reusing the tail of the deepest chain is deliberate — a bench file has nowhere to put
 setup (`AGENTS.md`, Benchmarks).
+
+### B-31 · `AGENTS.md` describes three benchmark files, there are four
+
+- **Status:** agreed — found 2026-09-22
+- **Kind:** docs
+
+The section *Benchmarks* of `AGENTS.md` names three files: `ColdResolve`, `WarmResolve` and
+`RandomScope`. `test/PerformanceTests/ResolveText.bench.js` (since `0ea787f`)
+is missing there. It measures the instance `resolveText` over four texts. No benchmark calls a
+static entry point, so a change confined to those two is not visible in `npm run bench`.
 
 ## Tooling
 

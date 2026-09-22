@@ -134,7 +134,9 @@ ExpressionResolver.resolveText({ text, context, defaultValue, timeout })
 Which form is in use is decided by the **first argument alone**: an expression is always a
 string, a configuration is always an object. No key of the configuration is inspected to find
 that out, so a context object that happens to carry a key named `context` can never be mistaken
-for a configuration.
+for a configuration. `null` is not an object in this sense. A first argument that is neither a
+string nor an object is **rejected with a `TypeError`** saying so; it is a mistake in the calling
+code and is not treated as a failed statement, so no default value applies to it (7).
 
 Both forms answer a promise, build a single resolver over the context and delegate to the
 instance methods. `aTimeout` / `timeout` is described in 4.5.
@@ -156,11 +158,9 @@ resolver.resolve(aExpression, aDefault)                                    // �
 resolver.resolveText(aText, aDefault)                                      // → Promise<string>
 ```
 
-`context` defaults to the default context of the **executer in use** and `parent` to `null`;
-`name` defaults to a generated name (5.1). Leaving `context` out and passing `context: null` are
-**not the same thing**: the first takes the executer's default context, which for
-`EsprimaExecuter` is the global object, while the second is an empty context, equivalent to `{}`
-(6.3). `executer` takes the **registered name** of an executer or an
+`parent` defaults to `null` and `name` to a generated name (5.1). Leaving `context` out,
+`context: null` and `context: undefined` are **the same thing**: the resolver has no context of its
+own (6.3), whichever executer it runs. `executer` takes the **registered name** of an executer or an
 **`Executer` instance**. A name is looked up in the registry and an unregistered one throws; an
 instance is taken as it is and needs no registration, because it already addresses the executer.
 Anything that is neither is ignored, as though the option were left out.
@@ -334,9 +334,9 @@ through (6.5) — keeps the set of keys in step.
 
 ### 6.3 A resolver without a context
 
-A resolver built with `context: null` is an empty context, equivalent to `{}`. It contributes
-nothing to a lookup and is passed through. This is not the same as leaving `context` out, which
-takes the executer's default context (4.2).
+A resolver built without a context — `context: null`, `context: undefined`, or the option left
+out (4.2) — has an empty context, equivalent to `{}` for a lookup. It contributes nothing to a
+lookup and is passed through.
 
 Such a resolver gains content like any other: through `updateData`, `mergeContext`, or a write from
 an expression evaluated on it (6.5).
@@ -492,7 +492,8 @@ in it, and a single broken expression in it is a defect in that expression, not 
 the place where it can still be found.
 
 A **form that an entry point rejects itself** follows the same line: `resolve` throws a
-`SyntaxError` for a delimited input that does not end with `}` (4.3), while in a text anything that
+`SyntaxError` for a delimited input that does not end with `}` (4.3), both static entry points
+reject a first argument of neither call form with a `TypeError` (4.1), while in a text anything that
 is not an expression is text and no error arises at all (3.1).
 
 A statement that takes longer than one second produces a warning naming it. The resolution is
@@ -524,10 +525,13 @@ where it exists.
 ### 9.1 The interface
 
 ```javascript
-new Executer({ defaultContext, execution })
-executer.defaultContext          // the context a resolver gets when the caller passes none
+new Executer({ execution })
 executer.execute(aStatement, aContext)
 ```
+
+An executer runs statements and holds no context of its own: the context always comes from the
+resolver, and a context shared by many resolvers is the context of a resolver at the root of their
+chain (5.1).
 
 `ExecuterRegistry` keeps implementations under a name: `registrate(aName, anExecuter)` and
 `getExecuter(aName)`, the latter also the module's default export. Importing an executer module

@@ -95,7 +95,6 @@ return (async ({${thePropertyNameString}}) => {
 };
 
 const EXECUTER = new Executer({
-	defaultContext: {},
 	execution: (aStatement, aContext) => {
 		const propertyNames = getPropertyNames(aContext);
 		const expression = getOrCreateFunction(aStatement, propertyNames);

@@ -19,6 +19,35 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-22 — Does an executer offer a default context?
+
+**Decision:** **No.** `defaultContext` is removed from the `Executer` interface — the constructor
+option and the getter. A resolver built without a context has none of its own, whichever executer
+it runs. `SPECIFICATION.md` 4.2, 6.3 and 9.1.
+
+**Reasoning:** Frank's, on 2026-09-22, on this proposal. Since 2026-08-30 the constructor no longer
+read it, so half of the public interface was dead while the specification still described it. The
+alternative on the table was to redefine it as a global context available behind every chain; it
+was not taken because every part of it is covered or contradicted already. A context shared by
+many resolvers is what a resolver at the root of their chain is (5.1), and the global object can
+be handed in as a context (6.4). Holding data is not an executer's job — it runs statements, and
+the context comes from the resolver (see the entry of 2026-08-30 on where a check belongs). A single
+object per executer module shared by every resolver is exactly what broke on 2026-08-30: a
+`mergeContext` on one context-less resolver showed up in all later ones, because
+`ResolverContextHandle` keeps a context by identity. And one more layer behind the chain would cost
+every name the chain does not carry one step more.
+
+**Alternatives:** A global context behind the chain, per executer or per package. It becomes the
+better choice if a consumer needs values visible to chains it does not build itself — then it
+belongs to the resolver, not the executer, and needs its own rules for writes.
+
+**Consequences:** Consumer-visible for 3.0.0: `executer.defaultContext` answers `undefined`. An own
+executer that passes the option keeps working, the option is ignored. Under `EsprimaExecuter` a
+resolver without a context no longer sees the global object as its context; it reaches globals
+through its `RESERVED_NAMES` list only (B-09).
+
+---
+
 ## 2026-09-22 — Which executer does a resolver use when the `executer` option is left out?
 
 **Decision:** **The one of its parent.** The constructor takes the `executer` option where it is a

@@ -85,7 +85,7 @@ describe("Specification 8 - Executer", () => {
 
 	it("is a class an own implementation can build on", async () => {
 		expect(typeof Executer).toBe("function");
-		expect(new Executer({ defaultContext: {}, execution: () => null }) instanceof Executer).toBe(true);
+		expect(new Executer({ execution: () => null }) instanceof Executer).toBe(true);
 	});
 });
 

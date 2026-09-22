@@ -79,7 +79,6 @@ export const reset = () => {
 };
 
 const EXECUTER = new Executer({
-	defaultContext: {},
 	execution: (aStatement, aContext) => {
 		STATEMENTS.push(aStatement);
 

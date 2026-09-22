@@ -36,7 +36,7 @@ import { EXECUTERNAME as EsprimaExecuterName, setupExecuter as setupEsprimaExecu
  *   `ResolverContextHandle`, and every executer gets it for free. They stay in `test/executer/rules/`
  *   as plain `it`, asked of every implementation because `TestExecuter` evaluates nothing and they
  *   cannot be seen without a real one.
- * - **The interface contract** - `defaultContext` and `execution` (9.1), registering on import and
+ * - **The interface contract** - `execution` (9.1), registering on import and
  *   being reachable by name (9.2). An implementation that fails it is not an executer, so it is no
  *   yes/no axis.
  * - **The dialect** - a spelling is not a yes or no. It is carried as `variableName` on the executer

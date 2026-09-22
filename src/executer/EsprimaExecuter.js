@@ -4,7 +4,6 @@ import escodegen from "escodegen";
 import { registrate } from "../ExecuterRegistry.js";
 import CodeCache from "../CodeCache.js";
 import Executer from "../Executer.js";
-import { GLOBAL } from "@default-js/defaultjs-common-utils";
 
 export const EXECUTERNAME = "esprima-executer";
 
@@ -126,7 +125,6 @@ const getOrCreateFunction = (aStatement) => {
 };
 
 const EXECUTER = new Executer({
-	defaultContext: GLOBAL,
 	execution: (aStatement, aContext) => {
 		const expression = getOrCreateFunction(aStatement);
 		return expression(aContext);
