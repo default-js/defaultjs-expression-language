@@ -58,6 +58,14 @@ describe("Specification 4.1 - the static entry points, configuration form", () =
 		expect(Date.now() - start >= 90).toBe(true);
 	});
 
+	// The form is taken only where the configuration is the sole argument, so a trailing argument
+	// turns it into a rejection. Open in BACKLOG.md: "A configuration object followed by another
+	// argument is rejected instead of taken".
+	it.fails("decides the call form by the first argument alone, even where another argument follows", async () => {
+		const result = await ExpressionResolver.resolve({ expression: "${ value }", context: { value: "resolved" } }, undefined);
+		expect(result).toBe("resolved");
+	});
+
 	// "a default value was passed" is the presence of the key defaultValue, independent of what it
 	// holds. That the key is honoured is shown above; that defaultValue: undefined counts as passed
 	// cannot be told from the outside - the answer is undefined either way. No test claims it.

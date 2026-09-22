@@ -1,70 +1,6 @@
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 import { isNullOrUndefined } from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 
-const VARNAME_CHECK = /^[$_\p{ID_Start}][$\p{ID_Continue}]*$/u;
-const RESERVED_WORDS = new Set([
-	"break",
-	"case",
-	"catch",
-	"class",
-	"const",
-	"continue",
-	"debugger",
-	"default",
-	"delete",
-	"do",
-	"else",
-	"export",
-	"extends",
-	"finally",
-	"for",
-	"function",
-	"if",
-	"import",
-	"in",
-	"instanceof",
-	"new",
-	"return",
-	"super",
-	"switch",
-	"this",
-	"throw",
-	"try",
-	"typeof",
-	"var",
-	"void",
-	"while",
-	"with",
-	"yield",
-	"enum",
-	"implements",
-	"interface",
-	"let",
-	"package",
-	"private",
-	"protected",
-	"public",
-	"static",
-	"await",
-	"null",
-	"true",
-	"false",
-	"constructor",
-	"undefined",
-]);
-
-/**
- * Whether a name can stand for a variable in a statement.
- *
- * The same rule the property cache applies while it collects the names of a context - kept here
- * because the cache of a global context does not go through that loop and still has to answer the
- * same set of names.
- *
- * @param {string|symbol} name
- * @returns {boolean}
- */
-const isVariableName = (name) => typeof name === "string" && !RESERVED_WORDS.has(name) && VARNAME_CHECK.test(name);
-
 /**
  * The descriptor a property has where it is defined - own or anywhere up the prototype chain of
  * the object holding it.
@@ -91,8 +27,8 @@ const findPropertyDescriptor = (data, property) => {
  * holding it - never the value of the property. That is the contract of #getPropertyDef,
  * whose caller reads the property off the handle it gets back.
  *
- * Because every name is present, such a link answers every lookup and nothing below it is
- * reached, and ownKeys reports every name of the global object.
+ * Because every name is present, such a resolver answers every lookup and nothing below it is
+ * reached, and ownKeys reports every own key of the global object.
  *
  * @param {ResolverContextHandle} handle
  */
@@ -111,7 +47,12 @@ const createGlobalCacheWrapper = (handle) => {
 			return false;
 		},
 		keys: () => {
-			return Object.getOwnPropertyNames(GLOBAL).filter(isVariableName);
+			// No name of its own. `has` already answers every lookup, so a name of the global object
+			// is found from anywhere below; listing it as well would only hand it to an executer that
+			// turns a name into code, which then fails over names it never needed - the index "0" of
+			// a frame, a symbol another library planted. A statement reaches a global through the
+			// ordinary scope chain anyway (SPECIFICATION.md 6.4, 9.8).
+			return [];
 		},
 	};
 };
@@ -129,7 +70,7 @@ export default class ResolverContextHandle {
 	#parent = null;
 	/** @type {object|null} */
 	#data = null;
-	/** @type {Map<string,ResolverContextHandle>|null} */
+	/** @type {Map<string|symbol,ResolverContextHandle>|null} */
 	#cache = null;
 	/** @type {boolean} */
 	#providesData = false;
@@ -138,11 +79,13 @@ export default class ResolverContextHandle {
 	 * Creates an instance of Context.
 	 *
 	 * @constructor
-	 * @param {object} context
+	 * @param {object} context where none is passed, the handle holds no object at all and carries no
+	 * name, not even one of Object.prototype - SPECIFICATION.md 6.3. It gets an object on the first
+	 * write.
 	 * @param {ResolverContextHandle} parent
 	 */
 	constructor(context, parent) {
-		this.#data = context || {};
+		this.#data = isNullOrUndefined(context) ? null : context || {};
 		this.#parent = parent ? parent : null;
 		this.#providesData = !isNullOrUndefined(context);
 
@@ -168,6 +111,7 @@ export default class ResolverContextHandle {
 				},
 				set: (data, property, value) => {
 					//console.log("set property:", property, "=", value);
+					this.#data ??= {};
 					this.#data[property] = value;
 					this.#cache.set(property, this);
 					this.#providesData = true;
@@ -255,13 +199,14 @@ export default class ResolverContextHandle {
 	}
 
 	updateData(data) {
-		this.#data = data || {};
+		this.#data = isNullOrUndefined(data) ? null : data || {};
 		this.#providesData = !isNullOrUndefined(data);
 		this.#cache = this.#initPropertyCache();
 	}
 
 	mergeData(data) {
 		if (typeof data !== "object" || data == null) return;
+		this.#data ??= {};
 		Object.assign(this.#data, data);
 		this.#providesData = true;
 		this.#cache = this.#initPropertyCache();
@@ -280,16 +225,12 @@ export default class ResolverContextHandle {
 		if (GLOBAL === data) 
 			return createGlobalCacheWrapper(this);
 
+		// every key JavaScript says the object carries, nothing filtered - which of them an executer
+		// can put into its code is the executer's business (DECISIONS.md 2026-08-30, 2026-09-22)
 		const cache = new Map();
 		let type = data;
 		while (!isNullOrUndefined(type)) {
-			for (let name of Reflect.ownKeys(type)) {
-				if (typeof name !== "string"); //ignore non string property names
-				else if (RESERVED_WORDS.has(name)); //ignore reserved words
-				else if (!VARNAME_CHECK.test(name))
-					console.warn(`Variable name is illegal ${name}, variable irgnored!`);
-				else cache.set(name, this);
-			}
+			for (let name of Reflect.ownKeys(type)) cache.set(name, this);
 			type = Reflect.getPrototypeOf(type);
 		}
 

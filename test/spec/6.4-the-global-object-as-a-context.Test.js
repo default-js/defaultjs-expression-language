@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
 import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/executer/ContextDeconstructorExecuter.js";
+import { EXECUTERNAME as ContextObjectExecuterName } from "../../src/executer/ContextObjectExecuter.js";
 
 /**
  * SPECIFICATION.md 6.4 - the global object as an ordinary context object.
@@ -25,10 +26,12 @@ describe("Specification 6.4 - the global object as a context object", () => {
 		expect(result).toBe(2);
 	});
 
-	// A link below a global one asks the global link for its names, which is where an indexed name
-	// of the global object reaches an executer that turns names into code. A page carrying a frame
-	// has one: window[0] is frames[0], so the own name "0" appears for as long as the frame does.
-	it("carries a link below a global one while the page has a frame", async () => {
+	// A resolver over the global object contributes no name to the enumeration of a resolver below
+	// it: everything it holds is reachable through the ordinary scope chain of the statement anyway,
+	// so handing those names on would only make an executer that turns a name into code fail over
+	// names it never needed - the index "0" of a frame, a symbol another library planted on `window`.
+	// A lookup still finds them (6.4), it is the name list that stays out.
+	it("carries a resolver below a global one while the page has a frame", async () => {
 		const frame = document.createElement("iframe");
 		document.body.appendChild(frame);
 		try {
@@ -38,5 +41,12 @@ describe("Specification 6.4 - the global object as a context object", () => {
 		} finally {
 			frame.remove();
 		}
+	});
+
+	// ...and the global name is still found from below, which is what makes the list above needless.
+	it("reaches a global name from a resolver below a global one", async () => {
+		const root = new ExpressionResolver({ context: globalThis, name: "global", executer: ContextDeconstructorExecuterName });
+		const leaf = new ExpressionResolver({ context: { own: "from leaf" }, name: "leaf", parent: root, executer: ContextDeconstructorExecuterName });
+		expect(await leaf.resolve("${ Math.round(1.5) }")).toBe(2);
 	});
 });

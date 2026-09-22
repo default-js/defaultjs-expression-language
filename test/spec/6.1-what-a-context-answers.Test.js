@@ -57,6 +57,26 @@ describe("Specification 6.1 - every access goes through the proxy", () => {
 		expect(JSON.stringify(resolver.context).includes("frozen")).toBe(true);
 	});
 
+	// A context carries every key JavaScript says it carries, whether or not it could stand for a
+	// variable - DECISIONS.md, 2026-09-22.
+	it("enumerates a key that is not a variable name", async () => {
+		const resolver = new ExpressionResolver({ context: { "test-test": "dashed" }, name: "root" });
+		expect(Object.keys(resolver.context).includes("test-test")).toBe(true);
+	});
+
+	it("answers a symbol key the context carries", async () => {
+		const marker = Symbol("marker");
+		const resolver = new ExpressionResolver({ context: { [marker]: "from symbol" }, name: "root" });
+		expect(resolver.context[marker]).toBe("from symbol");
+	});
+
+	// A context carries what `in` says it carries, inherited members included (5.2) - an object
+	// handed over as a context answers the members of Object.prototype itself.
+	it("answers a member of Object.prototype for a plain object as context", async () => {
+		const resolver = new ExpressionResolver({ context: {}, name: "root" });
+		expect(resolver.context.valueOf === Object.prototype.valueOf).toBe(true);
+	});
+
 	// `data || {}` in the constructor of ResolverContextHandle turns a falsy context into an empty
 	// one, so 0, "" and false build a resolver that carries no name at all. Which shapes of context
 	// an *executer* can work with is a different question and has its rows in the matrix; this is

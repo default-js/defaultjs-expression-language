@@ -43,16 +43,17 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | --- | --- | --- | --- |
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 | B-28, B-29 (follow-up decisions) |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
-| 3 | Raise test coverage | largely done | B-30 |
-| 4 | Documentation | `SPECIFICATION.md` written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
-| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-07, B-25, B-26, B-27 |
+| 3 | Raise test coverage | largely done | B-30, B-38 |
+| 4 | Documentation | `SPECIFICATION.md` written; readme, JSDoc and the executers open | **B-39**, B-20, B-21, B-22, B-23, B-24 |
+| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-07, B-25, B-26, B-27, B-40 |
 
-**Markers, counted 2026-09-22** (`npm test`: 669 passed, 60 expected fail, 729 cases). No
-`it.fails` is left in `test/spec/` and no entry carries `Blocks 3.0.0` — the resolver keeps every
-rule that has a test. B-21 is what can still add a blocker. The 60 `no` cells in
+**Markers, counted 2026-09-22**, after the context filtering was taken out (`DECISIONS.md`, the two
+entries of that day)
+(`npm test`: 669 passed, 72 expected fail, 741 cases). One `it.fails` is left in `test/spec/`, and it
+pins B-33, the only entry that still blocks. The 71 `no` cells in
 `test/executer/capabilities/` say *this executer does not support this*, which is neither a defect
-nor a broken rule; whether one of them is meant to become a `yes` is an entry here. What blocks
-3.0.0 is the marker, not this count.
+nor a broken rule — 11 of them are what the default executer gave up on 2026-09-22, and the table
+itself is on its way out with B-39. What blocks 3.0.0 is the marker, not this count.
 
 ## Overview
 
@@ -61,7 +62,6 @@ nor a broken rule; whether one of them is meant to become a `yes` is an entry he
 | B-03 | A `parent` that is not an `ExpressionResolver` is silently dropped | decision | defect | |
 | B-04 | A context that is not an object throws from inside the property cache | decision | gap | |
 | B-05 | The data methods of 6.6 raise a `TypeError` over a sealed or a frozen context | decision | gap | |
-| B-06 | Take the name check out of `ResolverContextHandle` | agreed | refactor | |
 | B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | |
 | B-08 | `EsprimaExecuter` cannot reach a context value from inside a nested function | decision | capability | |
 | B-09 | `RESERVED_NAMES` in the esprima executer misspells `global` | agreed | defect | |
@@ -87,12 +87,19 @@ nor a broken rule; whether one of them is meant to become a `yes` is an entry he
 | B-29 | Move the build from webpack to Vite? | decision | tooling | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | |
 | B-31 | `AGENTS.md` describes three benchmark files, there are four | agreed | docs | |
+| B-33 | A configuration object followed by another argument is rejected instead of taken | agreed | defect | yes |
+| B-35 | A name the caller passes is checked against nothing | decision | gap | |
+| B-36 | The instance entry points and the data methods take input of the wrong type without a rule | decision | gap | |
+| B-37 | `setupExecuter` without a size sets 1000, not the 5000 an executer starts with | decision | gap | |
+| B-38 | Rules without a test that pins them | agreed | test | |
+| B-39 | Take the capabilities apart — document each executer on its own | agreed, **urgent** | docs | |
+| B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | |
 
 ---
 
 ## Release blockers
 
-None open.
+B-33 — the entry stands in its own section below.
 
 ## Resolver
 
@@ -139,28 +146,20 @@ all four raise (measured 2026-09-07, node 22). 6.5 says the equivalent for a wri
 sealed context at all — `Object.seal` and `Object.preventExtensions` appear in no test. To decide:
 6.6 gains a sentence and cases follow it, or a refused change is swallowed.
 
-### B-06 · Take the name check out of `ResolverContextHandle` and give it to the executer that needs it
-
-- **Status:** agreed 2026-08-30 — reasoning in `DECISIONS.md`
-- **Kind:** refactor · **Spec:** 6.1
-- **Records:** `CHANGELOG.md`, `SPECIFICATION.md`
-
-What goes from `src/ResolverContextHandle.js`: `VARNAME_CHECK`, `RESERVED_WORDS`, `isVariableName`,
-the warning `Variable name is illegal …` in `#initPropertyCache`, and the same filter in the keys of
-`createGlobalCacheWrapper`. What takes over: `ContextDeconstructorExecuter`, the only part that turns
-context names into code, filters the names it destructures. Constants more than one part needs go
-into a central `Constants.js`. Consumer-visible: under `ContextObjectExecuter` names like
-`test-test`, `class`, `0` or `undefined` become reachable (`ctx["test-test"]` is an ordinary access),
-an enumeration of a context widens by the same names, and the warning leaves the context path. Settle
-while implementing: whether `undefined` and `constructor` may then shadow through a `with` block, and
-what the filter costs in the executer, which computes its name list on every call (`npm run bench`).
-Decide `RESERVED_NAMES` of B-09 together with it — same rule, other executer.
-
 ### B-07 · A name found at the top of a resolver chain costs as much as one found at the bottom
 
 - **Status:** investigate — confirm with a counter in the trap, then fix
 - **Kind:** defect (performance) · **Spec:** none
 - **Records:** `DECISIONS.md`
+
+**A second case since 2026-09-22**, and it is the same rule from the other side: a name that only
+the **root** carries costs the whole chain. `ContextDeconstructorExecuter` reads every name of the
+context on every execution, the seven of `Object.prototype` among them, and since a resolver without
+a context holds no object those seven are carried by the root alone. Over a chain of 100 000
+resolvers without contexts one `resolve` takes 40 ms against 10 ms before (chromium, 2026-09-22),
+while `ownKeys` of the same proxy got faster, 3.1 ms against 9.4. Before, each empty resolver held
+`{}` and answered such a name itself, which hid the walk. A negative result cached per handle, or the
+`Symbol.unscopables` fix above, would answer both halves.
 
 Under `WithScopedExecuter` a lookup scales with the full chain depth even when the name sits a few
 resolvers up: `RandomScope` at depth 100 000 answers 138 hz under `with-scoped` against 662 000 hz
@@ -200,8 +199,8 @@ over the rewrite closes the first two causes, not the third. Decide together wit
 `src/executer/EsprimaExecuter.js` lists `"gobal"`; everything not on the list is rewritten to
 `ctx?.name`. The list is therefore the whole global surface of this executer: `Object`, `Array`,
 `Map`, `Set`, `console`, `fetch`, `window` are reachable; `Math`, `JSON`, `Date`, `Promise`,
-`document` and any global the application planted are not (`${ Math.round(1.5) }` answers
-`undefined`). Direction, Frank's: derive the list from the names of `GLOBAL` instead of maintaining
+`document` and any global the application planted are not (`${ Math.round(1.5) }` raises a
+`TypeError`: `ctx?.Math` is `undefined`, and reading `round` off it throws). Direction, Frank's: derive the list from the names of `GLOBAL` instead of maintaining
 it by hand. Settle when writing it: the derived list is a snapshot taken at module load; it makes
 every global reachable, which removes the property 6.4 leans on (a typo and an empty value are
 indistinguishable); a context property must keep winning over a global of the same name; and the
@@ -297,7 +296,9 @@ consumer never imported that module — keep, or give it a documented entry poin
 not list `ResolverContextHandle`, the class the name probably meant. Decide together: the handle's
 own public members `get parent` and `updateData` are uncovered (B-30) and only worth covering if
 they are surface. `updateData(data)` replaces the data, but the proxy shape is fixed in the
-constructor, so it cannot move a handle between the global shape and the ordinary one.
+constructor, so it cannot move a handle between the global shape and the ordinary one. The handle is
+already surface in one place: 6.2 tells a consumer to call `contextHandle.resetCache()`, while
+section 8 lists the getter `contextHandle` and none of the handle's members.
 
 ### B-16 · The `module` entry produces a bundle nothing can consume
 
@@ -340,6 +341,51 @@ The file sets `"omitVersion": true`; `generate-license-file` 4.2.1 knows `omitVe
 `LICENSE-OF-THIRD-PARTY` carries versions and churns on every dependency bump. Fixing it changes a
 published file.
 
+### B-33 · A configuration object followed by another argument is rejected instead of taken
+
+- **Status:** agreed — the rule of 4.1 decides it
+- **Kind:** defect · **Spec:** 4.1 · **Blocks 3.0.0:** yes
+- **Pinned by:** `decides the call form by the first argument alone, even where another argument
+  follows` (`test/spec/4.1-…`)
+- **Records:** `CHANGELOG.md`
+
+4.1 decides the call form *by the first argument alone*. Both static entry points take the
+configuration form only when `arguments.length === 1`, so `resolve({ expression, context }, x)` falls
+through to the string check and rejects with a `TypeError` claiming the object is not a
+configuration. Settle while fixing: what extra arguments mean in the configuration form — the rule
+says only that they do not decide it.
+
+### B-35 · A name the caller passes is checked against nothing
+
+- **Status:** decision
+- **Kind:** gap · **Spec:** 3.3, 5.1, 5.5
+
+5.1 holds a *generated* name to the character rule of 3.3 and says nothing about a passed one. The
+constructor takes any truthy value: a name carrying `.` or `:` can never be addressed by a scope
+prefix while a filter (6.6) still finds it, a `/` breaks the path `chain` answers (5.5), and `""` or
+`0` get a generated name instead. To decide: reject such a name, or state that only a name obeying
+3.3 is addressable by a prefix.
+
+### B-36 · The instance entry points and the data methods take input of the wrong type without a rule
+
+- **Status:** decision
+- **Kind:** gap · **Spec:** 4.2, 4.3, 6.6
+
+4.1 rejects a first argument of the wrong type with a `TypeError`; nothing is said for the instance.
+Measured 2026-09-22: `resolver.resolveText(42)` answers `42`, `resolver.resolve(42)` raises a
+`TypeError` out of `trim` and logs it as a failed statement, `mergeContext` ignores anything that is
+not an object, and `updateData` and `deleteData` ignore an empty key. To decide: one rule for all of
+them, most likely the one 4.1 already has.
+
+### B-37 · `setupExecuter` without a size sets 1000, not the 5000 an executer starts with
+
+- **Status:** decision
+- **Kind:** gap · **Spec:** 9.10
+
+Every executer builds its cache with `{ size: 5000 }`; `CodeCache.setup` defaults a missing `size` to
+1000, so `setupExecuter({})` or `setupExecuter()` shrinks the cache instead of leaving it alone. 9.10
+names neither number. To decide: which default is meant, and whether 9.10 states it.
+
 ## Documentation and naming
 
 ### B-20 · Every code example in `README.md` uses a default import that does not exist
@@ -355,17 +401,22 @@ It is what an AI system reads to learn the package.
 
 ### B-21 · `SPECIFICATION.md` has not been read rule by rule since it was written
 
-- **Status:** agreed — does not wait for anyone's notes
+- **Status:** agreed — the read-through is done, Frank's review points are open
 - **Kind:** docs · **Spec:** all of it
 - **Records:** `SPECIFICATION.md`
 
-The restructure of 2026-09-05 moved and shortened text but verified nothing, so a rule that was
-wrong on 2026-08-22 now reads as though it holds. Read every rule against the code and the suite;
-decide per rule whether it is true, still wanted, and pinned. A rule the code does not keep becomes
-an entry with `Blocks 3.0.0`; wording does not. Known so far: section 2 calls a chain *the stacking
-context*, a term no other section uses; the last paragraph of 4.2 names *the global-write switch*,
-which the document no longer has (B-10). Frank has
-further points from reviewing the restructure; they are added here when they come.
+Read rule by rule against the code, the suite and a node probe on 2026-09-22. What it produced: the
+two release blockers - B-33, and the shadowing of `Object.prototype` names, closed the same day -
+the gaps B-35 to B-37, and the missing pins in B-38. The capability counts of 9.2 to 9.9 were recounted from `CAPABILITIES` and hold. Fixed in the
+text: *the stacking context* in section 2, *the global-write switch* in 4.2, four references to a
+section 1.3 that does not exist, one broken sentence in 9.7, `self` missing from the esprima list in
+9.8, and 3.3 now says **ASCII** letters, which is what `EXPRESSION_SCOPE` accepts — a prefix
+`Äpfel::` is not recognized, and whether it should be is Frank's to say.
+
+Still open here: the bundle sizes in 9.2 (11.5 KB and 355.6 KB, also in `AGENTS.md` and
+`DECISIONS.md`) do not match `dist/` as committed on 2026-09-07 — 16.1 KiB and 365.5 KiB minified.
+Take the figures from the next `npm run build` rather than from this note. Frank has further points
+from reviewing the restructure; they are added here when they come.
 
 ### B-22 · The JSDoc of the whole package needs one pass
 
@@ -406,7 +457,54 @@ Decided 2026-08-30: one member of a chain is a **resolver**, and `SPECIFICATION.
 `DECISIONS.md` 41; `CHANGELOG.md` 13, entries under `[Unreleased]` among them, which a reader meets
 without a definition; `src/` 3 comments; `AGENTS.md` 2.
 
+### B-39 · Take the capabilities apart — document each executer on its own
+
+- **Status:** agreed 2026-09-22 — **urgent**, Frank's call; needs its own plan under `plans/`
+- **Kind:** docs · **Spec:** 9.3 to 9.9
+- **Records:** `SPECIFICATION.md`, `TESTING.md`, `AGENTS.md`, `DECISIONS.md`
+
+The capability catalogue compares four implementations cell by cell, which is the wrong question:
+**each executer is to be looked at on its own, closed in itself.** What is owed instead is clean
+documentation per executer — how it works, and what follows from that for the expressions a consumer
+writes: which dialect, which names have to be variables, which shapes of context it runs over, what
+a write does, which globals it reaches, what it does when it cannot run. The comparison across four
+columns, the counts (`79 of 106`), and `no` as a state disappear with it.
+
+Touches everything the catalogue holds up: `test/ExecuterCapabilities.js` and the six files under
+`test/executer/capabilities/`, part B of `SPECIFICATION.md` (9.3 to 9.9), the sections *Tests* of
+`AGENTS.md` and 4 of `TESTING.md`, and the entries of 2026-08-30 and 2026-09-05 in `DECISIONS.md`
+that set up the two-state table. Open with it: what carries the guard a `no` cell gives today — an
+executer that starts or stops doing something turns the gate red — once the table is gone.
+
 ## Benchmarks
+
+### B-40 · What the name cache costs and saves when reading and writing along a chain
+
+- **Status:** agreed 2026-09-22 — Frank's order, measure before anything is changed
+- **Kind:** bench · **Spec:** 6.2
+- **Records:** `DECISIONS.md`, and `SPECIFICATION.md` 6.2 if the cache goes
+
+Every handle keeps `#cache`, a `Map` from every name its context carries to the handle carrying it
+(`src/ResolverContextHandle.js`: built in `#initPropertyCache`, read by `#getPropertyDef`, the
+`ownKeys` trap and `hasData`, kept in step by the `set` and `deleteProperty` traps, `updateData`,
+`mergeData` and `resetCache`). **Since 2026-09-22 it filters nothing**, so it holds exactly what
+`key in object` would answer, one `Map` per resolver, built on construction.
+
+**Measure what it costs and what it saves**, over a chain, for both directions:
+
+- **Reading** — a name the resolver carries itself, one only an ancestor carries, one nobody
+  carries, and one the root alone carries (the case B-07 got on 2026-09-22). Against the cache and
+  against a live `in` walking `#data` of each handle.
+- **Writing** — `updateData`, `mergeContext`, `deleteData` and an assignment from inside an
+  expression. Each of those rebuilds or amends the cache today, which is work a live lookup would
+  not do at all.
+- **Building** — one `#initPropertyCache` per resolver, which a chain pays once per resolver and a
+  template engine pays on every nesting level it enters.
+
+What hangs on the answer: **6.2 itself.** Without the cache, names are as live as values, the
+snapshot rule of 6.2 falls away and `resetCache` loses its purpose — a rule and a public method
+would go, so the measurement decides a specification question and not only an implementation.
+Note the benchmark caveats of B-25 and B-27, and compare alternating runs rather than single ones.
 
 ### B-25 · The deep-chain benchmarks are bimodal by a factor of two across runs
 
@@ -451,6 +549,27 @@ The section *Benchmarks* of `AGENTS.md` names three files: `ColdResolve`, `WarmR
 `RandomScope`. `test/PerformanceTests/ResolveText.bench.js` (since `0ea787f`)
 is missing there. It measures the instance `resolveText` over four texts. No benchmark calls a
 static entry point, so a change confined to those two is not visible in `npm run bench`.
+
+### B-38 · Rules without a test that pins them
+
+- **Status:** agreed — goal 3
+- **Kind:** test
+
+Found by the read-through of B-21. The code keeps each of them as far as it was checked, but nothing
+turns the gate red if that changes:
+
+1. 6.7 — the `deep` option of `buildSecure`; the four cases never pass it.
+2. 9.2 — `with-scoped-executer` announcing its deprecation on the first expression it resolves.
+3. 6.1, 6.5 — a write over a frozen context fails. The capability row `leaves a key of a frozen
+   context unchanged` asks it of an assignment in an expression; `updateData` over a frozen context is
+   not asked at all, and a sealed context is not in the suite (B-05).
+4. 6.4 — `getData()` on a resolver over the global object answers the global object itself, and a
+   write through it is an ordinary global write.
+5. 3.1 — the two limits: a brace inside a comment counts, a regular expression literal after `)` is
+   read as division.
+
+Also stale: the header of `test/spec/6.1-what-a-context-answers.Test.js` points at
+`test/executer/rules/6.1-the-proxy.Test.js`, which does not exist.
 
 ## Tooling
 

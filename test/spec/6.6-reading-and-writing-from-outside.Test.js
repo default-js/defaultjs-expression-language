@@ -26,6 +26,17 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		expect(leaf.getData("value")).toBe("from root");
 	});
 
+	// A context carries every key JavaScript says it carries - DECISIONS.md, 2026-09-22.
+	it("getData reads a key that is not a variable name", async () => {
+		const resolver = new ExpressionResolver({ context: { "test-test": "dashed" }, name: "root" });
+		expect(resolver.getData("test-test")).toBe("dashed");
+	});
+
+	it("getData reads a key named like a reserved word", async () => {
+		const resolver = new ExpressionResolver({ context: { class: "reserved" }, name: "root" });
+		expect(resolver.getData("class")).toBe("reserved");
+	});
+
 	it("getData with a filter reads from the addressed link", async () => {
 		const { leaf } = buildChain();
 		expect(leaf.getData("value", "root")).toBe("from root");

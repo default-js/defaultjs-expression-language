@@ -36,7 +36,7 @@ deeper must never overwrite values further up.
 | **Statement** | A piece of JavaScript to be evaluated, without delimiters. |
 | **Expression** | A statement in its delimited form, `${…}`, optionally carrying a scope prefix. |
 | **Resolver** | One `ExpressionResolver` instance: a name, a context, and optionally a parent. |
-| **Chain** | A resolver and its parents. Also called the stacking context. |
+| **Chain** | A resolver and its parents. |
 | **Root** | The resolver that has no parent. A resolver without a parent is its own root. |
 | **Context** | The data an expression is evaluated against, one object per resolver. |
 | **Executer** | The strategy that turns a statement into a value. Pluggable. |
@@ -102,8 +102,8 @@ elsewhere in the text, and the other way round.
 `${name::statement}` evaluates the statement on the resolver of the chain that carries the name
 `name`. The prefix is optional; without it the resolver the call was made on applies.
 
-The name is a label, not a JavaScript identifier. Allowed are **letters, digits, whitespace,
-`-` and `_`** — nothing else. The name is trimmed at both ends, so leading and trailing
+The name is a label, not a JavaScript identifier. Allowed are **the ASCII letters `a`–`z` and
+`A`–`Z`, digits, whitespace, `-` and `_`** — nothing else. The name is trimmed at both ends, so leading and trailing
 whitespace is not part of it. The character set is narrow enough that scope and statement can always
 be separated, and that a quoted `::` inside a statement cannot be read as a prefix.
 
@@ -172,8 +172,8 @@ holds, however it got it — so one executer named at the root of a chain applie
 built under it that does not name its own. The getter `executer` answers the one in use.
 
 The instance methods stay **positional** and get no configuration form of their own. Everything a
-configuration would carry beyond the default value — the context, the executer, the global-write
-switch — is already fixed on the instance and must not be overridable per call.
+configuration would carry beyond the default value — the context and the executer — is already
+fixed on the instance and must not be overridable per call.
 
 ### 4.3 `resolve` versus `resolveText`
 
@@ -244,8 +244,17 @@ What decides is whether the key **exists** on a resolver, not what it holds. A k
 value `undefined` answers the lookup and stops the walk; a key that a resolver does not carry at all
 is passed on to the parent.
 
-Keys inherited through the **prototype chain** of a context object count as carried — a getter
-or a method defined on a class is reachable from an expression.
+Which keys a resolver carries is **what JavaScript says it carries**, and nothing is filtered out of
+that: a key inherited through the **prototype chain** counts, so a getter or a method defined on a
+class is reachable from an expression; so do a key that could not stand for a variable
+(`test-test`), one named like a reserved word (`class`), an index, and a symbol.
+
+Two consequences are worth naming, because both follow from the language rather than from a choice
+made here. A context object inherits from `Object.prototype` unless it was built without a
+prototype, so a resolver over a plain object **carries `toString`, `valueOf`, `hasOwnProperty` and
+their kind**, and shadows a resolver above it that holds one of those names as data. And a key an
+executer cannot express stays unreachable *from a statement* under that executer while `getData`
+reads it — how a statement addresses a name is the executer's own (9.3).
 
 ### 5.3 Lookup with a prefix
 
@@ -306,14 +315,15 @@ object passed to the constructor** and it **answers for the whole chain**: readi
 follows 5.2, so it sees what the resolvers above carry.
 
 Enumerating it describes the chain rather than one resolver. `Object.keys`, a spread and
-`JSON.stringify` answer every name the chain carries, each with the enumerability it has where it is
-defined, so the members of a prototype stay out of `Object.keys` as they would on the object itself.
-`Object.getOwnPropertyNames` is the wider list and names them.
+`JSON.stringify` answer every name the chain carries — those that are no variable names among them —
+each with the enumerability it has where it is defined, so the members of a prototype stay out of
+`Object.keys` as they would on the object itself. `Object.getOwnPropertyNames` is the wider list and
+names them, and `Object.getOwnPropertySymbols` answers the symbol keys.
 
 Three further rules hold for any context:
 
 - **Values are read at the moment of the lookup** (6.2), never collected up front.
-- **A write lands on the resolver it was made on**, never on one nearer the root (1.3). Where that
+- **A write lands on the resolver it was made on**, never on one nearer the root (section 1). Where that
   resolver was built over a frozen object, the write fails as it would on the object itself.
 - **Any object works as a context**, a frozen or sealed one included, and so do an array, a `Map`, a
   `Set`, a `NodeList` and a DOM element. Which of them a given implementation can run a statement
@@ -335,8 +345,9 @@ through (6.5) — keeps the set of keys in step.
 ### 6.3 A resolver without a context
 
 A resolver built without a context — `context: null`, `context: undefined`, or the option left
-out (4.2) — has an empty context, equivalent to `{}` for a lookup. It contributes nothing to a
-lookup and is passed through.
+out (4.2) — holds **no object at all**. It therefore carries no name, not even one every object
+inherits, contributes nothing to a lookup and is passed through. That is the difference to a
+resolver built over `{}`, which carries what that object inherits (5.2) and shadows those names.
 
 Such a resolver gains content like any other: through `updateData`, `mergeContext`, or a write from
 an expression evaluated on it (6.5).
@@ -357,6 +368,10 @@ the chain. Three things follow from what such a resolver is, and all three are i
 - It carries **every** name, so it answers every lookup that reaches it and no resolver below it is
   ever consulted. A resolver over the global object therefore belongs at the root of a chain, not in
   the middle of one.
+- It contributes **no name to an enumeration** below it. A lookup still finds everything it holds,
+  from any resolver of the chain, but `Object.keys` of a context below it does not list the globals:
+  a statement reaches a global through the ordinary scope chain (9.8), so listing them would only
+  hand names like the index of a frame to an executer that has to turn every name into code.
 - It is **not wrapped**. Every other context is answered for through something that flattens the
   chain and catches writes; in front of an object that already carries every name that has nothing to
   add, and it would break every operation that enumerates the context. `getData()` on such a resolver
@@ -375,7 +390,7 @@ a context and the only path with guaranteed behaviour.
 Where a write goes once an executer lets it through is a rule:
 
 - It lands in the context of the resolver the expression is evaluated on, **never in an ancestor's**
-  (1.3). A name an ancestor carries is shadowed from that resolver downwards, not changed where it
+  (section 1). A name an ancestor carries is shadowed from that resolver downwards, not changed where it
   lives.
 - Where that resolver was built over a frozen object, the write fails as it would on the object
   itself.
@@ -408,7 +423,7 @@ it, and code outside the resolver holding the same reference sees the change. A 
 want that hands over a copy.
 
 They act **on the chain**, not on one isolated resolver, and how far each one reaches is per method,
-listed below. The rule of 1.3 — a value introduced further from the root never overwrites one nearer
+listed below. The rule of section 1 — a value introduced further from the root never overwrites one nearer
 to it — describes the *expression* path; it is not a prohibition on these methods.
 
 `filter` is a scope name and selects **the one resolver** the call applies to, by the rule of 5.3.
@@ -431,7 +446,7 @@ looks:
 - **With a filter** the addressed resolver is the target outright. The value is written there,
   whatever the rest of the chain holds.
 
-This is the counterpart to 1.3: the chain protects a resolver's value against an expression evaluated
+This is the counterpart to section 1: the chain protects a resolver's value against an expression evaluated
 further from the root, while the data methods are the path that may reach across resolvers.
 
 `deleteData` removes a key from **one** resolver — the addressed one with a filter, and without one
@@ -556,12 +571,13 @@ resolves.
 
 `esprima-executer` is registered only when its module is imported explicitly, because `espree`
 grows the browser bundle from 11.5 KB to 355.6 KB. It is the least complete of the four — 71 of 106
-capabilities against 90 for the default — and what it cannot do is in 9.3 to 9.9.
+capabilities against 79 for the default — and what it cannot do is in 9.3 to 9.9.
 
 The default is not the most complete either, and that is deliberate: it is picked for speed, and
 where a capability costs what speed is worth it does without. `context-object-executer` is the
-implementation to pick when completeness matters more — it answers 103 of the 106, and it is the
-only one under which a write from inside an expression is readable afterwards in every shape (9.7).
+implementation to pick when completeness matters more — it answers 103 of the 106, it runs over
+every shape of context (9.6), and it is the only one under which a write from inside an expression
+is readable afterwards in every shape (9.7).
 
 ### 9.3 What a capability is
 
@@ -579,11 +595,11 @@ What each implementation supports, over 106 cases asked of all four:
 |---|---|---|---|---|---|
 | 9.4 `syntax` | which constructs run at all | 25/27 | 25/27 | 25/27 | 21/27 |
 | 9.5 `context-scope` | whether a construct carrying a context name still reaches it | 26/26 | 26/26 | 25/26 | 12/26 |
-| 9.6 `context-shape` | which structures work as a context | 19/19 | 19/19 | 16/19 | 19/19 |
+| 9.6 `context-shape` | which structures work as a context | 19/19 | 19/19 | 5/19 | 19/19 |
 | 9.7 `context-write` | whether a write is readable afterwards | 11/12 | 12/12 | 5/12 | 4/12 |
 | 9.8 `global-scope` | which globals are reachable, and whether a write is contained | 14/17 | 16/17 | 14/17 | 10/17 |
 | 9.9 `cache` | whether it keeps answering in every state of its code cache | 5/5 | 5/5 | 5/5 | 5/5 |
-| **All six** | | **100/106** | **103/106** | **90/106** | **71/106** |
+| **All six** | | **100/106** | **103/106** | **79/106** | **71/106** |
 
 The complete catalogue, 106 rows against four implementations, is `CAPABILITIES` in
 `test/ExecuterCapabilities.js`. It is the source these subsections are written from.
@@ -653,11 +669,22 @@ carrying a symbol key, a key that is not a variable name, a key named like a res
 key beside a named one, an accessor on a prototype, many keys at once, and a key named `ctx` or
 `context`.
 
-Three implementations answer all 19. `context-deconstruction-executer` misses three, and they
-have one cause: **it reads every name of a context before it runs anything**, so an accessor that
-throws breaks every statement over that context, including one that touches no name, and an accessor
-that only costs is evaluated on every execution. An `arguments` object is that shape, its `callee`
-being a poisoned accessor.
+Three implementations answer all 19. `context-deconstruction-executer` answers 5, and the 14 it
+misses have one cause: **it binds every name of a context as a variable before it runs anything**.
+
+A name that cannot be a variable — an index, a symbol, a reserved word, a key like `test-test` —
+therefore stops every statement over that context, including one that names none of them; the
+executer reports which name and which statement rather than dropping the name, because a dropped
+name hides a property the caller defined. An array, a `Map`, a `Set`, a `NodeList` and a DOM element
+carry such names on their prototypes, so this executer does not run over them at all. Reading every
+name has a
+second consequence: an accessor that throws breaks every statement over that context, and one that
+merely costs is paid on every execution — an `arguments` object is that shape, its `callee` being a
+poisoned accessor.
+
+A context of plain data is what this implementation is for. Anything else is
+`context-object-executer`, which addresses a name through an object and needs no name to be a
+variable at all.
 
 ### 9.7 `context-write` — whether a write survives
 
@@ -677,8 +704,8 @@ What still reaches the context under it is a **mutation** of an object the conte
 carried back.
 
 That is a trade and not a gap. Carrying a value back means declaring every context name in the body
-of the generated function instead of listing it in a parameter list, and the source `new Function`
-then has to parse on a cache miss costs about eleven times as much at a shallow chain. This implementation is the default
+of the generated function instead of listing it in a parameter list, and that longer source, which
+`new Function` parses on every cache miss, costs about eleven times as much at a shallow chain. This implementation is the default
 because it is the fast one, so where a capability costs what its speed is worth, it does without.
 A consumer who needs a write from inside an expression to persist picks `context-object-executer`,
 which keeps all 12 — its dialect writes through the context rather than into a binding, so there is
@@ -697,7 +724,7 @@ Two halves, 17 cases. The first is reach: `with-scoped-executer`, `context-objec
 `context-deconstruction-executer` run the statement as ordinary JavaScript, so every global is
 reachable and none of them can prevent that. `esprima-executer` rewrites identifiers onto its context
 variable and leaves alone only what its own list names, so it reaches `Object`, `Array`, `Map`,
-`Set`, `console`, `fetch` and `window` — and **not** `Math`, `JSON`, `Date`, `Promise`, `document`,
+`Set`, `console`, `fetch`, `window` and `self` — and **not** `Math`, `JSON`, `Date`, `Promise`, `document`,
 or any global the application itself planted.
 
 The second half is containment:

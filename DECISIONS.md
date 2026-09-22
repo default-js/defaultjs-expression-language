@@ -19,6 +19,72 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-22 — What does an executer do with a name it cannot use?
+
+**Decision:** **It filters nothing and reports.** `ContextDeconstructorExecuter` binds every name
+the context carries, a name that cannot be a variable included, so such a context stops every
+statement it runs — and the error names the offending key and the statement it happened on.
+`SPECIFICATION.md` 9.6.
+
+**Reasoning:** Frank's, on 2026-09-22, against the proposal to move the filter from the handle into
+this executer. A filter hides a property the caller defined: the caller sees a field they wrote
+answer nothing, with no way to learn whether it was dropped, misspelled or simply empty. JavaScript
+already detects the case — the generated function does not compile — so the only thing missing is a
+message that says which statement failed and which name did it, because the statement need not
+mention that name at all. The price was measured before the decision, not after: eleven rows of
+`context-shape` turn from `yes` to `no`, so the default executer runs over 79 of 106 capabilities
+instead of 90 and does not run over an array, a `Map`, a `Set`, a `NodeList` or a DOM element.
+Frank's answer is that this executer was never meant to carry those shapes. What the decision does
+**not** cover is a name the executer never needed: a resolver over the global object stops handing
+its names down, because a statement reaches a global through the ordinary scope chain (Frank, the
+same day) - otherwise one frame on the page would stop every statement below such a resolver.
+
+**Alternatives:** Filter in the executer (the proposal) — keeps all 19 shapes and hides the caller's
+own names. Filter only inherited names and warn about own ones — keeps the shapes and the message,
+at the price of a rule that tells one name from another. Make `context-object-executer` the default
+— removes the case entirely, at the price of changing the dialect every consumer writes.
+
+**Consequences:** The default executer is for a context of plain data; anything else is
+`context-object-executer`. Whoever hands over a `NodeList` gets an error naming a key on its
+prototype, which reads like a defect until the message is read — the readme owes an explanation
+(B-20). The one filter left in this executer is `blockedPropertyNames`, which is not about names
+that cannot be bound.
+
+## 2026-09-22 — Which names does a context carry?
+
+**Decision:** **Every name JavaScript says it carries** — `key in object`, nothing filtered. A
+symbol, a reserved word, a key that is not a variable name, and every member the object inherits,
+the ones of `Object.prototype` included, are carried and answer a lookup. A resolver built without a
+context holds **no object at all** rather than `{}`, and gets one on the first write through
+`updateData` or `mergeContext`. `SPECIFICATION.md` 5.2, 6.1, 6.3. Supersedes the filtering half of
+the entry of 2026-08-30, whose consequences this carries out.
+
+**Reasoning:** Frank's, on 2026-09-22: what the caller hands over is what the caller gets. The
+read-through of the specification found the filter answering for two rules at once and keeping
+neither — names like `test-test` were dropped, while `Object.prototype` members were kept and let a
+resolver without a context shadow `valueOf` of its root. Stopping the prototype
+walk before `Object.prototype` was proposed and not taken: it would have been one more rule the
+handle makes up on behalf of the caller. Without a filter the only rule left is the language's own,
+and the one it cannot express — that a resolver without a context contributes nothing — is kept by
+not giving that resolver an object.
+
+**Alternatives:** Stop the walk at `Object.prototype` (the proposal): section 1 and 6.3 hold for
+every name, at the price of a rule the language does not have. Keep the behaviour and write an
+exception into 6.3: the cheapest, and it leaves a special case every consumer has to know.
+
+**Measured** when the work closed, `npm run bench`, four runs of `4cc573e` against two of the
+result: **1.02 over all rows**, 1.11 for the three executers that do not read every name, and 1.05
+for the default one over everything but a chain of 100 000 resolvers or more that carries no context
+at all. That one case costs a factor of three and is in `BACKLOG.md` under B-07: the seven names of
+`Object.prototype` are now carried by the root alone, so each of them walks the whole chain, where an
+empty resolver holding `{}` used to answer them at the first step.
+
+**Consequences:** A context value named `valueOf`, `toString` or `hasOwnProperty` further up the
+chain is shadowed by every resolver below that holds a plain object — that is `in` answering, and
+5.2 says so. An executer that turns names into code filters for itself what it cannot express
+(`ContextDeconstructorExecuter`: symbols, reserved words, names that are not identifiers). Whether
+the name snapshot of 6.2 still earns its place once it filters nothing is left to a measurement.
+
 ## 2026-09-22 — Does an executer offer a default context?
 
 **Decision:** **No.** `defaultContext` is removed from the `Executer` interface — the constructor

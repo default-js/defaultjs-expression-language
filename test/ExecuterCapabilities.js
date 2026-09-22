@@ -212,20 +212,27 @@ export const CAPABILITIES = {
 		cases: {
 			//                                                                          with-scoped  context-object  deconstruction  esprima
 			"resolves over a context the caller froze":                                [ YES,         YES,            YES,            YES ],
-			"resolves over a context carrying a key that is not a variable name":      [ YES,         YES,            YES,            YES ],
-			"runs a statement over an array context":                                  [ YES,         YES,            YES,            YES ],
-			"runs a statement over a Map context":                                     [ YES,         YES,            YES,            YES ],
-			"runs a statement over a Set context":                                     [ YES,         YES,            YES,            YES ],
-			"runs a statement over a NodeList context":                                [ YES,         YES,            YES,            YES ],
+			// **Eleven rows the deconstructor gave up on 2026-09-22.** It binds every name the context
+			// carries and filters none, because a filter hides a property its caller defined
+			// (`DECISIONS.md`, 2026-09-22). A name that cannot be a variable - an index, a symbol, a
+			// reserved word, `test-test` - therefore stops every statement over that context, whether
+			// or not the statement mentions it, and the executer says which name and which statement.
+			// Arrays, `Map`, `Set`, a `NodeList` and a DOM element carry such names on their
+			// prototypes, so this executer does not run over them at all.
+			"resolves over a context carrying a key that is not a variable name":      [ YES,         YES,            NO,             YES ],
+			"runs a statement over an array context":                                  [ YES,         YES,            NO,             YES ],
+			"runs a statement over a Map context":                                     [ YES,         YES,            NO,             YES ],
+			"runs a statement over a Set context":                                     [ YES,         YES,            NO,             YES ],
+			"runs a statement over a NodeList context":                                [ YES,         YES,            NO,             YES ],
 			// the deconstructor reads every name of a context before it runs anything, and `callee` on
 			// an arguments object is a poisoned accessor. BACKLOG.md keeps open whether it should cope.
 			"runs a statement over an arguments object as context":                    [ YES,         YES,            NO,             YES ],
-			"reads through an element context":                                        [ YES,         YES,            YES,            YES ],
-			"reads the length of an array context and ignores its indices":            [ YES,         YES,            YES,            YES ],
-			"reads a named key of a context that also carries a numeric one":          [ YES,         YES,            YES,            YES ],
-			"reads an accessor of the prototype of a Map context":                     [ YES,         YES,            YES,            YES ],
+			"reads through an element context":                                        [ YES,         YES,            NO,             YES ],
+			"reads the length of an array context and ignores its indices":            [ YES,         YES,            NO,             YES ],
+			"reads a named key of a context that also carries a numeric one":          [ YES,         YES,            NO,             YES ],
+			"reads an accessor of the prototype of a Map context":                     [ YES,         YES,            NO,             YES ],
 			"runs a statement over a context without a prototype":                     [ YES,         YES,            YES,            YES ],
-			"runs a statement over a context carrying a symbol key":                   [ YES,         YES,            YES,            YES ],
+			"runs a statement over a context carrying a symbol key":                   [ YES,         YES,            NO,             YES ],
 			// **Two keys that used to be dangerous, and no longer are.** Both name a binding the
 			// generated code of an executer could declare for itself, and the deconstructor declares
 			// none since 2026-09-20 - it destructures in its parameter list, so the only names inside
@@ -234,7 +241,7 @@ export const CAPABILITIES = {
 			// outside it.
 			"runs a statement over a context carrying a key named ctx":                [ YES,         YES,            YES,            YES ],
 			"runs a statement over a context carrying a key named context":            [ YES,         YES,            YES,            YES ],
-			"runs a statement over a context carrying a key named like a reserved word": [ YES,       YES,            YES,            YES ],
+			"runs a statement over a context carrying a key named like a reserved word": [ YES,       YES,            NO,             YES ],
 			"runs a statement over a context carrying many keys":                      [ YES,         YES,            YES,            YES ],
 			// Both are the same property from two sides: the deconstructor reads every name of a
 			// context before it runs anything. Where an accessor throws, no statement runs at all; where

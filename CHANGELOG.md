@@ -91,7 +91,56 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `BACKLOG.md` and the index of pending work are gone — those belong to the records that carry them.
   Every rule is written as holding, so the document describes 3.0.0 rather than the work in progress.
 
+  **Read against the code on 2026-09-22.** No rule changed meaning. 3.3 now says what a scope name
+  has always accepted: the **ASCII** letters, not letters in general. 9.8 adds `self` to the globals
+  `esprima-executer` reaches. Four references to a section 1.3 that never existed point at section 1,
+  and two terms the document no longer defines — *the stacking context*, *the global-write switch* —
+  are gone.
+
 ### Changed
+
+- **A context carries every key JavaScript says it carries.** Names that are not variable names
+  (`test-test`, `0`), reserved words (`class`, `undefined`, `constructor`) and symbol keys used to be
+  dropped when a resolver was built, with a warning `Variable name is illegal …` for the first kind.
+  They are now reachable through `getData`, through the context and, where the executer can express
+  them, from an expression — `ctx["test-test"]` under `context-object-executer`. `Object.keys`, a
+  spread and `JSON.stringify` of a context include them. The warning is gone. Under
+  `with-scoped-executer` a context key named like `undefined` now shadows it inside an expression.
+  See `SPECIFICATION.md` 6.1 and `DECISIONS.md`, 2026-09-22.
+
+- **`context-deconstruction-executer`, the default, no longer runs over a context whose names it
+  cannot bind — and says so.** It binds every name a context carries as a variable and filters
+  nothing, so a name that cannot be one stops every statement over that context, whether or not the
+  statement mentions it: an index, a symbol, a reserved word, a key like `test-test`. In practice
+  that rules out an array, a `Map`, a `Set`, a `NodeList` and a DOM element, which carry such names
+  on their prototypes. It used to drop those names silently, which hid a property the caller had
+  defined. The error names the key and
+  the statement: *Context property name "test-test" cannot be used as a variable by
+  context-deconstruction-executer, so this statement cannot run over this context! statement: 1 + 1*.
+  A consumer who hands over such a context picks `context-object-executer`, which addresses a name
+  through an object and needs no name to be a variable. `SPECIFICATION.md` 9.6, and `DECISIONS.md`,
+  2026-09-22.
+
+- **The default executer warns about a large context while it compiles, not on every execution.**
+  `High count of properties at first level …` used to be written on every resolution, which in a
+  browser costs more than the resolution itself — measured at a factor of four to twenty-five. It is
+  now written when the statement is compiled, so a consumer hears it once per context shape and
+  statement. The threshold moved from 10 names to 25, because every ordinary object brings seven
+  inherited names along.
+
+- **A resolver whose context is the global object contributes no name to an enumeration below it.**
+  `Object.keys` of a context below such a resolver used to list the names of the global object;
+  it now lists what the other resolvers of the chain carry. Nothing changes for a lookup: a global
+  is found from anywhere in the chain, and a statement reaches it through the ordinary scope chain.
+  What this fixes: those names were handed to every executer that turns a name into code, so one
+  frame on the page — `window[0]` — was enough to stop every statement below a global resolver.
+  See `SPECIFICATION.md` 6.4.
+
+- **A resolver without a context no longer answers the names of `Object.prototype`.** It held an
+  empty object, so `toString`, `valueOf`, `hasOwnProperty` and the rest of `Object.prototype` were
+  answered by it rather than by a resolver further up that carried them. It now holds no object at
+  all until a value is written to it. A resolver built over a plain object still answers those
+  names itself — that is what `in` says. See `SPECIFICATION.md` 5.2 and 6.3.
 
 - **The static entry points reject a first argument that is neither a string nor an object.**
   `ExpressionResolver.resolve` and `resolveText` now reject a number, a boolean, a function,
