@@ -19,6 +19,41 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-22 — Which executer does a resolver use when the `executer` option is left out?
+
+**Decision:** **The one of its parent.** The constructor takes the `executer` option where it is a
+registered name or an `Executer` instance, otherwise the executer of the `parent`, and only a
+resolver without a parent falls back to `ExpressionResolver.defaultExecuter`. The choice is made once,
+in the constructor, and the getter `executer` answers it. `SPECIFICATION.md` 4.2.
+
+**Reasoning:** Frank's, on 2026-09-22: a chain is defined as a whole, and its executer should be
+stable along it and change only where the chain says so explicitly, rather than being named on every
+resolver. Two facts of the code make that more than convenience:
+- **The dialect belongs to the executer** (`SPECIFICATION.md` 9.3) — `context-object-executer`
+  reads `${ctx.value}` where the other three read `${value}` — and a scoped statement is executed by
+  the executer of the resolver the call was made on, not of the one it addresses: the module-level
+  `resolve` hands `aExecuter` up the chain unchanged (`src/ExpressionResolver.js:84-89`). Before this,
+  `${root::ctx.x}` on a leaf built without the option ran under the default executer although `root`
+  was built for `context-object-executer`, and failed in the dialect it was written for.
+- **The only other way to keep one executer across a chain is global.** Setting
+  `ExpressionResolver.defaultExecuter` switches it for everything on the page, including code that
+  has nothing to do with the chain. Inheritance scopes the choice to the chain it was made for.
+
+The capabilities of 9.4 to 9.8 point the same way: whether a write from an expression persists
+depends on the executer, so a mixed chain gives one expression different semantics per level.
+
+**Alternatives:** Falling back to `defaultExecuter` for every resolver, as before — keeps the
+constructor independent of the parent, but makes a non-default chain name its executer on every
+resolver and lets a forgotten option switch the dialect silently. It would be the better choice only
+if resolvers of one chain were routinely meant to run different executers, which nothing in the
+package or its specification suggests.
+
+**Consequences:** Consumer-visible (`CHANGELOG.md`, `Changed`): a resolver built without the option
+under a parent with a non-default executer now runs that executer. A mixed chain stays possible and
+is now always explicit. The getter `executer` joins the public surface (section 8). The constructor
+reads `parent.executer` before it checks that `parent` is an `ExpressionResolver`, so a parent that
+is not one leaves `undefined` behind — carried in `BACKLOG.md` under the entry on such a parent.
+
 ## 2026-09-20 — Does `ContextDeconstructorExecuter` keep its write-back?
 
 **Decision:** **No.** The executer runs the statement over bindings destructured in the parameter

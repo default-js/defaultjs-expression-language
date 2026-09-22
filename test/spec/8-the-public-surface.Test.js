@@ -52,7 +52,7 @@ describe("Specification 8 - ExpressionResolver, the instance surface", () => {
 		});
 	}
 
-	for (const name of ["name", "parent", "context", "contextHandle", "chain", "effectiveChain", "contextChain"]) {
+	for (const name of ["name", "parent", "context", "contextHandle", "executer", "chain", "effectiveChain", "contextChain"]) {
 		it(`carries the getter ${name}`, async () => {
 			const descriptor = Object.getOwnPropertyDescriptor(ExpressionResolver.prototype, name);
 			expect(typeof descriptor.get).toBe("function");

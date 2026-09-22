@@ -163,8 +163,13 @@ resolver.resolveText(aText, aDefault)                                      // �
 (6.3). `executer` takes the **registered name** of an executer or an
 **`Executer` instance**. A name is looked up in the registry and an unregistered one throws; an
 instance is taken as it is and needs no registration, because it already addresses the executer.
-Without the option the resolver uses `ExpressionResolver.defaultExecuter`, whose setter accepts
-either form as well. Anything that is neither is ignored and the default applies.
+Anything that is neither is ignored, as though the option were left out.
+
+Without the option the resolver takes the executer of its **parent**, and only a resolver without
+a parent falls back to `ExpressionResolver.defaultExecuter`, whose setter accepts either form as
+well. The choice is made once, in the constructor, and the parent's executer is whatever that parent
+holds, however it got it — so one executer named at the root of a chain applies to every resolver
+built under it that does not name its own. The getter `executer` answers the one in use.
 
 The instance methods stay **positional** and get no configuration form of their own. Everything a
 configuration would carry beyond the default value — the context, the executer, the global-write
@@ -501,7 +506,7 @@ exist so a consumer can build their own debug output.
 **`ExpressionResolver`** — static `resolve`, `resolveText`, `buildSecure`, `defaultExecuter`;
 constructor `{ context, parent, name, executer }`;
 instance `resolve`, `resolveText`, `getData`, `updateData`, `deleteData`, `mergeContext`; getters `name`, `parent`, `context`, `contextHandle`,
-`chain`, `effectiveChain`, `contextChain`.
+`executer`, `chain`, `effectiveChain`, `contextChain`.
 
 **`ExecuterRegistry`** — `registrate`, `getExecuter`.
 

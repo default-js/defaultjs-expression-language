@@ -125,6 +125,15 @@ Entries here are independent of each other. An undertaking whose steps depend on
   the behaviour that makes a mistake visible at construction rather than at the first resolution.
   Decide whether `parent` follows it. Consumer-visible if it changes, so the outcome belongs in
   `DECISIONS.md` and in `CHANGELOG.md`. Found 2026-08-24 while probing the edge cases of section 4.
+  **Since the executer is inherited (2026-09-22) the dropped parent leaves a second trace.** The
+  constructor asks `parent.executer` before it checks `parent instanceof ExpressionResolver`
+  (`src/ExpressionResolver.js:275`), so `new ExpressionResolver({ parent: {} })` holds `undefined`
+  as its executer and the getter `executer` answers `undefined`, while 4.2 says it answers the one
+  in use. Resolution still works, but only by accident: the module-level `resolve` defaults
+  `aExecuter` to `DEFAULT_EXECUTER` (`:84`), so the executer is picked at call time rather than
+  once in the constructor, and a child of that resolver inherits the `undefined`. Verified
+  2026-09-22 under node. Checking the normalized `this.#parent` instead of the raw option closes
+  it whichever way the question above is decided.
 
 - [ ] **Should the `ctx` prefix of `ContextObjectExecuter` be configurable?**
   An idea, not agreed work. That executer hands the context to the statement as the object `ctx`

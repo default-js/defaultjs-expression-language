@@ -50,6 +50,42 @@ describe("Specification 4.2 - the instance entry points", () => {
 		expect(await resolver.resolve("${ anything }")).toBe("from the instance");
 	});
 
+	// Identity rather than an answer: the rule is which executer the resolver holds, and whether it
+	// then hands a statement to that executer is a different rule (9.1).
+	it("takes the executer of its parent where the option is left out", async () => {
+		const executer = new Executer({ defaultContext: {}, execution: () => null });
+		const parent = new ExpressionResolver({ context: {}, executer });
+		const resolver = new ExpressionResolver({ context: {}, parent });
+		expect(resolver.executer === executer).toBe(true);
+	});
+
+	it("takes the executer of its parent through the whole chain", async () => {
+		const executer = new Executer({ defaultContext: {}, execution: () => null });
+		const root = new ExpressionResolver({ context: {}, executer });
+		const middle = new ExpressionResolver({ context: {}, parent: root });
+		const resolver = new ExpressionResolver({ context: {}, parent: middle });
+		expect(resolver.executer === executer).toBe(true);
+	});
+
+	it("prefers an executer of its own over the one of its parent", async () => {
+		const parent = new ExpressionResolver({ context: {}, executer: new Executer({ defaultContext: {}, execution: () => null }) });
+		const executer = new Executer({ defaultContext: {}, execution: () => null });
+		const resolver = new ExpressionResolver({ context: {}, parent, executer });
+		expect(resolver.executer === executer).toBe(true);
+	});
+
+	it("takes the executer of its parent where the option is neither a name nor an instance", async () => {
+		const executer = new Executer({ defaultContext: {}, execution: () => null });
+		const parent = new ExpressionResolver({ context: {}, executer });
+		const resolver = new ExpressionResolver({ context: {}, parent, executer: 42 });
+		expect(resolver.executer === executer).toBe(true);
+	});
+
+	it("takes the default executer where there is neither the option nor a parent", async () => {
+		const resolver = new ExpressionResolver({ context: {} });
+		expect(resolver.executer === ExpressionResolver.defaultExecuter).toBe(true);
+	});
+
 	// An instance that is not registered is still usable; a *name* that is not registered is not,
 	// because a name can only be resolved through the registry.
 	it("throws on an executer name that is not registered", async () => {

@@ -270,7 +270,11 @@ export default class ExpressionResolver {
 	 * `ExpressionResolver.defaultExecuter` - 4.2.
 	 */
 	constructor({ context, parent = null, name = null, executer } = {}) {
-		this.#executer = executer instanceof Executer ? executer : typeof executer === "string" ? getExecuterType(executer) : ExpressionResolver.defaultExecuter;
+		if(executer instanceof Executer) this.#executer =  executer;
+		else if (typeof executer === "string") this.#executer = getExecuterType(executer);
+		else if(parent != null) this.#executer = parent.executer;
+		else this.#executer = ExpressionResolver.defaultExecuter;
+		
 		this.#parent = parent instanceof ExpressionResolver ? parent : null;
 		this.#name = name || generateName();		
 		this.#contextHandle = new ResolverContextHandle(context , this.#parent ? this.#parent.contextHandle : null);
@@ -287,6 +291,10 @@ export default class ExpressionResolver {
 
 	get context() {
 		return this.#context;
+	}
+
+	get executer() {
+		return this.#executer;
 	}
 
 	get contextHandle() {

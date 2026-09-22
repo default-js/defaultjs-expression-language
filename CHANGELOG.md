@@ -86,6 +86,14 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Changed
 
+- **A resolver without an executer of its own takes the one of its parent.** Until now a
+  resolver built without the `executer` option used `ExpressionResolver.defaultExecuter`, whatever
+  its parent had been built with, so a chain named its executer on every resolver or mixed two.
+  The order is now: the `executer` option, then the executer of the `parent`, then the default.
+  A resolver whose parent runs a non-default executer changes behaviour with this, since it now
+  evaluates in that executer's dialect. The new getter `executer` answers the executer in use.
+  See `SPECIFICATION.md` 4.2.
+
 - **The specification no longer promises that a write from inside an expression stays off the global
   object.** `SPECIFICATION.md` 6.5 carried that as a guarantee, conditional on a switch that was
   never implemented. It is **withdrawn** and restated as a capability of the executer in use,
