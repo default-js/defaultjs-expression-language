@@ -18,7 +18,7 @@ Four things are tested, and each has one place:
 Ask in this order:
 
 1. **Does it pin a rule of `SPECIFICATION.md`?** If not, it goes to `test/general/` — the code cache
-   and the helpers of the suite are the two things there today. Nothing in `test/general/` loops over
+   is the one thing there today. Nothing in `test/general/` loops over
    the executers; if a case wants to, it belongs in `test/executer/`.
 2. **Is the rule observable without executing a statement?** Then it is the resolver's and goes to
    `test/spec/`: parsing and delimiting, the chain, the entry points, the data methods, the public

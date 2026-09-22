@@ -47,7 +47,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 4 | Documentation | `SPECIFICATION.md` written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-07, B-25, B-26, B-27 |
 
-**Markers, counted 2026-09-22** (`npm test`: 686 passed, 60 expected fail, 746 cases). No
+**Markers, counted 2026-09-22** (`npm test`: 669 passed, 60 expected fail, 729 cases). No
 `it.fails` is left in `test/spec/` and no entry carries `Blocks 3.0.0` — the resolver keeps every
 rule that has a test. B-21 is what can still add a blocker. The 60 `no` cells in
 `test/executer/capabilities/` say *this executer does not support this*, which is neither a defect

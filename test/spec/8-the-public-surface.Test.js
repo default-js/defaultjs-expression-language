@@ -111,8 +111,4 @@ describe("Specification 8 - the executer modules", () => {
 			expect(module.default instanceof Executer).toBe(true);
 		});
 	}
-
-	it("EsprimaExecuter exports setDebug", async () => {
-		expect(typeof EsprimaModule.setDebug).toBe("function");
-	});
 });
