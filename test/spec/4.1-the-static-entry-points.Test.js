@@ -5,9 +5,6 @@ import { useTestExecuter, answersFromContext, answerWith } from "../TestExecuter
 /**
  * SPECIFICATION.md 4.1 - the static entry points, in both call forms, and the rejection of a first
  * argument that is neither.
- *
- * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();

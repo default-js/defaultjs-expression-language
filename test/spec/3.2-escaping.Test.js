@@ -8,11 +8,7 @@ import { useTestExecuter, statements } from "../TestExecuter.js";
  * Escaping happens in ExpressionResolver, above the executer, and what the rule says is not that an
  * escaped expression answers itself - it is that the expression is **never handed to an executer**.
  * That is asserted here directly, through the record of `TestExecuter`, and the answers are asserted
- * beside it. Before 2026-09-01 both were inferred from what a registered implementation replied,
- * which is a detour through something this section has nothing to do with.
- *
- * The name is written bare because that is the dialect of the TestExecuter. No case here depends on
- * anything 9.3 leaves to an implementation.
+ * beside it.
  */
 
 useTestExecuter();

@@ -1,5 +1,5 @@
 import { bench, describe } from "vitest";
-import { EXECUTERS } from "../ExecuterCapabilities.js";
+import { EXECUTERS } from "./Executers.js";
 import { buildChain, bindExecuter, DEPTHS } from "./ChainBuilder.js";
 
 /**

@@ -19,8 +19,8 @@ import { registrate } from "../src/ExecuterRegistry.js";
  * ```
  *
  * The answer is the statement, so the text shows exactly what the resolver delimited - and nothing
- * about anybody's ability to evaluate it. That `{v: 2}.v` also *evaluates* to `2` is a rule of 3.4
- * and belongs to the implementations, where it is asked of all four against the matrix.
+ * about anybody's ability to evaluate it. That `{v: 2}.v` also *evaluates* to `2` is the work of an
+ * executer and tested with each one.
  *
  * **`answerWith`** sets a different answer for one case. The rules that need it are the ones about
  * what the resolver does *with* a result: the default value replaces `null` (4.4), a promise is

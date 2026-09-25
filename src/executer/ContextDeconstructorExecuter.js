@@ -3,7 +3,7 @@ import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 
-let DEBUG = true;
+let DEBUG = false;
 export const EXECUTERNAME = "context-deconstruction-executer";
 const EXPRESSION_CACHE = new CodeCache({ size: 5000 });
 

@@ -5,8 +5,6 @@ import { useTestExecuter, answersFromContext, answerWith, statements } from "../
 
 /**
  * SPECIFICATION.md 4.3 - resolve answers a value, resolveText answers a text.
- * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();
@@ -46,10 +44,6 @@ describe("Specification 4.3 - resolve answers a value, resolveText answers a tex
 		expect(result).toBe("one and two");
 	});
 
-	// Counted through a getter rather than through "${counter++} ${counter++}": whether a write
-	// from an expression persists is the executer's own (9.7), so a counting write would pin this
-	// rule to the executers that keep one. Reading does not. Verified 2026-09-01 against all four:
-	// each answers "0 1" and reads the getter exactly twice.
 	// The rule from the executer side: the same expression standing twice is handed over twice, not
 	// resolved once and substituted. The counting getter below shows what a caller notices; this
 	// one states the rule without needing a side effect to see it.
@@ -58,6 +52,7 @@ describe("Specification 4.3 - resolve answers a value, resolveText answers a tex
 		expect(statements().join("|")).toBe("value|value");
 	});
 
+	// Counted through a getter: a lookup reads it once per occurrence, and nothing has to be written.
 	it("resolveText evaluates every occurrence on its own", async () => {
 		let reads = 0;
 		const context = { get counter() { return reads++; } };

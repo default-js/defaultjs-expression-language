@@ -7,8 +7,7 @@ import { useTestExecuter, answerWith } from "../TestExecuter.js";
  * SPECIFICATION.md 7 - what the resolver says and does when a statement fails.
  *
  * What is left here is what happens **above** the executer: the warning, and the statement it names.
- * That an error arrives at all is the executer's part, and what each entry point makes of one is
- * asked of every implementation in `test/executer/rules/7-errors.Test.js`.
+ * What each entry point makes of an error is `7-errors.Test.js`.
  *
  * The failure is therefore produced rather than provoked: `answerWith` throws, and what is asserted
  * is that the resolver names the statement and hands the error on. Before 2026-09-01 each case wrote

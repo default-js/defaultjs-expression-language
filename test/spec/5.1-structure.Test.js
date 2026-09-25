@@ -4,8 +4,7 @@ import { ExpressionResolver } from "../../index.js";
 /**
  * SPECIFICATION.md 5.1 - name and parent of a resolver.
  *
- * Never executes a statement, so it runs once. The lookup itself - 5.2 to 5.4 - is asked of every
- * executer in test/executer/rules/.
+ * Never executes a statement. The lookup itself is 5.2 to 5.4.
  */
 
 describe("Specification 5.1 - structure", () => {

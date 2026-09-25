@@ -1,12 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
+import { useTestExecuter, answersFromContext } from "../TestExecuter.js";
 
 /**
  * SPECIFICATION.md 6.6 - getData, updateData, deleteData and mergeContext.
  *
  * Resolver API: none of it executes a statement. How far along the chain each of them reaches is
- * the rule they share - see DECISIONS.md, 2026-08-22.
+ * the rule they share - see DECISIONS.md, 2026-08-22. Where a case asks what a statement is handed
+ * afterwards, the answer is a lookup in that context.
  */
+
+useTestExecuter();
+answersFromContext();
 
 describe("Specification 6.6 - reading and writing from outside", () => {
 
@@ -162,6 +167,19 @@ describe("Specification 6.6 - reading and writing from outside", () => {
 		leaf.mergeContext({ value: "from leaf" });
 		expect(root.getData("value")).toBe("from root");
 		expect(leaf.getData("value")).toBe("from leaf");
+	});
+
+	// mergeContext, not updateData: a filterless updateData changes the value where the key lives,
+	// which is the parent here. Defining a key on this resolver and shadowing the parent from here
+	// on is what mergeContext does - and the context a statement is handed has to follow both ways.
+	it("shadows a value of the parent for a statement until the shadowing key is deleted", async () => {
+		const parent = new ExpressionResolver({ context: { test: "test" } });
+		const resolver = new ExpressionResolver({ context: {}, parent });
+		resolver.mergeContext({ test: "success" });
+		expect(await resolver.resolve("${test}")).toBe("success");
+		expect(await parent.resolve("${test}")).toBe("test");
+		resolver.deleteData("test");
+		expect(await resolver.resolve("${test}")).toBe("test");
 	});
 
 	it("mergeContext with a filter merges into the addressed link", async () => {

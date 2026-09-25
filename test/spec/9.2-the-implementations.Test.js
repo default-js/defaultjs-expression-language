@@ -6,9 +6,9 @@ import * as ContextDeconstructorModule from "../../src/executer/ContextDeconstru
 /**
  * SPECIFICATION.md 9.2 - which implementation the resolver uses when the caller names none.
  *
- * The two halves of 9.2 that belong to the implementations - that each registers itself on
- * import, and what each can execute - are asked of all four in `test/executer/rules/`, against
- * the matrix. What is left here is a property of the resolver: which one it defaults to.
+ * That each implementation registers itself on import is `test/executer/interface.Test.js`, what
+ * each can execute is tested with that executer. What is here is a property of the resolver: which
+ * one it defaults to.
  */
 
 const ContextDeconstructorExecuterName = ContextDeconstructorModule.EXECUTERNAME;

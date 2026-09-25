@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
+import { useTestExecuter, answerWith } from "../TestExecuter.js";
 
 /**
  * SPECIFICATION.md 4.6 - both entry points answer a promise, and a promise value is awaited.
+ *
+ * Where a case needs a promise as the value of a statement, it is set with `answerWith` rather than
+ * computed: awaiting it is the resolver's work, producing it would be an executer's.
  */
+
+useTestExecuter();
 
 describe("Specification 4.6 - both entry points answer a promise", () => {
 
@@ -27,12 +33,12 @@ describe("Specification 4.6 - both entry points answer a promise", () => {
 	});
 
 	it("awaits a promise value before answering it", async () => {
-		const result = await ExpressionResolver.resolve("${ Promise.resolve(\"awaited\") }", {});
-		expect(result).toBe("awaited");
+		answerWith(() => Promise.resolve("awaited"));
+		expect(await ExpressionResolver.resolve("${ promised }", {})).toBe("awaited");
 	});
 
 	it("awaits a promise value before inserting it into a text", async () => {
-		const result = await ExpressionResolver.resolveText("a ${ Promise.resolve(\"awaited\") } b", {});
-		expect(result).toBe("a awaited b");
+		answerWith(() => Promise.resolve("awaited"));
+		expect(await ExpressionResolver.resolveText("a ${ promised } b", {})).toBe("a awaited b");
 	});
 });

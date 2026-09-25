@@ -9,9 +9,8 @@ import { useTestExecuter, statements } from "../TestExecuter.js";
  * `TestExecuter`, which answers the statement it was handed, so what a case reads out of the result
  * is exactly the text the resolver cut out - no evaluation is involved, and none is asserted.
  *
- * That those statements also *evaluate* to something is 3.4 and a rule of the implementations; it is
- * asked of all four in `test/executer/rules/3.4-…`. Before 2026-09-01 both were pinned in one case
- * here, which meant a broken scanner and a broken executer looked the same.
+ * That those statements also *evaluate* to something is the executer's work and tested with each
+ * executer, so a broken scanner and a broken executer cannot look the same.
  */
 
 useTestExecuter();

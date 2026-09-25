@@ -10,8 +10,6 @@ import EsprimaExecuter from "../../src/executer/EsprimaExecuter.js";
  *
  * What an omitted context means is pinned here only as far as the constructor decides it: the
  * resolver has none, whichever executer it runs.
- * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
  */
 
 useTestExecuter();

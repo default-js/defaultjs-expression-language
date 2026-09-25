@@ -1,52 +1,41 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/executer/ContextDeconstructorExecuter.js";
-import { EXECUTERNAME as ContextObjectExecuterName } from "../../src/executer/ContextObjectExecuter.js";
+import { useTestExecuter, answersFromContext, answerWith } from "../TestExecuter.js";
 
 /**
- * SPECIFICATION.md 6.4 - the global object as an ordinary context object.
+ * SPECIFICATION.md 6.4 - the global object handed in as a context.
  *
- * How a name that no resolver carries reaches the global object is the executer's own (9.8) and is
- * a row of the capability catalogue. What is here is the global object handed in as a context.
+ * How a statement reaches a global otherwise is the executer's own. What is here is the resolver's
+ * share: a resolver over the global object is an ordinary one of the chain, it carries every name,
+ * and it contributes none to the enumeration of a resolver below it. Asked of the context a statement
+ * is handed, so nothing is evaluated.
  */
 
-describe("Specification 6.4 - the global object as a context object", () => {
+useTestExecuter();
+// the answer is the value the context carries under the statement - a lookup, so what a case
+// reads is which resolver answered, not what anybody computed
+answersFromContext();
 
-	it("takes the global object as an ordinary link of the chain", async () => {
+describe("Specification 6.4 - the global object as a context", () => {
+
+	it("answers a global name from a resolver over the global object", async () => {
 		const resolver = new ExpressionResolver({ context: globalThis, name: "global" });
-		const result = await resolver.resolve("${ Math.round(1.5) }", "fallback");
-		expect(result).toBe(2);
+		expect((await resolver.resolve("${Math}")) === Math).toBe(true);
 	});
 
-	// This executer gets its own case because it is the one that reads the names of the context
-	// before it runs a statement, so a global context reaches it differently than the other three.
-	it("takes the global object as an ordinary link under the deconstruction executer", async () => {
-		const resolver = new ExpressionResolver({ context: globalThis, name: "global", executer: ContextDeconstructorExecuterName });
-		const result = await resolver.resolve("${ Math.round(1.5) }", "fallback");
-		expect(result).toBe(2);
+	it("answers a global name from a resolver below a global one", async () => {
+		const root = new ExpressionResolver({ context: globalThis, name: "global" });
+		const leaf = new ExpressionResolver({ context: { own: "from leaf" }, name: "leaf", parent: root });
+		expect((await leaf.resolve("${Math}")) === Math).toBe(true);
 	});
 
-	// A resolver over the global object contributes no name to the enumeration of a resolver below
-	// it: everything it holds is reachable through the ordinary scope chain of the statement anyway,
-	// so handing those names on would only make an executer that turns a name into code fail over
-	// names it never needed - the index "0" of a frame, a symbol another library planted on `window`.
-	// A lookup still finds them (6.4), it is the name list that stays out.
-	it("carries a resolver below a global one while the page has a frame", async () => {
-		const frame = document.createElement("iframe");
-		document.body.appendChild(frame);
-		try {
-			const root = new ExpressionResolver({ context: globalThis, name: "global", executer: ContextDeconstructorExecuterName });
-			const leaf = new ExpressionResolver({ context: { own: "from leaf" }, name: "leaf", parent: root, executer: ContextDeconstructorExecuterName });
-			expect(await leaf.resolve("${ own }")).toBe("from leaf");
-		} finally {
-			frame.remove();
-		}
-	});
-
-	// ...and the global name is still found from below, which is what makes the list above needless.
-	it("reaches a global name from a resolver below a global one", async () => {
-		const root = new ExpressionResolver({ context: globalThis, name: "global", executer: ContextDeconstructorExecuterName });
-		const leaf = new ExpressionResolver({ context: { own: "from leaf" }, name: "leaf", parent: root, executer: ContextDeconstructorExecuterName });
-		expect(await leaf.resolve("${ Math.round(1.5) }")).toBe(2);
+	// Everything the global object holds is reachable through the ordinary scope chain of a statement
+	// anyway, so listing it would only hand an executer that turns names into code names it never
+	// needed - the index "0" of a frame, a symbol another library planted on `window`.
+	it("contributes no name to the enumeration of a resolver below it", async () => {
+		answerWith((aStatement, aContext) => Object.keys(aContext).join());
+		const root = new ExpressionResolver({ context: globalThis, name: "global" });
+		const leaf = new ExpressionResolver({ context: { own: "from leaf" }, name: "leaf", parent: root });
+		expect(await leaf.resolve("${names}")).toBe("own");
 	});
 });

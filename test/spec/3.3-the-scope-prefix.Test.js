@@ -6,9 +6,7 @@ import { useTestExecuter, answersFromContext, answerWith, statements } from "../
  * SPECIFICATION.md 3.3 - the syntax of the scope prefix.
  *
  * Every case stays on the resolver the call is made on, so it pins the syntax and nothing else -
- * the walk to an ancestor is 5.3 and is asked of every executer.
- * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
+ * the walk to an ancestor is 5.3.
  */
 
 useTestExecuter();
@@ -17,10 +15,6 @@ useTestExecuter();
 answersFromContext();
 
 describe("Specification 3.3 - the scope prefix", () => {
-
-	// The walk to an ancestor is 5.3 and is asked of every executer in test/executer/shared/. Every
-	// test here stays on the link the call is made on, so it pins the syntax of the prefix and
-	// nothing else.
 
 	it("addresses the link carrying the name", async () => {
 		const resolver = new ExpressionResolver({ name: "scope", context: { value: "from scope" } });

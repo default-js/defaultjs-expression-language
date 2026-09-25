@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS } from "../ExecuterCapabilities.js";
+import { EXECUTERNAME as ContextObjectExecuterName } from "../../src/executer/ContextObjectExecuter.js";
+import getExecuter from "../../src/ExecuterRegistry.js";
 import { useTestExecuter, answersFromContext } from "../TestExecuter.js";
 
 /**
@@ -28,9 +29,7 @@ describe("Specification 6.7 - buildSecure", () => {
 	});
 
 	// That a statement can still reach a global - buildSecure is no sandbox - is not a rule of 6.7
-	// but a capability of 9.8, and it is in the catalogue as `reaches the global Math`.
-	// It cannot be asserted here without evaluating something, and it would say nothing about
-	// buildSecure if it were.
+	// but the executer's own, and is tested with each executer.
 
 	it("forwards name and parent to the constructor", async () => {
 		const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root" });
@@ -43,9 +42,8 @@ describe("Specification 6.7 - buildSecure", () => {
 		const secure = ExpressionResolver.buildSecure({
 			context: { open: "ok" },
 			propFilter,
-			option: { name: "secure", executer: EXECUTERS[1].name }
+			option: { name: "secure", executer: ContextObjectExecuterName }
 		});
-		const result = await secure.resolve("${ ctx.open }", "fallback");
-		expect(result).toBe("ok");
+		expect(secure.executer === getExecuter(ContextObjectExecuterName)).toBe(true);
 	});
 });

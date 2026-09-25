@@ -1,6 +1,6 @@
 import { bench, describe } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS } from "../ExecuterCapabilities.js";
+import { EXECUTERS } from "./Executers.js";
 
 /**
  * What replacing expressions in a text costs. The other three benchmarks all call `resolve` with
@@ -52,7 +52,7 @@ const buildText = (expression) => {
 
 /**
  * The four texts, spelled for one executer - `ContextObjectExecuter` addresses a context value as
- * `ctx.value` where the other three take `value` (SPECIFICATION.md 9.3).
+ * `ctx.value` where the other three take `value` (SPECIFICATION.md 9.2).
  */
 const buildTexts = (variableName) => {
 	const word = variableName("word");

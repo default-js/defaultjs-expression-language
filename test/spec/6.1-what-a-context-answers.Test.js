@@ -1,17 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import { EXECUTERS } from "../ExecuterCapabilities.js";
 import { useTestExecuter, answersFromContext } from "../TestExecuter.js";
 import { catchError } from "../TestUtils.js";
 
 /**
- * SPECIFICATION.md 6.1 - the proxy, seen without executing a statement.
+ * SPECIFICATION.md 6.1 - what a context answers, seen without executing a statement.
  *
  * That it is not the object the caller handed in, and that it enumerates the whole chain, is
- * resolver API. What a statement reads through it is asked of every executer in
- * test/executer/rules/6.1-the-proxy.Test.js.
- * Where a statement reaches a context value, the name is spelled the way the default executer
- * spells it, taken from the catalogue - the dialect is the executer's own (9.3) and no rule here.
+ * resolver API, and so is everything a statement could read through it: no executer is involved.
  */
 
 useTestExecuter();
@@ -79,8 +75,8 @@ describe("Specification 6.1 - every access goes through the proxy", () => {
 
 	// `data || {}` in the constructor of ResolverContextHandle turns a falsy context into an empty
 	// one, so 0, "" and false build a resolver that carries no name at all. Which shapes of context
-	// an *executer* can work with is a different question and has its rows in the matrix; this is
-	// about what the resolver makes of what it was handed.
+	// an *executer* can work with is that executer's own; this is about what the resolver makes of
+	// what it was handed.
 	it("takes a falsy primitive as an empty context", async () => {
 		for (const context of [0, "", false]) {
 			const resolver = new ExpressionResolver({ context, name: "ctx" });

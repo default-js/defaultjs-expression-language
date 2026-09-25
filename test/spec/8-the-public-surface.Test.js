@@ -91,7 +91,7 @@ describe("Specification 8 - Executer", () => {
 
 describe("Specification 8 - the executer modules", () => {
 
-	// not every module has it, and 9.10 names only setupExecuter - but where a module exports a
+	// not every module has it, and 9.3 names only setupExecuter - but where a module exports a
 	// debug switch it is surface a consumer can reach, so it is pinned rather than left to chance.
 	it("exports setDebug where it has one", async () => {
 		expect(typeof EsprimaModule.setDebug).toBe("function");

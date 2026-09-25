@@ -31,71 +31,17 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   **without registering it**, which is what a caller wants for one that is built for a single
   resolver. See `SPECIFICATION.md` 4.2.
 
-- **`SPECIFICATION.md` ships with the package.** It states what the resolver does, rule by
-  rule — expression syntax, the resolver chain and its scopes, the context and what it
-  guarantees, error handling, the executers, and the whole public surface. It describes the
-  released package: every rule in it holds by 3.0.0, and it carries no index of pending work.
+- **`SPECIFICATION.md` ships with the package.** Part A states what the resolver does, rule by
+  rule — expression syntax, the resolver chain and its scopes, the context and what it guarantees,
+  error handling, and the whole public surface. Part B states the interface an executer implements,
+  the four the package ships and how to tune them. It describes the released package: every rule in
+  it holds by 3.0.0, and it carries no index of pending work.
 
-  Revised on 2026-08-24, while every rule was being written out as a test. Six rules changed or
-  were added, none of them describing behaviour that exists yet — they say what the pending fixes
-  have to produce. **3.1**: a brace inside a string literal does not count towards the matching
-  closing brace, and an opening `${` without a matching brace is not an expression, so the text
-  stands unchanged. **3.2**: escaping holds per occurrence, even where the same expression also
-  appears unescaped. **5.1**: a generated name only has to be unique — the `ER1` shape is what the
-  implementation does, not a promise. **5.3**: where two links carry the same name, the first one
-  found climbing towards the root answers. **5.5**: a link provides a context when the caller
-  handed one to the constructor or a value has been written to it since; what the context holds
-  no longer decides anything, so an empty object counts. **8.3, today 9.3**: how a statement addresses a
-  context value is the executer's own — `ContextObjectExecuter` requires `ctx.value` where the
-  other three take `value`, so switching executer can mean rewriting expressions.
-
-  **Revised again on 2026-08-30**: the term *Link* is gone. One member of a chain is a
-  **resolver** — section 2 no longer defines a second word for the same thing, and the rules read
-  in one vocabulary.
-
-  **Revised again on 2026-09-01**: section 8.3 — today 9.3 to 9.9 — carries a **capability table** — one row per point
-  where the four executers legitimately differ, one column per executer. A consumer can now see,
-  before picking one, whether a write from an expression persists, whether a global is reachable,
-  whether a context value survives into a callback written in the statement, and whether an
-  assignment executes at all. One row is a *rule* that two implementations do not keep yet rather
-  than a capability, and it is marked as such. 8.2 — today 9.2 — no longer describes the limits of
-  `esprima-executer` in prose; the table carries them.
-
-  **Revised again on 2026-09-05**: the section on what an executer decides is now **part B**, and describes
-  the whole surface instead of the differences — six capabilities, measured across 106 cases per
-  implementation, with a count per capability and per executer and a paragraph on what each one
-  cannot do. The vocabulary is settled with it: *behaviour* is what the resolver does and holds under
-  every executer, *capability* is what an executer supports. **An executer has capabilities and
-  nothing else**, so the distinction between a difference and a broken rule is gone from that
-  section; where an implementation lacks something that ought to arrive, `BACKLOG.md` says so.
-  What the measurement changed for a reader picking an executer: `esprima-executer` reaches a context
-  value in far fewer places than the old table showed — never inside a function body, and not inside
-  an object or array literal, a ternary, a computed key, a spread or a tagged template — and
-  `context-deconstruction-executer`, the default, loses `this` inside a method of the context, and
-  reads every property of the context on every execution — a getter among them, whether or not the
-  statement touches it.
-
-  **Restructured the same day, and the section numbers moved with it.** The document now has two
-  parts: **part A** is the resolver, its API and everything that holds no matter which executer runs
-  a statement; **part B** is the executers and their capabilities, one section per capability. The
-  numbering follows: the public surface is section 8 where it was 9, the executers are section 9
-  where they were 8, and what was 8.1 to 8.4 is now 9.1 to 9.10. Within part A, 6.1 stopped
-  describing the context proxy — an implementation detail that does not belong in a specification —
-  and describes **what a context answers** instead; 6.4 and 6.5 kept their numbers and gave their
-  executer halves to part B. Two statements were added that the document had never made: **the three
-  data methods write into the object the caller handed over** (6.6), and a statement may be arbitrary
-  JavaScript while how much of it runs is a capability (3.4, 9.4). No rule changed meaning; every
-  external link into this document by section number does.
-
-  **And it says only what the package does.** The dates, the decision history, the pointers into
-  `BACKLOG.md` and the index of pending work are gone — those belong to the records that carry them.
-  Every rule is written as holding, so the document describes 3.0.0 rather than the work in progress.
-
-  **Read against the code on 2026-09-22.** No rule changed meaning. 3.3 now says what a scope name
-  has always accepted: the **ASCII** letters, not letters in general. 9.8 adds `self` to the globals
-  `esprima-executer` reaches. Four references to a section 1.3 that never existed point at section 1,
-  and two terms the document no longer defines — *the stacking context*, *the global-write switch* —
-  are gone.
+- **`README.md` documents every executer.** How each one runs a statement; how a statement
+  addresses a context value under it — `${ctx.value}` under `context-object-executer`, the bare
+  name under the other three, so switching executer can mean rewriting expressions; which JavaScript
+  it runs, which shapes of context it runs over, what an assignment inside a statement leaves behind
+  and which globals it reaches; and how to pick one for a chain and tune its code cache.
 
 ### Changed
 
@@ -118,8 +64,8 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   the statement: *Context property name "test-test" cannot be used as a variable by
   context-deconstruction-executer, so this statement cannot run over this context! statement: 1 + 1*.
   A consumer who hands over such a context picks `context-object-executer`, which addresses a name
-  through an object and needs no name to be a variable. `SPECIFICATION.md` 9.6, and `DECISIONS.md`,
-  2026-09-22.
+  through an object and needs no name to be a variable. `README.md` describes the executer, and
+  `DECISIONS.md` (2026-09-22) the reasoning.
 
 - **The default executer warns about a large context while it compiles, not on every execution.**
   `High count of properties at first level …` used to be written on every resolution, which in a
@@ -159,8 +105,8 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 - **The specification no longer promises that a write from inside an expression stays off the global
   object.** `SPECIFICATION.md` 6.5 carried that as a guarantee, conditional on a switch that was
-  never implemented. It is **withdrawn** and restated as a capability of the executer in use,
-  measured per implementation in 9.7 and 9.8, because the package cannot keep it: only an executer can
+  never implemented. It is **withdrawn** — whether a write stays off the global object is up to the
+  executer in use (`SPECIFICATION.md` 6.5) — because the package cannot keep it: only an executer can
   intercept an assignment, and three of the four shipped today let an unqualified one reach the
   global object in at least one shape. Nothing about the code changed here — what changed is that
   the document now says what the code does. Concretely, and worth knowing for anyone who read the
@@ -221,10 +167,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   expressions have to be rewritten with it.
 
   The default is the fast implementation rather than the complete one, and the write-back is what a
-  cache miss paid for — about eleven times the cost at a shallow chain, measured both ways. Of the
-  106 capabilities it answers 90 where `context-object-executer` answers 103; `SPECIFICATION.md` 9.7
-  carries the twelve cases of `context-write` one by one, and `DECISIONS.md` (2026-09-20) the
-  reasoning. A write to a name **no resolver of the chain carries** was never kept by this executer
+  cache miss paid for — about eleven times the cost at a shallow chain, measured both ways.
+  `README.md` describes what it keeps and what it does not, and `DECISIONS.md` (2026-09-20) carries
+  the reasoning. A write to a name **no resolver of the chain carries** was never kept by this executer
   or by `with-scoped-executer` and still is not: it creates a global instead.
 
 - **Escaping is a rule of `resolveText` alone.** `resolve("\${value}")` used to answer the text

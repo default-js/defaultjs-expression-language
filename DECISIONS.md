@@ -2,7 +2,7 @@
 
 Architecture and API decisions for `@default-js/defaultjs-expression-language`, newest first.
 
-What matters in an entry is the *reasoning*. A decision recorded without it cannot be revisited later — only obeyed or overturned blindly. Entries stay even once superseded; a later entry references the one it replaces.
+What matters in an entry is the *reasoning*. A decision recorded without it cannot be revisited later — only obeyed or overturned blindly. Only decisions in force stand here, each written against the current state: a superseded entry is deleted, a partly superseded one is rewritten to the half still in force, and git history keeps what was there before.
 
 A decision that is only a step inside a running undertaking stays in that undertaking's plan under `plans/`. It moves here once it outlives the plan.
 
@@ -19,35 +19,85 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-26 — Is an executer measured against a shared catalogue, or tested as a solution of its own?
+
+**Decision:** **As a solution of its own.** Each executer has its own suite under
+`test/executer/<executer>/`, and it tests only what that executer guarantees. A case hands the
+executer what it is handed in use and nothing else — `execute(aStatement, aContext)`, a bare
+statement and a plain data context — and builds no `ExpressionResolver`. The four share the
+interface and nothing else: `test/executer/interface.Test.js` asks each whether importing its module
+registers it, and nothing else in the suite loops over them. What an executer does not do is
+documented with it in `README.md`, not pinned by a test. The chain walk and every other rule of the
+resolver are tested in `test/spec/` without a real executer — against `TestExecuter`, or against the
+context the resolver hands over. `SPECIFICATION.md` part B keeps the interface, the list of
+implementations and their tuning; the capability sections and their counts are gone.
+
+**Reasoning:** Frank's, on 2026-09-26 (B-39). The capability catalogue compared four implementations
+cell by cell and asked each the questions of the others, which made every difference a `no` — and a
+`no` reads like a shortcoming of a solution that never set out to do the thing. An executer is a
+strategy with its own trade-offs: the default gives up the write-back and keys that are no variable
+names for speed, the context-object one gives up the bare-name dialect for completeness. Each is
+described by what it does, and a consumer reads one description instead of a four-column table.
+
+Going through a resolver was wrong for the same reason, and Frank caught it after the first
+delivery: a case built that way tests the chain, the scope prefix and the default value along with
+the executer, and a case that only exists through a chain — a write to a name an ancestor carries —
+is not the executer's at all.
+
+The chain walk was asked of all four because it needs a statement to be seen, but it is the work of
+`ResolverContextHandle`. The traps an executer reaches the chain through — reading a name, asking
+whether one exists, listing them — can be asked of the context directly, so the rule is tested once,
+where it lives.
+
+**Alternatives:** Keeping the catalogue and dropping the comparison from the documents — rejected: the
+table is the comparison. Keeping the resolver rules running under all four — rejected: it makes the
+chain walk a demand on every executer beyond the interface, which is the shared feature set this
+decision removes.
+
+**Consequences:** A limitation has no test, so an executer that starts doing what it did not do turns
+nothing red — the guard a `no` cell gave is given up deliberately, and `README.md` is where such a
+change has to be written. A `yes` that held only by accident became no guarantee: a write the esprima
+executer cannot run was "contained", a write the deconstructor never carries back left a frozen key
+"unchanged" — those were dropped rather than promised. Case bodies repeat across the four suites on
+purpose, each in its own dialect; sharing a body would be sharing a feature set. `it.fails` has one
+meaning left: in `test/spec/`, a rule the resolver does not keep yet. The benchmarks keep a list of
+the four executers (`test/PerformanceTests/Executers.js`), because comparing them is what a benchmark
+is for.
+
+A case is kept where a change to *that* executer could break it — it runs the executer's own code or
+pins a guarantee its README section states. Three executers paste the statement unchanged into the
+function they generate, so one representative case stands for every construct and every position of
+a name there; asked twenty times, the engine gives the same answer twenty times. Only `esprima`,
+whose rewrite walks the statement node by node, is asked construct by construct. That cut the
+suites from 343 cases to 81 without moving the coverage.
+
 ## 2026-09-22 — What does an executer do with a name it cannot use?
 
 **Decision:** **It filters nothing and reports.** `ContextDeconstructorExecuter` binds every name
 the context carries, a name that cannot be a variable included, so such a context stops every
 statement it runs — and the error names the offending key and the statement it happened on.
-`SPECIFICATION.md` 9.6.
+`README.md` documents it with the executer.
 
 **Reasoning:** Frank's, on 2026-09-22, against the proposal to move the filter from the handle into
 this executer. A filter hides a property the caller defined: the caller sees a field they wrote
 answer nothing, with no way to learn whether it was dropped, misspelled or simply empty. JavaScript
 already detects the case — the generated function does not compile — so the only thing missing is a
 message that says which statement failed and which name did it, because the statement need not
-mention that name at all. The price was measured before the decision, not after: eleven rows of
-`context-shape` turn from `yes` to `no`, so the default executer runs over 79 of 106 capabilities
-instead of 90 and does not run over an array, a `Map`, a `Set`, a `NodeList` or a DOM element.
+mention that name at all. The price was measured before the decision, not after: the default executer no longer
+runs over an array, a `Map`, a `Set`, a `NodeList` or a DOM element.
 Frank's answer is that this executer was never meant to carry those shapes. What the decision does
 **not** cover is a name the executer never needed: a resolver over the global object stops handing
 its names down, because a statement reaches a global through the ordinary scope chain (Frank, the
 same day) - otherwise one frame on the page would stop every statement below such a resolver.
 
-**Alternatives:** Filter in the executer (the proposal) — keeps all 19 shapes and hides the caller's
+**Alternatives:** Filter in the executer (the proposal) — keeps every shape of context and hides the caller's
 own names. Filter only inherited names and warn about own ones — keeps the shapes and the message,
 at the price of a rule that tells one name from another. Make `context-object-executer` the default
 — removes the case entirely, at the price of changing the dialect every consumer writes.
 
 **Consequences:** The default executer is for a context of plain data; anything else is
 `context-object-executer`. Whoever hands over a `NodeList` gets an error naming a key on its
-prototype, which reads like a defect until the message is read — the readme owes an explanation
-(B-20). The one filter left in this executer is `blockedPropertyNames`, which is not about names
+prototype, which reads like a defect until the message is read — `README.md` explains it. The one filter left in this executer is `blockedPropertyNames`, which is not about names
 that cannot be bound.
 
 ## 2026-09-22 — Which names does a context carry?
@@ -56,8 +106,7 @@ that cannot be bound.
 symbol, a reserved word, a key that is not a variable name, and every member the object inherits,
 the ones of `Object.prototype` included, are carried and answer a lookup. A resolver built without a
 context holds **no object at all** rather than `{}`, and gets one on the first write through
-`updateData` or `mergeContext`. `SPECIFICATION.md` 5.2, 6.1, 6.3. Supersedes the filtering half of
-the entry of 2026-08-30, whose consequences this carries out.
+`updateData` or `mergeContext`. `SPECIFICATION.md` 5.2, 6.1, 6.3.
 
 **Reasoning:** Frank's, on 2026-09-22: what the caller hands over is what the caller gets. The
 read-through of the specification found the filter answering for two rules at once and keeping
@@ -81,8 +130,8 @@ empty resolver holding `{}` used to answer them at the first step.
 
 **Consequences:** A context value named `valueOf`, `toString` or `hasOwnProperty` further up the
 chain is shadowed by every resolver below that holds a plain object — that is `in` answering, and
-5.2 says so. An executer that turns names into code filters for itself what it cannot express
-(`ContextDeconstructorExecuter`: symbols, reserved words, names that are not identifiers). Whether
+5.2 says so. An executer that turns names into code has to cope with names it cannot express;
+`ContextDeconstructorExecuter` reports them (the entry above). Whether
 the name snapshot of 6.2 still earns its place once it filters nothing is left to a measurement.
 
 ## 2026-09-22 — Does an executer offer a default context?
@@ -124,7 +173,7 @@ in the constructor, and the getter `executer` answers it. `SPECIFICATION.md` 4.2
 **Reasoning:** Frank's, on 2026-09-22: a chain is defined as a whole, and its executer should be
 stable along it and change only where the chain says so explicitly, rather than being named on every
 resolver. Two facts of the code make that more than convenience:
-- **The dialect belongs to the executer** (`SPECIFICATION.md` 9.3) — `context-object-executer`
+- **The dialect belongs to the executer** (`SPECIFICATION.md` 9.2) — `context-object-executer`
   reads `${ctx.value}` where the other three read `${value}` — and a scoped statement is executed by
   the executer of the resolver the call was made on, not of the one it addresses: the module-level
   `resolve` hands `aExecuter` up the chain unchanged (`src/ExpressionResolver.js:84-89`). Before this,
@@ -134,8 +183,8 @@ resolver. Two facts of the code make that more than convenience:
   `ExpressionResolver.defaultExecuter` switches it for everything on the page, including code that
   has nothing to do with the chain. Inheritance scopes the choice to the chain it was made for.
 
-The capabilities of 9.4 to 9.8 point the same way: whether a write from an expression persists
-depends on the executer, so a mixed chain gives one expression different semantics per level.
+What a statement may contain and whether a write from it persists depend on the executer as well,
+so a mixed chain gives one expression different semantics per level.
 
 **Alternatives:** Falling back to `defaultExecuter` for every resolver, as before — keeps the
 constructor independent of the parent, but makes a non-default chain name its executer on every
@@ -183,9 +232,9 @@ and `hasOwnProperty`, `toString` and the rest come with it. The deep depths of t
 bimodal ones `BACKLOG.md` warns about and decide nothing here; the shallow cold figures are the
 measurement.
 
-The capability is not worth that to this implementation. `SPECIFICATION.md` 6.5 promises nothing
+The write-back is not worth that to this implementation. `SPECIFICATION.md` 6.5 promises nothing
 about a write persisting — where an assignment lands is the executer's own — so nothing in the
-document breaks, and the package still offers the capability under an executer built for it.
+document breaks, and the package still offers it under an executer built for it.
 
 **Alternatives:** Keeping the write-back and paying the miss — rejected: it makes the default the
 slowest of the three non-`with` implementations on the path that hurts, which contradicts why it was
@@ -193,20 +242,16 @@ made the default. Cutting the cost instead of the feature, by emitting the write
 the statement text actually contains and leaving out the names inherited from the prototype chain —
 the two levers the backlog entry had worked out — rejected as well: both are real, but they buy back
 part of a factor of eleven at the price of a generator that has to reason about the statement it
-compiles, and the capability was not wanted enough to fund that. Moving the write-back to a fifth
+compiles, and the write-back was not wanted enough to fund that. Moving the write-back to a fifth
 executer, so that the strategy exists under a name of its own — not taken, because
-`context-object-executer` already answers all twelve cases of `context-write` and a second
-implementation of one capability is not worth its maintenance.
+`context-object-executer` already keeps every such write, and a second implementation of the same
+behaviour is not worth its maintenance.
 
 **Consequences:** Consumer-visible, and the loudest part of it is that the **default** executer
 changed behaviour: `${ known = "after" }` no longer leaves `getData("known")` answering `"after"`,
 and a text carrying `${ counter++ }` twice renders `0 0`. A **mutation** of an object the context
 holds still works, because nothing has to be carried back for it. `CHANGELOG.md` carries the
-migration note. Six cells of `context-write` move to `no` in `test/ExecuterCapabilities.js`, and the
-default drops from 96 to 90 of the 106 capabilities — `SPECIFICATION.md` 9.2, 9.3 and 9.7 are written
-against that. The row `carries no untouched NaN of an ancestor into the context it ran on` is now
-kept by all four trivially and guards nothing until an executer carries a value back again; it stays
-for that day. The random name suffix the generated prologue needed is gone with the prologue: the
+migration note. The random name suffix the generated prologue needed is gone with the prologue: the
 generated function declares no name of its own any more, so a context key can no longer collide with
 one.
 
@@ -229,8 +274,7 @@ Two things follow, and the second is the price of the first:
 specification, a changelog (five dates, seven passages of decision prose), a backlog index (six
 pointers and a section listing them) and test documentation (four references into the suite). Each of
 those has its own file here, and a reader looking up what the package does had to step over the other
-three. The trim took it from 777 lines to 726 without dropping a single rule, which is the measure of
-how much of it was not specification.
+three.
 
 Writing it as though everything exists is the same argument from the other end: a specification that
 describes its own incompleteness is a status report, and status is what `BACKLOG.md` is for. The
@@ -241,12 +285,10 @@ version of it — and the loss would be real if the two ever disagreed.
 that does not exist — rejected, but only because the document ships with 3.0.0 and not before: while
 the package is unreleased there is no consumer to mislead, and by release the markers would have to be
 gone anyway. Cutting the unimplemented features out of the document until they land — rejected: the
-specification would then say less than the project has decided, and the switch of 6.5 is exactly the
-kind of rule that has to be written down before it is built.
+specification would then say less than the project has decided, and a rule that is decided but not
+built is exactly the kind that has to be written down first.
 
-**Consequences:** Section 10 is gone. `AGENTS.md` no longer promises that the disagreements are listed
-in the document, and names the release gate instead. Three `BACKLOG.md` entries that pointed at
-section 10 point at the rule they have to make true. The one thing to watch: a rule can now be added
+**Consequences:** The one thing to watch: a rule can now be added
 to the document that nothing implements and nothing pins, and the document will not say so — only a
 `BACKLOG.md` entry and a failing test will. A rule written without both is a rule that nobody is
 holding.
@@ -254,10 +296,11 @@ holding.
 ## 2026-09-05 — How is the specification laid out?
 
 **Decision:** In **two parts**. Part A is the **resolver**: what it does, what its API promises, and
-everything that holds no matter which executer runs a statement — those are rules, and an
-implementation may not decline one. Part B is the **executers**: what an implementation supports, one
-section per capability. The numbering follows the split, so the public surface becomes section 8 and
-the executers section 9, with 9.1 to 9.10 where 8.1 to 8.4 were.
+everything that holds no matter which executer runs a statement — those are rules, and an executer
+may not decline one. Part B is the **executers**: the interface (9.1), the implementations the
+package ships (9.2) and their tuning (9.3). What each executer can do is not specified there but
+documented with it in `README.md` (2026-09-26). The numbering follows the split, so the public
+surface is section 8 and the executers section 9.
 
 Three consequences inside part A, all of them Frank's findings:
 
@@ -267,23 +310,16 @@ Three consequences inside part A, all of them Frank's findings:
   each name has where it is defined, a write lands on the resolver it was made on, and a frozen
   context behaves as the object itself would.
 - **6.4 and 6.5 keep their numbers and lose their executer halves.** Whether a global is reachable
-  and whether a write can be contained are capabilities; what stays is the resolver's share — the
-  global object handed in *as* a context, and where a write lands once an executer lets it through.
+  and whether a write can be contained are the executer's own; what stays is the resolver's share —
+  the global object handed in *as* a context, and where a write lands once an executer lets it
+  through.
 - **6.6 gains a statement the document never made**: the three data methods write into the object the
   caller handed over. Read off the code and then measured — `updateData` and `deleteData` through the
   context, `mergeContext` through `Object.assign` on it — and pinned by three cases in `test/spec/`.
-  `AGENTS.md` had claimed the opposite.
 
-**Reasoning:** Section 6 mixed the two axes, and once the capability catalogue of the same day gave
-part B a table, the executer halves of 6.4 and 6.5 stood in the document twice. The split is the
-same distinction the catalogue made checkable: an executer has capabilities and nothing else, so a
-document that states rules and capabilities in one run of sections cannot say which is which. A
-reader picking an implementation now has one part to read, and a reader implementing one has the
-other.
-
-The two-questions structure of the catalogue carried into part B: each capability gets a section
-(9.4 to 9.9) rather than one shared table, because the `specification` field of a catalogue entry has
-to point at prose that defines *that* capability, and six entries pointing at one section say nothing.
+**Reasoning:** Section 6 mixed the two axes: rules of the resolver and what one executer happens to do
+stood in one run of sections, and a reader could not tell which was which. A reader picking an
+executer now reads its description, and a reader implementing one reads the interface.
 
 **Alternatives:** Regrouping without renumbering — rejected: sections out of order make a
 specification unusable for looking something up. Cutting the tie between a section number and a test
@@ -292,107 +328,20 @@ from a case to the rule it pins, and a specification is not restructured often e
 losing it. Keeping the proxy in the document as an appendix — rejected: it is not what the package
 promises, and the four promises that hang off it stand on their own.
 
-**Consequences:** Roughly 100 citations by section number moved with the document — 29 test file
-names, the `specification` fields of the catalogue, and the records. The one failure mode is a
-citation that still parses: `(6.1)` used to mean *the proxy* and now means *what a context answers*,
-so a missed one stays readable and says the wrong thing. That is why the sweep went by number rather
-than by file. Every external link into the published document by section number breaks, which is what
-the `CHANGELOG.md` entry is for. `TESTING.md` §2 stands unchanged for the rules half of the suite,
-because only the capability files are named after something other than a section.
-
-## 2026-09-05 — What does an executer owe this package, and what is its own?
-
-**Decision:** **An executer has capabilities and nothing else.** Beyond the interface of 9.1 and the
-promise to execute a statement, `SPECIFICATION.md` demands nothing of it. A **capability** measures
-how far an executer supports JavaScript over a dynamic context — which constructs run, how much of
-the language's scoping survives, which values stay reachable, whether a write behaves the way an
-assignment does. A **behaviour** is what the *resolver* does, and it holds under every executer. The
-two words separate by subject, not by rank: `SPECIFICATION.md` says *behaviour* for the resolver and
-*capability* for the executer, and the whole of part B is written from it. This **supersedes the vocabulary half
-of the entry of 2026-09-01** below, which made *capability* the name of a difference between
-implementations.
-
-The third state of the table goes with it. `defect` said "the specification demands this and this
-implementation does not keep it", and there is no such thing once nothing is demanded: the catalogue
-has `yes` and `no`. Whether a `no` is meant to become a `yes` belongs in `BACKLOG.md`, which is where
-the decision of 2026-08-30 already put it.
-
-**Reasoning:** Frank's, against the structure delivered earlier the same day, and the code carries
-it. The 25 rows the table called rules — the chain walk of 5.2 to 5.4, the name snapshot of 6.2, a
-link without a context, the data methods from outside, the error policy of 7 — are not the executer's
-work at all: the walk lives in the proxy traps of `ResolverContextHandle`, and every executer gets it
-for free whether it opens a `with` block, hands the proxy over as `ctx` or destructures the names
-`ownKeys` already collected. An executer cannot break them except by not reaching the context, and
-that is a broken executer rather than a declined rule. Calling them "a demand on the implementations"
-was a misnomer that made it undecidable where a case belongs.
-
-The one case that argued back was the negative guarantee of 6.5, which only an executer can keep —
-and it was answered by moving the specification rather than the vocabulary; see the entry below.
-
-The widening of the catalogue decided the same day settled the umbrella: once the table lists what
-every implementation supports rather than only where the four differ, *capability* has to mean what
-an executer can do rather than where they disagree.
-
-**Alternatives:** *behaviour* as the umbrella with *rule* and *capability* as two kinds under it —
-proposed and rejected: it kept a distinction the executer axis does not have. Keeping `defect` for
-the containment of a global write — rejected with it, because that state only exists if the document
-may demand something of an implementation. Leaving the vocabulary as it stood — rejected: the
-published document said *behaviour* six times and never *capability*, while pointing the reader at a
-file whose name carries the word, and `CHANGELOG.md` described the document with the word the
-document did not use.
-
-**Consequences:** `test/ExecuterCapabilities.js` keeps its name and exports `CAPABILITIES` with two
-states. `SPECIFICATION.md` carries the six capabilities in part B, one subsection each with one column per
-implementation, written by hand from the catalogue because the suite runs in a browser and cannot
-read a document. The `it.fails` marker regains one meaning per directory — *not implemented
-yet* in `test/spec/`, *this executer does not support this* in `test/executer/capabilities/` — which
-is a paragraph `AGENTS.md` no longer has to spend on the ambiguity. What is lost is the ability to say
-"this implementation is wrong" in the table; that statement now lives in `BACKLOG.md`, where the
-reasoning for it can be written down.
-
-## 2026-09-05 — Where does a case about an executer live?
-
-**Decision:** In two directories, and the directory answers what the case is.
-`test/executer/capabilities/<capability>.Test.js` holds the cases with a row in the catalogue, one
-file per capability, named after it. `test/executer/rules/<section>-<slug>.Test.js` holds the rules of
-the resolver that only show through a statement — no row, no state, plain `it` under all four
-implementations. This **replaces the file-per-section decision of 2026-09-01 for the capability half
-only**; the rules half keeps section names, so `TESTING.md` §2 stands for it as written.
-
-Every construct is asked **twice**, in two capabilities: `syntax` asks whether it runs, with constants
-inside it, and `context-scope` asks whether the same construct still reaches a context value. A case
-that puts a context name inside a construct answers both at once, and a failure then does not say
-which broke.
-
-**Reasoning:** A capability spanned sections when this was decided — `syntax` read 3.4 and 8.2,
-`global-scope` read 6.4, 6.5 and 8.3 — so naming its file after one section would have had to pick a
-winner. The restructure of the same day gave each capability a section of its own (9.4 to 9.9), which
-is the shape this decision asked for. The rules do not span
-anything, so nothing is gained by renaming them.
-
-The two-questions rule was not a theory but a repair. Every case of 3.4 put a constant inside its
-construct — `${ {a: 4}.a }` — so all four executers answered `yes` to *evaluates an object literal*
-while one of them cannot reach a context value inside one. The same case shape hid it for the arrow
-function, the template literal and the regular expression. Splitting the question found 13 capability
-gaps in one executer that the suite had been green over.
-
-**Alternatives:** One directory with a naming convention — rejected: the difference between a row and
-no row is exactly what a reader needs to know before writing a case, and a directory says it without
-being read. Keeping one file per section for both halves — rejected for the reason above.
-
-**Consequences:** `TESTING.md` gains a section for each half and the table at its top lists four
-places instead of three. A capability that later splits in two means moving cases between files, and
-the catalogue key moving with them — the case count before and after is the guard, as it was for
-every stage of this undertaking.
+**Consequences:** A restructure moves every citation by section number, in test file names and in the
+records. The one failure mode is a citation that still parses — `(6.1)` used to mean *the proxy* and
+now means *what a context answers* — so a sweep goes by number rather than by file. Every external
+link into the published document by section number breaks, which is what the `CHANGELOG.md` entry is
+for.
 
 ## 2026-09-05 — What happens when the specification promises something no implementation keeps?
 
 **Decision:** **The specification moves.** `SPECIFICATION.md` 6.5 promised that an assignment inside
 an expression could not reach the global object while a switch was off. Only an executer can keep that
-promise, an executer may be written by anyone, and three of the four shipped today break it in at
-least one shape — so the promise is withdrawn and restated as a **capability**, measured per
-implementation in 9.7 and 9.8. The `allowGlobalWrite` switch stays in the document as pending,
-but its *off* state is bounded by what the executer in use can intercept.
+promise, an executer may be written by anyone, and three of the four shipped break it in at least one
+shape — so the promise was withdrawn, and whether a write stays off the global object is the
+executer's own (6.5, 9.2). The switch, `allowGlobalWrite`, left the document with it; `BACKLOG.md`
+carries whether it is worth having.
 
 **Reasoning:** Frank's, on 2026-09-05: where we find that we promise something we cannot keep, the
 document is what gets corrected. The alternative offered at the time — keep the promise and point it
@@ -408,17 +357,13 @@ nothing contains an explicit `globalThis.x = 1`, which means the guarantee was n
 but only about the accidental leak of an unqualified name. A promise that has to be qualified three
 times is not the promise the document made.
 
-**Alternatives:** Requiring the containment of every executer and marking the two that fail as defects
-— that is what stood until this day, and it is incompatible with the entry above: nothing is demanded
-of an executer. Requiring it of the default executer only — rejected as above. Implementing the switch
-first and deciding afterwards — rejected: the specification would have kept a promise it could not
-keep for however long that takes, and the switch's own reach is what the measurement calls into
-question.
+**Alternatives:** Requiring the containment of every executer and marking the ones that fail as
+defects — incompatible with an executer owing nothing beyond the interface. Requiring it of the
+default executer only — rejected as above. Implementing the switch first and deciding afterwards —
+rejected: the specification would have kept a promise it could not keep for however long that takes,
+and the switch's own reach is what the measurement calls into question.
 
-**Consequences:** Section 10 loses its row for the negative guarantee — there is no rule left there for the code to break —
-and keeps the two that name the unimplemented switch. `BACKLOG.md` carries the write-to-globalThis
-entry as a capability gap rather than a defect, with the open question of whether the switch is worth
-having on these terms. `CHANGELOG.md` records the withdrawal, because a consumer may have read the
+**Consequences:** `CHANGELOG.md` records the withdrawal, because a consumer may have read the
 guarantee. What this rules out is a claim of safety: the package does not sandbox the global object,
 and 6.7 says the same about `buildSecure`.
 
@@ -427,12 +372,8 @@ and 6.7 says the same about `buildSecure`.
 **Decision:** In `test/spec/` nothing is evaluated. `TestExecuter` answers the **statement it was
 handed**, so a case reads the resolver's own work out of the result and nothing else. Where a rule
 is about what the resolver does *with* a result, the result is set — `answerWith(fn)` for one case,
-`answersFromContext()` for a file that needs the value a context carries. Every rule that needs a
-statement to be *evaluated* is a demand on the implementations and lives in `test/executer/rules/`,
-with a row in the matrix.
-
-This supersedes the TestExecuter of the entry below, which destructured the context and compiled
-with `new Function` — `ContextDeconstructorExecuter` under another name.
+`answersFromContext()` for a file that needs the value a context carries. What needs a statement to
+be *evaluated* is an executer's work and is tested with that executer.
 
 **Reasoning:** Frank's, on reading the result: a case must not test two things at once. The first
 case of 3.1 said both *the expression was delimited correctly* and *the statement was evaluated
@@ -444,40 +385,29 @@ const result = await ExpressionResolver.resolveText("a ${ {v: 2}.v } b", {});
 expect(result).toBe("a {v: 2}.v b");
 ```
 
-That reads as what it is — the text the scanner cut out. What `{v: 2}.v` evaluates to is 3.4, asked
-of all four implementations in `test/executer/rules/3.4-…`.
+That reads as what it is — the text the scanner cut out. What `{v: 2}.v` evaluates to is an
+executer's work.
 
-The evaluating TestExecuter had a second cost that only showed later: a case could rely on it
-without anybody noticing, because it behaved like a real implementation. The rewrite found several —
-section 7 wrote statements that *happened* to fail under the default executer, so a changed default
-could have taken the failure away and left the cases green for nothing. They now throw through
-`answerWith` and assert what the resolver does with an error, which is what section 7 is about.
+An evaluating `TestExecuter` had a second cost: a case could rely on it without anybody noticing,
+because it behaved like a real implementation. Section 7 wrote statements that *happened* to fail
+under the default executer, so a changed default could have taken the failure away and left the cases
+green for nothing. They throw through `answerWith` and assert what the resolver does with an error,
+which is what section 7 is about.
 
-**Alternatives:** Keeping the evaluation and living with the double meaning — that is what was there,
-and it hid a broken scanner behind a working executer and the other way round. Teaching the
-TestExecuter just enough for `test/spec/` — rejected, since "just enough" grows with every case that
-finds it convenient, which is how the evaluating one came about.
+**Alternatives:** Keeping the evaluation and living with the double meaning — it hid a broken scanner
+behind a working executer and the other way round. Teaching the `TestExecuter` just enough for
+`test/spec/` — rejected, since "just enough" grows with every case that finds it convenient, which is
+how an evaluating one comes about.
 
-**Consequences:** 63 cases had to be rewritten, and several got sharper on the way: 4.4 sets the
-answer instead of finding a statement that produces it, 4.5 no longer needs a slow function in a
-context, and `${ await Promise.resolve(20) + 1 }` — one case that asked both whether `await` works
-and whether a global is reachable — is now two, one per side. `test/spec/` no longer needs
-`catchError` in 3.2 or a `typeof` in 4.2. What could not survive is one case of 6.7: "filters the
-context, not the globals" cannot be asserted without evaluating something, and it said nothing about
-`buildSecure` anyway — reaching a global is a freedom of 8.3 and has its row.
-
-Coverage is unchanged at 92.81 % of statements, and branches went up: the executer side covers the
-paths that need a compiler, which is where they belonged. The risk that the general suite would stop
-reaching them did not materialise — worth writing down, because it was the argument against this
-split.
+**Consequences:** A case that needs a value sets it rather than finding a statement that produces it.
+What cannot be asserted this way — that `buildSecure` filters the context and not the globals — says
+nothing about the resolver and is the executer's own.
 
 ## 2026-09-01 — Does the constructor take an executer instance, or only a registered name?
 
 **Decision:** Both. `new ExpressionResolver({ executer })` keeps looking a **string** up in the
 registry and still throws on a name that is not registered; an **`Executer` instance** is now taken
-as it is. This **reverses the decision of 2026-08-22** ("a registered name and nothing else", plan
-question 40, written into `SPECIFICATION.md` 4.2), and it closes the `BACKLOG.md` entry that carried
-the question.
+as it is. Before, it took a registered name and nothing else.
 
 **Reasoning:** Frank's, 2026-09-01. Three things, and the first is the one that decides it:
 
@@ -508,208 +438,6 @@ stays a silent fallback — the same class of thing as the `parent` that is not 
 (`BACKLOG.md`), and if that one is ever made loud, this one goes with it. The constructor JSDoc
 documents the option for the first time.
 
-## 2026-09-01 — What is tested against what?
-
-**Decision:** Three things are tested, and each has exactly one place. This **replaces both entries
-of 2026-09-01 below**, which describe stages of the same day's work rather than a concept.
-
-| What | Where | Against |
-|---|---|---|
-| the **resolver** — parsing, chain, entry points, data methods, public surface | `test/spec/` | `TestExecuter`, the implementation the suite owns |
-| the **implementations** — every rule only observable through a statement | `test/executer/rules/` | all four registered executers |
-| **which implementation answers what** | `MATRIX` in `test/ExecuterCapabilities.js` | data only — no test logic |
-
-`TestExecuter` (`test/TestExecuter.js`) is a small implementation of 9.1: it executes a statement
-against a context, lets errors through, and **records the statements handed to it**. It is never
-registered by `src/executer/index.js` and never a default. A file that needs it calls
-`useTestExecuter()`, which moves `ExpressionResolver.defaultExecuter` for that file and puts the
-previous one back — the static entry points of 4.1 take no executer, so a file that pins them has to
-move the default rather than pass an option.
-
-`MATRIX` holds **one row per case that runs per executer**, keyed by the case name the test carries,
-with three states: `yes` (has to pass, runs as `it`), `no` (a freedom 8.3 grants, runs as
-`it.fails`), `defect` (a rule the implementation does not keep yet, also `it.fails`, with its
-`BACKLOG.md` entry named in a comment). A section file asks `casesOf(section, executer)` and writes
-ordinary tests; a case whose name is no row throws.
-
-**Reasoning:** Frank's review of the structure delivered the same day, and each of its four points
-found something the rebuild had left in place because it had only reshaped what was there.
-
-*The general suite tested the resolver against a real implementation.* That is why it carried a
-dialect and `defaultExecuterEntry` — a workaround for a dependency it should not have had. 3.2 shows
-what it cost: the rule is that an escaped expression is **never handed to an executer**, and the
-suite asserted it through what a foreign implementation replied. With a recording executer it is
-asserted directly, and seven cases across 3.1, 3.2, 3.3 and 4.3 now state their rule instead of
-inferring it. The recorder is also the boundary marker: a case that needs `TestExecuter` taught
-something specific — one of the three freedoms of 8.3 — is a case that belongs on the executer side.
-
-*The catalogue carried test logic.* `run` and `expected` in a data file are tests in disguise, which
-had been rejected once already in another wrapping. They are back in the test files.
-
-*Five capability rows were a selection, not a table.* They were what the previous suite happened to
-have marked as a freedom. With every per-executer case in the matrix — 35 rows today — the table is
-what it looks like: the conformance overview of the package, in which a rule everybody keeps, a
-freedom, and a broken rule are told apart at a glance. That third state is what the old two-state
-table could not say, and it is the more useful half: `defect` names a rule with a backlog entry,
-`no` names a difference nobody has to fix.
-
-*`SetupExecuterTest` was 8.4, today 9.9, under another name.* Asking the same subject twice, once per executer
-and once in the general suite, is how a suite grows a duplicate that nobody reconciles. It is one
-file now, and the general half is gone.
-
-**Alternatives:** One file that runs every case, with the section files reduced to exported case
-tables — it would keep the matrix out of the test bodies entirely and cut the per-file setup cost,
-but the section files would stop being test files and every failure would report the same file.
-Decided against by Frank after both sides were laid out. Carrying both answers per capability row,
-`{ supported, unsupported }` — rejected by Frank as reintroducing the complication a case is meant
-to avoid: a test either passes or it does not. Teaching `TestExecuter` to block globals so that
-`test/spec/` cannot lean on them — rejected: 3.4 and 4.6 are about `Promise` and `await`, not about
-reachability, and a sandbox would have made those cases harder to read for a boundary the executer
-suite already guards.
-
-**Consequences:** `test/spec/` no longer knows any registered implementation, so changing the default
-executer cannot touch it — the case that pins which one is the default is the one place that
-notices. `capabilityIt`, `RULE_GROUPS`, `defaultExecuterEntry` and the generated `CapabilityTest.js`
-are gone; `MatrixTest.js` checks the table's shape instead of running cases from it. The gate went
-from 415 to 409 cases: seven added where a rule is now stated directly, thirteen dropped as
-duplicates of what 5.2 and 8.4 (today 9.9) already ask. Coverage is unchanged at 92.81 % of statements — twice
-measured, because a rebuild that moves this much has to prove it lost nothing. What the matrix
-cannot check is a row no case reads any more: Vitest isolates each file, so nothing can see which
-rows were looked up. That is written into `MatrixTest.js` rather than papered over.
-
-## 2026-09-01 — Where does the test suite say what it tests, and where does it say what an executer may decline?
-
-**Superseded the same day** — see the entry above. The directory and the file name stayed; the
-matrix grew from five selected rows to every per-executer case, and the general suite stopped
-running against a registered implementation.
-
-**Decision:** In the directory, the file name and the capability catalogue — in that order, and
-nowhere else. This **replaces the `RULE_GROUPS` half of the entry below**, taken the same day.
-
-- **The directory is the group.** `test/spec/` holds the rules that run once, against
-  `ExpressionResolver.defaultExecuter`. `test/executer/rules/` holds the rules that only show
-  through a statement and are therefore asked of every implementation. `test/general/` holds what
-  pins no rule of `SPECIFICATION.md` at all — the code cache, the shape a context may have, the
-  helpers of the suite itself.
-- **The file name is the rule.** One file per section, `<section>-<slug>.Test.js`. A section with
-  halves in both groups — 6.1, 6.5, 7, 8.2 (today 6.4, 6.5, 7, 9.2) — has a file in each, and that is the whole answer to
-  what the `both` state of the old table tried to express.
-- **The catalogue is what an executer may decline.** `test/ExecuterCapabilities.js` carries, per
-  capability, the case that decides it (`context`, `run`, `expected`) and a matrix of one row per
-  capability against one column per executer. `test/executer/CapabilityTest.js` generates the tests
-  from it. No test file decides for itself that something is a capability.
-- **A case is unambiguous**: `yes` runs as `it` and has to pass, `no` runs as `it.fails` and has to
-  fail. There is deliberately **no test anywhere that pins what an executer answers instead**.
-
-**Reasoning:** Frank's, on 2026-09-01, against the structure delivered the same day, and every point
-of it held up.
-
-`RULE_GROUPS` was introduced against the `ChainTest.js:229` failure — a test counted as
-executer-independent until the constructor started reading `defaultContext` off the executer. But it
-would not have caught that: neither a declaration nor the test holding it against the shared suites
-can see a rule *becoming* executer-dependent. What actually caught it was changing the default
-executer, and what guards against it now is that the general suite takes its dialect from the
-catalogue, so the swap is a one-line experiment. The table checked its own consistency and nothing
-else, which is a problem that only exists once the table does.
-
-The counter-tests were worse than useless. `"does not count across two occurrences of a counting
-write"` said the same as `context/write-back: no`, in a second file, with no link between them: the
-day the deconstructor gains the write-back — it is in `BACKLOG.md` with a finished draft — that test
-turns red and the catalogue knows nothing about it. Two places to change for one fact is exactly
-what the catalogue was built to end. Removing them cost nothing: every case in the two
-`OwnBehaviourTest` files was either the other side of a capability or a rule the other three
-executers keep as well (`window.Math.round(1.5)` answers `2` everywhere, verified before it moved).
-
-Grouping the shared rules by theme rather than by section hid what a file contains behind its name —
-`ContextRules.js` carried 6.1, 6.2, 6.3 and 6.5 — and the four `ConformanceTest.js` files differed
-in one import line each. A file per section that loops over the executers itself removes both, and
-the count of files is not a cost worth paying attention to at this size: 36 files run in 8.3 s
-against 3.7 s for 18, so the split has room before it needs a second look.
-
-**Alternatives:** Keeping `RULE_GROUPS` and describing in it why a loop in the general suite is not a
-per-executer rule — rejected, because a table that has to explain its own exceptions is the thing
-being replaced. Carrying both expectations in a capability row, `{ supported, unsupported }` —
-rejected by Frank as reintroducing the complication: a case that answers two different things
-depending on a table is no longer a case one can read. A directory per executer holding a generated
-conformance file — that is what existed, and it produced four files with nothing in them.
-
-**Consequences:** `RULE_GROUPS`, `sectionsOf` and `test/general/RuleGroupTest.js` are gone, together
-with the `SECTIONS` exports of the shared suites. `SPECIFICATION.md` 8.3 still carries the capability
-table for a human reader and still has to be updated by hand — the suite runs in a browser and
-cannot read the document. Every file that loops over `EXECUTERS` now lives under `test/executer/`,
-which moved `ContextShapeTest`, `StackedContextTest` and `SetupExecuterTest` out of `test/general/`
-(all three were dissolved into section files later the same day);
-what is left there pins no rule and loops over nothing. Two cases still loop over the executers from
-inside `test/spec/` — 8.2 and 8.4, today 9.2 and 9.9 — and they are the one open question this structure does not
-answer; `BACKLOG.md` carries it. Measured across the rebuild: 415 cases before and after the moves,
-coverage unchanged at 92.81 % of statements.
-
-## 2026-09-01 — How does the test suite say what an executer can do, when the four differ on purpose?
-
-**Superseded the same day** — see the entries above. The vocabulary held; the mechanism did not:
-the catalogue carried the cases themselves, which put test logic into a data file.
-
-**Decision:** Through a **capability catalogue**, `test/ExecuterCapabilities.js`, and a vocabulary
-that separates three things:
-
-- a **function** — what all executers provide: execute an expression against a dynamic context.
-  One, not many.
-- a **capability** — a point where implementations may legitimately differ: whether a write
-  persists, whether a global is reachable, whether a nested function still sees the context.
-- a **rule** — a statement of `SPECIFICATION.md`. Normative. A rule that names no capability holds
-  for every executer, and an implementation may not decline it.
-
-The catalogue carries one row per capability with one state per executer, `supported` or
-`unsupported`, and nothing else. Whether a missing capability is meant to arrive belongs in
-`BACKLOG.md`, not in the table. A test asks the catalogue which `it` to use: `capabilityIt` answers
-the ordinary one where the state is `supported` and `it.fails` where it is not. The dialect — how a
-statement spells a context name — is not a capability, because it is not a yes or no; it stays as
-`variableName` on the executer entry, and the general suite takes its spelling from there rather
-than writing a bare name.
-
-**Superseded later the same day** — see the entry above: the group of a rule is the directory it
-lives in, and `RULE_GROUPS` is gone. What follows described it while it stood.
-
-The catalogue also declares, in `RULE_GROUPS`, which group each rule of the specification is tested
-in: `general` (once, in `test/spec/`), `per-executer` (once per implementation, in
-`test/executer/shared/`), or `both`. `test/general/RuleGroupTest.js` holds that declaration against
-what the shared suites actually open.
-
-**Reasoning:** The suite already knew all of this, but it knew it in the wrong places — a `FREEDOMS`
-table in one test file, a `leaksToday` boolean in another, an `it.fails` marker in a third. That is
-why the switch of the default executer on 2026-08-30 turned three unrelated tests red: what an
-executer can do was written into the assertions instead of being stated once. A table that a test
-reads is guarded in **both** directions, which prose and a skipped test are not: a capability that
-stops working fails the ordinary way, and one that starts working fails with `Expect test to fail`.
-Neither direction can pass unnoticed, so the table cannot claim a state the code does not have.
-Verified rather than argued: two rows were flipped on purpose and the gate answered in both
-directions.
-
-The vocabulary is load-bearing. *Specification* is the right word for the document and for a rule;
-it is the wrong word for the per-executer axis, because it would suggest an implementation may
-decline part of it. Keeping *rule* and *capability* apart is what makes it decidable where a case
-belongs — and where a rule is broken rather than absent, the row says so and `BACKLOG.md` carries
-the fix (the negative guarantee of 6.5 is the one such row today).
-
-**Alternatives:** Skipping a case per executer with `it.skip` — rejected: it guards nothing, and a
-capability that arrives goes unnoticed forever. Branching the expectation, `expect(result).toBe(reachesGlobals ? "2" : "${…}")` — that is what the suite did, and it hides the
-difference inside an assertion where no reader finds it; it also cannot say whether the second
-branch is a capability or a defect. Running the whole suite against `defaultExecuter` only —
-rejected: three implementations would stop being tested, and the fourth would be tested by
-accident, whichever it happens to be. A separate hand-written suite per executer — rejected as the
-starting point, because the rules would be copied four times and drift; what stays per executer is
-only what only that executer does.
-
-**Consequences:** The catalogue is the single place where "which executer can what" is written, and
-a row may only exist once a test reads it under every executer — a row nothing reads is a claim
-without cover. `SPECIFICATION.md` 8.3 carries the same table for a human reader, written by hand
-from the catalogue: the suite runs in a browser and cannot read the document, so a change has to go
-into both. The same limit applies to `RULE_GROUPS`, which lists the sections of the specification by
-hand. The general suite depends on the catalogue for its dialect, which is what makes a change of
-the default executer a one-line change rather than a rewrite — measured: with the default moved to
-`context-object-executer`, `test/spec/` answers one failure, and it is the case that pins the
-default by name.
-
 ## 2026-09-01 — Which executer is the default, and what does the switch cost a consumer?
 
 **Decision:** `context-deconstruction-executer`. `with-scoped-executer` stays registered, keeps its
@@ -731,7 +459,7 @@ number measured so far but has not been proven with a counter in the trap; the w
 carried in `BACKLOG.md`. Third, of the two candidates that do not use `with`, the deconstructor is
 the only one that leaves the way an expression is written alone: `context-object-executer` hands the
 context to the statement as `ctx` and therefore demands `${ctx.value}` where every expression
-written so far says `${value}` (8.3). Changing a default must not rewrite every consumer's
+written so far says `${value}` (9.2). Changing a default must not rewrite every consumer's
 expressions.
 
 **Alternatives:** `context-object-executer`, the fastest of the four in `RandomScope` — rejected on
@@ -744,9 +472,7 @@ holding the default back for it would mean holding it back indefinitely.
 
 **Consequences:** A write from inside an expression stops persisting for everyone who did not pick
 an executer — conformant per 6.5, silent, and the reason the entry in `CHANGELOG.md` carries a
-migration note rather than a line. `SPECIFICATION.md` 8.2 — today 9.2 — loses its *Open* note and section 10 its
-row, so the specification and the code now say the same thing about the default. The conformance
-suite pins the default by name (`test/spec/ExecuterTest.js`), so the next change of default turns
+migration note rather than a line. The suite pins the default by name (`test/spec/9.2-the-implementations.Test.js`), so the next change of default turns
 the gate red instead of announcing itself through unrelated failures — which is how this one was
 found. `WithScopedExecuter` is off the default path but stays in `src/executer/index.js` and in the
 bundle; whether it is removed for 3.0.0 is not decided here.
@@ -765,27 +491,22 @@ provided centrally, `Constants.js` being the obvious place.
 where the data is stored rather than where the rule applies looks cheap — it runs once instead of
 per use — but it makes the storage answer for a consumer it knows nothing about, and every other
 consumer pays for a rule it never asked for. That was measurable here: `VARNAME_CHECK` and
-`RESERVED_WORDS` are needed by exactly one of four executers, the one that turns names into code
-(`Object.getOwnPropertyNames` appears in `ContextDeconstructorExecuter` alone), yet they were
-applied while the property cache was built and therefore narrowed **the lookup** for all four. A
-context carrying `test-test`, `class`, `0` or `undefined` answered `undefined` under
+`RESERVED_WORDS` were needed by exactly one of four executers, the one that turns names into code,
+yet they were applied while the property cache was built and therefore narrowed **the lookup** for
+all four. A context carrying `test-test`, `class`, `0` or `undefined` answered `undefined` under
 `ContextObjectExecuter`, although `ctx["test-test"]` is an ordinary property access that executer
 can express. The component that owns the rule is the only one that can weigh it.
 
 **Alternatives:** Keep the filter where the names are collected, because it runs once per context
-instead of once per execution, and the one executer that needs it computes its name list on every
-call. That is a real cost and it is the argument that has to be measured when the check moves, not
-one that decides where the rule belongs. Splitting the rule — the syntactic half to the executer,
-the shadowing half (`undefined`, `constructor`) to the handle — was weighed and rejected for the
-same reason: it leaves the handle answering for a consumer's concern.
+instead of once per execution. That is a real cost and it is the argument that has to be measured
+when a check moves, not one that decides where the rule belongs. Splitting the rule — the syntactic
+half to the executer, the shadowing half (`undefined`, `constructor`) to the handle — was weighed and
+rejected for the same reason: it leaves the handle answering for a consumer's concern.
 
-**Consequences:** The filtering in `ResolverContextHandle` goes, including the `isVariableName`
-predicate added earlier the same day, and `ContextDeconstructorExecuter` takes the check over.
-Consumer-visible: names that were dropped become reachable and appear in an enumeration of a
-context, and the warning `Variable name is illegal …` leaves the context path. The same question
-is open for `RESERVED_NAMES` in `EsprimaExecuter`, which is that executer's version of the same
-rule — see `BACKLOG.md`. Beyond this case the rule applies to every part of the code, and it is
-the reason to ask, before adding a check anywhere, whose job the rule actually is.
+**Consequences:** The handle filters nothing, and since 2026-09-22 no part filters a name at all: a
+context carries what JavaScript says it carries, and the one executer that cannot use such a name
+reports it (the two entries of that day). Beyond this case the rule applies to every part of the
+code, and it is the reason to ask, before adding a check anywhere, whose job the rule actually is.
 
 ## 2026-08-29 — Is the price of evaluating every occurrence on its own acceptable?
 
@@ -961,7 +682,7 @@ would have to be maintained against the language.
 wrong: where a regular expression legitimately follows `)` or `]` — `${ (() => { if (a) /x/.test(b)
 })() }` is the shape — the `/` is read as division. Nothing is cut unless that literal also carries
 a brace. The everyday cases are safe in both directions, because division follows a value and a
-literal does not. `test/spec/SyntaxTest.js` pins both directions, and the division test is there to
+literal does not. `test/spec/3.1-delimiters.Test.js` pins both directions, and the division test is there to
 keep the heuristic honest rather than to prove a fix.
 
 ## 2026-08-24 — How does a test state a rule the code does not keep yet?
@@ -997,36 +718,6 @@ that is not marked as pending", and the count of expected fails is the measure o
 told by a red gate if they forget. A whole-suite review with every marker stripped is worth
 repeating before a release: it is what proves no marker has gone stale.
 
-## 2026-08-24 — How does a test express a rule that has to hold under every executer?
-
-**Decision:** The suite loops over an `EXECUTERS` table exported from `test/TestUtils.js`, which
-lists every registered executer together with a `variableName(property)` function answering the
-name a statement has to use to reach a context property under it. A test names that variable in a
-constant of its own and inserts it into the expression, so it measures the rule rather than the
-spelling. Executer-specific behaviour is not skipped in those loops — it is stated in
-`test/spec/ExecuterTest.js`, per executer, in a table of the three freedoms 8.3 grants.
-
-**Reasoning:** The rules of sections 5, 6 and 7 have to hold under every executer, so testing them
-under one proves a quarter of what is claimed. Writing them out four times by hand would have been
-four places to update. The `variableName` indirection exists because
-`ContextObjectExecuter` addresses a context value as `ctx.value` while the others use the bare
-name: without it the section 5 suite would have reported five rules broken under that executer
-which it in fact keeps. Keeping the executer-specific answers in one table in `ExecuterTest.js`
-rather than as conditions spread through the loops means a new executer is described in one place,
-and a difference nobody intended shows up as a wrong table row instead of a skipped test.
-
-**Alternatives:** `describe.each` — rejected, it widens the vitest surface the suite deliberately
-keeps at `describe`/`it`/`expect` and three matchers, and a plain `for` loop reads the same.
-Running each suite under the default executer only — rejected: 8.3 says everything outside its
-three freedoms holds regardless of the executer, and that sentence is worth checking rather than
-trusting.
-
-**Consequences:** Adding an executer means one row in `EXECUTERS`, one row in the `FREEDOMS` table
-of `ExecuterTest.js`, and the whole conformance suite runs against it. A test that must differ per
-executer — the negative guarantee of 6.5 is the one case so far — picks its marker inside the loop
-(`const pin = leaksToday ? it.fails : it`) instead of being marked wholesale, because a blanket
-marker fails on the executers that already keep the rule.
-
 ## 2026-08-24 — What do the edge cases of the expression parser and of the scope walk do?
 
 **Decision:** Three rules, all now in `SPECIFICATION.md`. A brace inside a string literal does not
@@ -1051,35 +742,30 @@ cannot shadow a name, which contradicts the purpose of the chain stated in secti
 
 **Consequences:** The parser of the brace fix has to know string literals — `'`, `"` and backtick
 — which is more than counting characters, and it has to be able to reach the end of the text
-without a match and then do nothing. Both are now pinned by tests marked `fails`. Still open, and
-noted in `BACKLOG.md` rather than decided here: what an escaped backslash in front of an
-expression means, and what an empty statement `${}` evaluates to.
+without a match and then do nothing.
 
 ## 2026-08-24 — May an executer dictate how a statement addresses a context value?
 
-**Decision:** Yes. How a context value is written inside a statement is the executer's own, a
-third freedom alongside the two 8.3 already granted. `ContextObjectExecuter` demands `ctx.` in
-front of every context value; the other three put the properties into scope, where the bare name
-works. `SPECIFICATION.md` 8.3 now says so, with both dialects spelled out.
+**Decision:** Yes. How a context value is written inside a statement is the executer's own.
+`ContextObjectExecuter` demands `ctx.` in front of every context value; the other three put the
+properties into scope, where the bare name works. `SPECIFICATION.md` 9.2 says so, and `README.md`
+spells out the dialect of each executer.
 
-**Reasoning:** The conformance suite of section 5 turned the difference up on 2026-08-24: five
-tests failed under `ContextObjectExecuter` alone. Addressed as `ctx.value` that executer keeps
-**every** rule of 5.2 the other three keep — shadowing, the walk to an ancestor, a key holding
-`undefined`, the prototype chain. So the chain, which is what section 5 is about, is not affected
-at all; only the spelling is. An executer is a strategy for turning a statement into a value, and
-what a statement may look like is part of that strategy. Forbidding it would mean rewriting
-`ContextObjectExecuter` around a rule nothing needed.
+**Reasoning:** The rules of section 5 turned the difference up on 2026-08-24: five tests failed under
+`ContextObjectExecuter` alone. Addressed as `ctx.value` that executer keeps **every** rule of 5.2 the
+other three keep — shadowing, the walk to an ancestor, a key holding `undefined`, the prototype
+chain. So the chain, which is what section 5 is about, is not affected at all; only the spelling is.
+An executer is a strategy for turning a statement into a value, and what a statement may look like is
+part of that strategy. Forbidding it would mean rewriting `ContextObjectExecuter` around a rule
+nothing needed.
 
 **Alternatives:** Make every executer put the context properties into scope, keeping `ctx.` as an
 addition. Rejected: it removes the one property that distinguishes `ContextObjectExecuter` from
 the others without a consumer asking for it. It would become the better choice if expressions
 ever have to be portable between executers — that is the cost below.
 
-**Consequences:** Switching executer can mean rewriting expressions, and that is now documented
-rather than discovered. `README.md` has to carry the dialects once it is rewritten, since it is
-what a consumer and an AI system read first. Test code that runs one case against several
-executers needs the name per executer — `test/spec/ChainTest.js` carries a `variableName`
-function for exactly that. Open alongside it, and only an idea so far: making the `ctx` prefix of
+**Consequences:** Switching executer can mean rewriting expressions, and that is documented rather
+than discovered. Open alongside it, and only an idea so far: making the `ctx` prefix of
 `ContextObjectExecuter` configurable, so a consumer can pick the identifier. It has its own
 `BACKLOG.md` entry.
 
@@ -1088,11 +774,11 @@ function for exactly that. Open alongside it, and only an idea so far: making th
 **Decision:** When the caller handed a context to the constructor — anything that is neither
 `null` nor `undefined` — or when a value has been set on the link since. What the context holds
 does not matter: an empty object counts. A link provides no context only if it was built without
-one and nothing has been written to it since. This replaces the rule written on 2026-08-22, under
-which a link counted only while its context held at least one reachable value.
+one and nothing has been written to it since.
 
-**Reasoning:** The older rule needed a definition of "holds a value", and pinning it in stage 2
-of the conformance plan showed that definition does not exist: `#initPropertyCache` walks the
+**Reasoning:** A rule by what the context holds — a link counting only while its context holds at least one
+reachable value — needs a definition of "holds a value", and pinning it showed that definition does
+not exist: `#initPropertyCache` walks the
 prototype chain to its end, so the cache of even `{}` holds `hasOwnProperty`, `toString` and the
 rest of `Object.prototype`. Read literally, every context would be non-empty and `effectiveChain`
 would equal `chain` again; read as intended, the specification would have had to draw a boundary
@@ -1101,7 +787,7 @@ somewhere inside the prototype chain — own keys plus everything up to but excl
 That is a lot of rule for a getter whose purpose is debug output. Deciding it at construction is
 one comparison, needs no cache, and cannot drift as the context changes shape.
 
-**Alternatives:** The 2026-08-22 rule with the prototype boundary written out. It would become
+**Alternatives:** That rule, with the prototype boundary written out. It would become
 the better choice if a consumer ever needs `effectiveChain` to answer "which links can actually
 contribute a value to a lookup" rather than "which links were given a context" — the two differ
 for a link handed an empty object.
@@ -1109,9 +795,7 @@ for a link handed an empty object.
 **Consequences:** `context: null` and `context: {}` are told apart here, and only here; for a
 lookup they stay equivalent (6.3). A link built without a context joins `effectiveChain` and
 `contextChain` the moment a value is written to it, so both still describe a state rather than a
-structure. The three assertions in
-`test/ExecuterTests/WithScopedExecuterTests/ResolverChainTest.js` that expect a `context: null`
-link to appear in `effectiveChain` are wrong under this rule and are marked as such.
+structure.
 
 ## 2026-08-22 — Where does the specification of the resolver live, and what is it for?
 
@@ -1131,8 +815,8 @@ rule, error handling — have no place in a getting-started document but must be
 somewhere.
 
 **Consequences:** A fourth permanent record to keep in step. The specification states intended
-behaviour, so it disagrees with the code in fourteen places listed in its section 10; each one
-is a `BACKLOG.md` entry, and the specification is the reference for what the fix has to achieve.
+behaviour; where the code does not keep it yet, `BACKLOG.md` carries the entry (2026-09-05), and the
+specification is the reference for what the fix has to achieve.
 Publishing it adds a file to the `files` array.
 
 ## 2026-08-22 — Does a key holding `undefined` shadow a value nearer the root?
@@ -1161,7 +845,7 @@ A key added directly to the handed-in object afterwards is invisible until
 `contextHandle.resetCache()`, `updateData` or `mergeContext` rebuilds the set.
 
 **Reasoning:** That cache is what makes the chain walk cheap — one map lookup per link. It also
-matches how the package is used: a link of a stacking context is filled and then used, not
+matches how the package is used: a resolver of a chain is filled and then used, not
 extended while it is being read.
 
 **Alternatives:** A live fallback — `Reflect.has(data, property)` on every cache miss — was
@@ -1170,9 +854,7 @@ entire chain, and `ownKeys`, which `ContextDeconstructorExecuter` calls on *ever
 would have to be rebuilt live along with it.
 
 **Consequences:** Mutating an object handed to a resolver is not enough to make a new key visible,
-which is a documented side effect rather than a defect. It also decides `effectiveChain`: a link
-counts as carrying values by what the cache holds, so keys the cache drops — reserved words,
-names that are not valid variable names — do not count.
+which is a documented side effect rather than a defect.
 
 ## 2026-08-22 — Is reaching the global object a promise of the package?
 
@@ -1193,33 +875,6 @@ sandboxed one, which is the direction a CMS deployment would want.
 `document` stay reachable from an expression. It is a way to hand over a cleaned context, not a
 sandbox, and must not be documented as one. A consumer who wants a name resolved locally puts it
 into the context so the engine finds it before walking out.
-
-## 2026-08-22 — What happens when an expression writes?
-
-**Decision:** Writing from inside an expression is **not specified**; `updateData` and
-`mergeContext` are the supported path. One guarantee is given, and it is negative: while writing
-to the global object is not explicitly allowed, an assignment inside an expression must not
-create or change anything there. The switch that allows it exists at three levels, each falling
-back to the one above — `ExpressionResolver.allowGlobalWrite`, the constructor option
-`allowGlobalWrite`, and the fifth argument of the static `resolve` / `resolveText` — and defaults
-to `false`.
-
-**Reasoning:** What an assignment does is decided by the executer, not by this package.
-`WithScopedExecuter` routes it through the context proxy and can be intercepted;
-`ContextDeconstructorExecuter` writes to a destructured local binding and cannot; `EsprimaExecuter`
-cannot execute an assignment at all, because `x = 5` is rewritten to `ctx?.x = 5`, a syntax error.
-Promising a destination would promise what only one executer can keep. The negative guarantee is
-different in kind: expressions are authored by users in CMS deployments, and a page where an
-expression can write to `window` is a problem regardless of which executer is in use.
-
-**Alternatives:** Specifying "a write always lands in the own context" was worked out and
-rejected: it is implementable for the `with`-based executer only, and choosing it would have
-locked `with` in as the default against the decision to move away from it.
-
-**Consequences:** The protected state means different things per executer — interception for the
-`with`-based one, strict-mode generation and a reported error for the deconstructor. That
-difference is part of the specification rather than hidden behind the switch. Turning the switch
-on restores plain JavaScript behaviour, including accidental globals.
 
 ## 2026-08-22 — Is an expression in a text evaluated once or once per occurrence?
 

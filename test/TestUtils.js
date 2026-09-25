@@ -1,5 +1,4 @@
-// The helpers that are not the catalogue. Which executer can what, and the list of executers
-// itself, live in `ExecuterCapabilities.js`.
+// Helpers the test files share.
 
 /**
  * Runs the function and answers the error it raised, or null where it raised none.
