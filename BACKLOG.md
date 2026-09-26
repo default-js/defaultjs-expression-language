@@ -43,7 +43,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | --- | --- | --- | --- |
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 | B-28, B-29 (follow-up decisions) |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
-| 3 | Raise test coverage | largely done | **B-43**, B-30, B-38 |
+| 3 | Raise test coverage | largely done | **B-43**, B-44, B-30, B-38 |
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-07, B-25, B-26, B-27, B-40 |
 
@@ -90,7 +90,8 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-38 | Rules without a test that pins them | agreed | test | |
 | B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | |
 | B-41 | The default executer logs its generated code on every cache miss | decision | defect | |
-| B-43 | Take the spec tests apart as well — test each component on its own | agreed, **urgent** | test | |
+| B-43 | Take the spec tests apart as well — test each component on its own | agreed, **urgent** — `plans/split-spec-tests.md` | test | |
+| B-44 | Review the component suites for necessity | agreed | test | |
 
 ---
 
@@ -570,29 +571,24 @@ for is done.
 
 ### B-43 · Take the spec tests apart as well — test each component on its own
 
-- **Status:** agreed 2026-09-26 — **urgent**, Frank's call; the scope is clarified first, then it
-  gets its own plan under `plans/`
+- **Status:** agreed 2026-09-26 — **urgent**, Frank's call; scope settled, running as
+  `plans/split-spec-tests.md`
 - **Kind:** test
-- **Records:** `TESTING.md`, `AGENTS.md`, `DECISIONS.md`
+- **Records:** `TESTING.md`, `AGENTS.md`, `DECISIONS.md`, `CHANGELOG.md` (the scanner module)
 
 The same move the executer suites made on 2026-09-26 (`DECISIONS.md`), now for `test/spec/`: 26
-files, 224 cases, one file per section of `SPECIFICATION.md`. Every case goes through
-`ExpressionResolver` with `TestExecuter` behind it — including the rules that are not the resolver's
-own work but that of `ResolverContextHandle` (the chain walk of 5.2 to 5.4, the snapshot of 6.2, what
-a context answers in 6.1 and 6.4), which are asked of the context through `answerWith` rather than of
-the handle directly. The one `it.fails` of the suite (B-33) lives there.
+files, 224 cases, every one of them through `ExpressionResolver`. The plan carries the decisions and
+the stages; this entry is deleted when the plan is.
 
-To settle before the plan, and each changes the work:
+### B-44 · Review the component suites for necessity
 
-- **What a unit is.** One suite per component — `ExpressionResolver`, `ResolverContextHandle`,
-  `ExecuterRegistry`, the scanner — each called directly with what it is handed in use, as the
-  executers are now; or something else.
-- **The tie between a test file and a section of `SPECIFICATION.md`.** Frank kept it on 2026-09-05
-  because it leads from a case to the rule it pins. Files named after components give it up unless
-  the section moves into the case or the header.
-- **`TestExecuter`.** Whether the resolver's own suite still needs it once the handle is tested on its
-  own, and what the static entry points of 4.1 are tested against.
-- **Necessity.** The same review as for the executers: only what the component's own code decides.
+- **Status:** agreed 2026-09-26 — after B-43
+- **Kind:** test
+
+B-43 moves the cases of `test/spec/` into one suite per component and deliberately thins nothing.
+Afterwards each suite gets the review the executer suites had: a case stays where a change to that
+component's own code could break it. Every case dropped is named with its reason, and coverage is
+checked against B-30 afterwards.
 
 ### B-30 · Coverage, and what is still uncovered
 
