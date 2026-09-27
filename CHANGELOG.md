@@ -45,6 +45,11 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Changed
 
+- **The expression scanner is a module of its own, `src/ExpressionScanner.js`.** It finds the
+  expressions of a text and takes the single expression of `resolve` apart; it moved out of
+  `src/ExpressionResolver.js` unchanged. It is internal — `index.js` does not export it and nothing
+  in `SPECIFICATION.md` promises its shape — but it is published under `src/` like every other file.
+
 - **A context carries every key JavaScript says it carries.** Names that are not variable names
   (`test-test`, `0`), reserved words (`class`, `undefined`, `constructor`) and symbol keys used to be
   dropped when a resolver was built, with a warning `Variable name is illegal …` for the first kind.

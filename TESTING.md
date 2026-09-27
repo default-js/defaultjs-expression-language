@@ -8,76 +8,75 @@ Every part of the suite has one place:
 
 | What | Where | Against |
 |---|---|---|
-| the **resolver**, the chain walk included | `test/spec/` | `TestExecuter`, which evaluates nothing, or the context the resolver hands over |
-| the **interface** every executer shares | `test/executer/interface.Test.js` | all four executer modules |
-| what **one executer** guarantees | `test/executer/<executer>/` | that executer alone, called as `execute(aStatement, aContext)` |
-| everything that pins no rule | `test/general/` | whatever it needs |
+| one **component** — `ExpressionScanner`, `ResolverContextHandle`, `ExpressionResolver`, `ExecuterRegistry`, `CodeCache` | `test/<component>/`, the full component name in lower case: `test/expressionscanner/`, `test/executerregistry/` | that component alone, called with what it is handed in use |
+| the class **`Executer`**, the interface | `test/executer/interface.Test.js` | the class |
+| what **one executer** guarantees, its interface included | `test/executer/<executer>/` | that executer alone, called as `execute(aStatement, aContext)` |
+| the **public surface** of the package | `test/package/surface.Test.js` | `index.js` and `Executer` |
 
 ## 1. Where a case belongs
 
-Ask in this order:
+Ask **whose code decides it**, in this order:
 
-1. **Is it about one executer?** Then it goes into that executer's directory — `with-scoped`,
-   `context-object`, `context-deconstruction`, `esprima` — and only if the executer **guarantees** it.
-   What an executer does not do is written into its section of `README.md`, never into a test.
-2. **Is it the interface?** Registering on import is asked of all four in
-   `test/executer/interface.Test.js`. Nothing else is asked of all four: every executer is a solution
-   of its own, and no feature set is shared beyond the interface.
-3. **Does it pin a rule of `SPECIFICATION.md`?** Then it is the resolver's and goes to `test/spec/`:
-   parsing and delimiting, the chain and its walk, the entry points, the data methods, the public
-   surface. It runs once.
-4. **Otherwise** it goes to `test/general/` — the code cache is the one thing there today.
+1. **One executer?** Then it goes into that executer's directory — `with-scoped`, `context-object`,
+   `context-deconstruction`, `esprima` — and only if the executer **guarantees** it. What an executer
+   does not do is written into its section of `README.md`, never into a test.
+2. **Whether an executer keeps the interface** — its module registers it on import and exports it,
+   its name and `setupExecuter` — is that executer's guarantee too, in its own `interface.Test.js`.
+   **No test lists or loops over the executers**: a new executer brings every question along with its
+   own directory, rather than having to be entered in somebody else's list, where a forgotten entry
+   turns nothing red. The class `Executer` itself is `test/executer/interface.Test.js`.
+3. **Otherwise the component whose code decides it:**
+   - `expressionscanner` — where an expression begins and ends, which occurrence is escaped, the
+     syntax of the scope prefix, the single-expression form of `resolve`;
+   - `resolvercontexthandle` — the chain walk, what a context answers, the snapshot of names, where a
+     write lands;
+   - `expressionresolver` — construction, the entry points and what they do with a result, default
+     value, timeout, asynchrony, errors and warnings, which resolver a scope prefix or a data method
+     addresses, the chain getters, the default executer;
+   - `executerregistry`, `codecache` — each its own.
+4. **The list of public members** is `test/package/surface.Test.js`: existence and shape only, so
+   that a removal trips over it. What a member does is tested with the component that has it.
 
-**The chain walk is the resolver's, not an executer's.** It lives in the traps of
-`ResolverContextHandle`, and an executer reaches the chain through them: reading a name, asking
-whether one exists, listing them. A case asks those of the context directly — through `TestExecuter`
-or on `resolver.context` — rather than of an executer that happens to use them.
+**A rule is tested where it lives, once.** The resolver hands statements to the scanner, reads the
+context through its handle and runs executers; none of that is retested through the resolver. What
+the resolver suite keeps is **one representative case per place where it connects** to another
+component — `test/expressionresolver/wiring.Test.js` — so that a broken connection turns something
+red.
 
 **The marker for a case in the wrong place:** you have to teach `TestExecuter` something specific to
-keep it in `test/spec/`, or a case in `test/spec/` needs a real executer to answer. Either way it is
+keep it in the resolver suite, or a resolver case needs a real executer to answer. Either way it is
 an executer's work and belongs with that executer.
 
 ## 2. Files
 
-**In `test/spec/` the file is the section**, named `<section>-<slug>.Test.js` —
-`6.2-names-are-a-snapshot.Test.js`. A section with two halves may have two files with two slugs,
-as 7 has. Not one file per case.
+**The file is the topic**, in every directory: `delimiters`, `escaping`, `lookup`, `snapshot`,
+`default-value`, `data-methods`; in an executer's directory `syntax`, `context`, `context-shape`,
+`write`, `globals`, `cache`, `interface`, and `errors` where the executer guarantees how it fails. A
+topic the component guarantees nothing in has no file. Not one file per case.
 
-**In an executer's directory the file is the topic**: `syntax`, `context`, `context-shape`, `write`,
-`globals`, `cache`, and `errors` where the executer guarantees how it fails. A topic the executer
-guarantees nothing in has no file.
+**The header of a file names the sections of `SPECIFICATION.md` it pins**, which is what leads from a
+case to its rule, and says what it deliberately does not pin. Anything matching `test/**/*Test.js`
+runs; `vitest.config.mjs` needs no change for a new file.
 
-The header of a file says what it covers and what it deliberately does not pin. Anything matching
-`test/**/*Test.js` runs; `vitest.config.mjs` needs no change for a new file.
+## 3. `TestExecuter` evaluates nothing
 
-## 3. In `test/spec/` nothing is evaluated
+A component that hands a statement to an executer — `ExpressionResolver` — is tested against
+`TestExecuter` (`test/TestExecuter.js`), so a case reads the component's own work out of the result
+and nothing about anybody's ability to evaluate:
 
-`TestExecuter` answers the statement it was handed, unchanged. A case therefore reads the resolver's
-own work straight out of the result:
+- **`new TestExecuter()`** answers the statement it was handed, unchanged.
+- **`new TestExecuter(fn)`** answers `fn(aStatement, aContext)` — for the rules about what the
+  resolver does *with* a result: the default value replaces `null` (4.4), a promise is awaited (4.6),
+  a type survives `resolve` (4.3), an error reaches the caller (7). Set the result, do not compute it.
+  For the rules about **which resolver answers**, a file declares
+  `const lookup = () => new TestExecuter((aStatement, aContext) => aContext[aStatement]);` — a
+  lookup, not an evaluation.
+- **What arrived, and how often**, a case records in its own answer function.
 
-```javascript
-const result = await ExpressionResolver.resolveText("a ${ {v: 2}.v } b", {});
-expect(result).toBe("a {v: 2}.v b");   // the text the scanner cut out
-```
-
-Four tools, and nothing else is needed:
-
-- **`useTestExecuter()`** at the top of the file — makes it the default for this file and restores
-  the previous one afterwards. Needed because the static entry points of 4.1 take no executer. It
-  also clears the record and any set answer after every case.
-- **`answerWith(fn)`** inside a case — for the rules about what the resolver does *with* a result:
-  the default value replaces `null` (4.4), a promise is awaited (4.6), a type survives `resolve`
-  (4.3), an error reaches the caller (7). Set the result, do not compute it. It also asks the context
-  a question directly — `aStatement in aContext`, `Object.keys(aContext)` — which is how the walk is
-  pinned for every trap an executer might use.
-- **`answersFromContext()`** at the top of the file — answers `context[statement]`, a lookup rather
-  than an evaluation, for the rules about **which resolver of the chain answers**.
-- **`statements()`** — what was handed over, in order. For what an answer cannot show: that a
-  statement arrived **not at all** (an escaped expression, 3.2) or **how often** (every occurrence on
-  its own, 4.3).
-
-A resolver can also be built with an executer of its own — `new ExpressionResolver({ executer })`
-takes an instance, not only a registered name.
+**One instance per case**, never registered. A resolver takes it as `executer`, on the root of a chain
+— the resolvers below take it from their parent. The static entry points of 4.1 take no executer, so
+a case sets `ExpressionResolver.defaultExecuter` to its instance and the file puts the previous one
+back in one `afterAll`.
 
 ## 4. An executer's suite tests its guarantees
 
@@ -116,8 +115,11 @@ failure then does not say which broke.
 - **A change in behaviour starts with a failing test**, and the failure is read before the source is
   touched: failing for the right reason, not just failing. Where the two states cannot be told apart
   from the outside, write that limitation into the file instead of implying a proof.
-- **`it.fails` stands in `test/spec/` only**, for a rule the resolver does not keep yet, with its
-  `BACKLOG.md` entry named in a comment.
+- **`it.fails` marks a requirement that is wanted and not implemented yet** — a rule of
+  `SPECIFICATION.md` the code does not keep — with its `BACKLOG.md` entry named in a comment. It may
+  stand in any component suite, never under `test/executer/`. A **fixed limit** is no such
+  requirement: it is pinned by an ordinary `it` that checks the limit. **No release carries an
+  `it.fails`.**
 - **The comment says why, not what.** Where a case cannot tell an implementation apart, or was
   carried over, or deliberately does not assert something, the comment says so.
 - **`describe` / `it` / `expect` with `toBe`, `toBeDefined`, `toBeUndefined`.** Keeping that surface

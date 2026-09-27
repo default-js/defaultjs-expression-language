@@ -43,14 +43,15 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | --- | --- | --- | --- |
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 | B-28, B-29 (follow-up decisions) |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
-| 3 | Raise test coverage | largely done | **B-43**, B-44, B-30, B-38 |
+| 3 | Raise test coverage | largely done | B-44, B-30, B-38 |
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
-| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-07, B-25, B-26, B-27, B-40 |
+| 5 | Do not lose performance | standing rule, see `AGENTS.md` | **B-45**, B-07, B-25, B-26, B-27, B-40 |
 
-**Markers, counted 2026-09-26** (`npm test`: 314 passed, 1 expected fail, 315 cases). One `it.fails`
-is left, in `test/spec/`, and it pins B-33, the only entry that still blocks. Nothing else in the
-suite is marked: an executer's suite tests what that executer guarantees, and what it does not do is
-documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
+**Markers, counted 2026-09-27** (`npm test`: 314 passed, 1 expected fail, 315 cases). One `it.fails`
+is left, in `test/expressionresolver/static-entry-points.Test.js`, and it pins B-33, the only entry
+that still blocks. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing else in
+the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
+is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
 ## Overview
 
@@ -90,8 +91,8 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-38 | Rules without a test that pins them | agreed | test | |
 | B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | |
 | B-41 | The default executer logs its generated code on every cache miss | decision | defect | |
-| B-43 | Take the spec tests apart as well — test each component on its own | agreed, **urgent** — `plans/split-spec-tests.md` | test | |
 | B-44 | Review the component suites for necessity | agreed | test | |
+| B-45 | `resolveText` walks a text twice — scan and replace in one pass | agreed, **high priority, next** | refactor | |
 
 ---
 
@@ -101,7 +102,44 @@ B-33 — the entry stands in its own section below.
 
 ## Resolver
 
-### B-03 · A `parent` that is not an `ExpressionResolver` is silently dropped
+### B-45 · `resolveText` walks a text twice — scan and replace in one pass
+
+- **Status:** agreed 2026-09-27 — **high priority, next**, Frank's call
+- **Kind:** refactor · **Spec:** 3.1, 3.2, 4.3, 7
+- **Records:** `CHANGELOG.md` if the shape of `src/ExpressionScanner.js` changes, `DECISIONS.md`
+
+`resolveText` runs two loops over one text: `scan` in `src/ExpressionScanner.js` collects every
+occurrence into an array of objects, then `resolveText` walks that array and builds the text. The
+array and one object per occurrence exist only to be read once. The goal is less memory and less
+time: `scan` is handed a function that resolves one occurrence and answers the processed text
+directly, in one pass.
+
+To settle before implementing, each changes the work:
+
+- **Asynchrony.** Resolving an occurrence is async, so the pass awaits the function. The occurrences
+  stay resolved one after the other and in order — 4.3 evaluates every occurrence on its own, and a
+  side effect has to mean what it says.
+- **Who keeps which rule.** Today the scanner decides escaped or not and where an expression ends;
+  the resolver consumes the escaping backslash (3.2), leaves a text without an expression standing
+  (3.1), and leaves a failed expression standing as written (7). Which of those move into the pass
+  and which stay with the function it is handed — the scanner should still know nothing about
+  executers, scopes or default values.
+- **The scanner suite.** The `scan` cases of `test/expressionscanner/` (22 of 29) read the
+  occurrences `scan` answers today and get rewritten against the new signature — through the
+  function handed in, which sees each occurrence.
+- **Measuring.** Time against `ResolveText`, over at least two runs; a difference counts only where
+  both runs agree on its direction and it exceeds the spread between them. **Memory has no
+  measurement yet**; how the saving is shown has to be agreed before the change, or it stays an
+  assumption. The baseline, taken 2026-09-27 right after the scanner moved into its own module, hz,
+  executers in the order with-scoped / context-object / context-deconstruction / esprima:
+
+  | Benchmark | Run 1 | Run 2 |
+  | --- | --- | --- |
+  | text, 20 distinct expressions | 37,520 / 44,415 / 15,807 / 41,466 | 35,667 / 43,025 / 15,394 / 43,574 |
+  | text, one expression 20 times | 36,230 / 48,358 / 17,224 / 48,468 | 34,396 / 28,697 / 14,953 / 46,289 |
+  | text, no expression at all | 4,106,786 / 4,173,409 / 4,153,674 / 4,133,077 | 4,270,976 / 4,174,348 / 4,068,190 / 4,274,756 |
+  | text, expressions carrying literals | 29,474 / 46,142 / 15,578 / 45,011 | 41,204 / 44,794 / 16,463 / 44,218 |
+ A `parent` that is not an `ExpressionResolver` is silently dropped
 
 - **Status:** decision
 - **Kind:** defect · **Spec:** 4.2
@@ -122,7 +160,7 @@ module-level `resolve` defaults `aExecuter` to `DEFAULT_EXECUTER`. Checking the 
 
 - **Status:** decision
 - **Kind:** gap · **Spec:** none — the specification says nothing about what a context may be
-- **Pinned by:** `test/spec/6.1-what-a-context-answers.Test.js`, asserting only *that* it throws
+- **Pinned by:** `test/resolvercontexthandle/context-shape.Test.js`, asserting only *that* it throws
 
 `ResolverContextHandle` keeps whatever it is handed except a falsy value (`data || {}`), so
 `context: "abc"`, `42` or `true` reaches `Reflect.ownKeys` on a primitive and throws
@@ -275,7 +313,7 @@ statement text alone — entries compiled under the old identifier would answer 
 
 - **Status:** decision
 - **Kind:** tooling · **Spec:** 8
-- **Pinned by:** `test/spec/8-the-public-surface.Test.js` (the deep import of `Executer`)
+- **Pinned by:** `test/package/surface.Test.js` (the deep import of `Executer`)
 - **Records:** `DECISIONS.md`, `CHANGELOG.md`
 
 `defaultjs-common-utils` already went this way, so the two packages diverge. Reaching a non-default
@@ -348,7 +386,7 @@ published file.
 - **Status:** agreed — the rule of 4.1 decides it
 - **Kind:** defect · **Spec:** 4.1 · **Blocks 3.0.0:** yes
 - **Pinned by:** `decides the call form by the first argument alone, even where another argument
-  follows` (`test/spec/4.1-…`)
+  follows` (`test/expressionresolver/static-entry-points.Test.js`)
 - **Records:** `CHANGELOG.md`
 
 4.1 decides the call form *by the first argument alone*. Both static entry points take the
@@ -456,8 +494,8 @@ they do; `registrate` is not an English word and is public; `getExecuterType` is
 - **Kind:** docs
 
 Decided 2026-08-30: one member of a chain is a **resolver**, and `SPECIFICATION.md` no longer uses
-*link*. Counted 2026-09-26 (`\blinks?\b`, case-insensitive, occurrences): `test/` 50, most of them test
-names and comments of `test/spec/` and the benchmarks; `DECISIONS.md` 36; `CHANGELOG.md` 9, entries
+*link*. Counted 2026-09-26 (`\blinks?\b`, case-insensitive, occurrences; `test/` recounted 2026-09-27):
+`test/` 44, in `test/expressionresolver/` (`chain-inspection`, `data-methods`) and the benchmarks; `DECISIONS.md` 36; `CHANGELOG.md` 9, entries
 under `[Unreleased]` among them, which a reader meets without a definition; `src/` 2 comments;
 `AGENTS.md` 2. The suites written on 2026-09-26 say *resolver* throughout.
 
@@ -511,7 +549,7 @@ runner.
 All bench files stay far below the 5000 entries of the cache, so `#trim()` never runs and the switch
 from write-time to use-time eviction (2026-08-21) is invisible to `npm run bench`. A bench that fills
 past `size` and then measures the hit rate on a hot subset would show it and give the eviction order
-a regression guard beyond `test/general/CodeCacheTest.js`.
+a regression guard beyond `test/codecache/caching.Test.js`.
 
 ### B-27 · `WarmResolve` and `ColdResolve` can report a mean two to four times too high at depth 10, and the cause is the chain they hold live
 
@@ -542,6 +580,9 @@ turns the gate red if that changes:
    write through it is an ordinary global write.
 5. 3.1 — the two limits: a brace inside a comment counts, a regular expression literal after `)` is
    read as division.
+6. 8 — `setDebug` of `ContextDeconstructorExecuter.js`. Section 8 makes `setDebug` surface wherever
+   a module exports it; only the one of `EsprimaExecuter.js` is pinned, in
+   `test/executer/esprima/interface.Test.js`. Found 2026-09-27.
 
 ## Tooling
 
@@ -569,23 +610,12 @@ for is done.
 
 ## Tests
 
-### B-43 · Take the spec tests apart as well — test each component on its own
-
-- **Status:** agreed 2026-09-26 — **urgent**, Frank's call; scope settled, running as
-  `plans/split-spec-tests.md`
-- **Kind:** test
-- **Records:** `TESTING.md`, `AGENTS.md`, `DECISIONS.md`, `CHANGELOG.md` (the scanner module)
-
-The same move the executer suites made on 2026-09-26 (`DECISIONS.md`), now for `test/spec/`: 26
-files, 224 cases, every one of them through `ExpressionResolver`. The plan carries the decisions and
-the stages; this entry is deleted when the plan is.
-
 ### B-44 · Review the component suites for necessity
 
-- **Status:** agreed 2026-09-26 — after B-43
+- **Status:** agreed 2026-09-26 — B-43 is done since 2026-09-27
 - **Kind:** test
 
-B-43 moves the cases of `test/spec/` into one suite per component and deliberately thins nothing.
+B-43 moved the cases of `test/spec/` into one suite per component and deliberately thinned nothing.
 Afterwards each suite gets the review the executer suites had: a case stays where a change to that
 component's own code could break it. Every case dropped is named with its reason, and coverage is
 checked against B-30 afterwards.
@@ -595,8 +625,9 @@ checked against B-30 afterwards.
 - **Status:** investigate — none of it is a missing test for a rule
 - **Kind:** test
 
-Measured 2026-09-26 with `npm run test:coverage`, 315 cases: statements **93.03 %** (534/574),
-branches **90.78 %** (266/293), functions **91.89 %** (102/111), lines **95.95 %** (474/494). Update
+Measured 2026-09-27 with `npm run test:coverage`, 315 cases: statements **93.04 %** (535/575),
+branches **90.78 %** (266/293), functions **91.96 %** (103/112), lines **95.95 %** (475/495) — the
+counts moved with the new `src/ExpressionScanner.js`, not with any case. Update
 these numbers when the picture changes rather than adding another baseline. Uncovered lines:
 
 1. `src/Utils.js`, all of it — B-17.

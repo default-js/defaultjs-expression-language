@@ -1,28 +1,36 @@
 import { describe, it, expect } from "vitest";
-import getExecuter from "../../src/ExecuterRegistry.js";
-import * as WithScopedModule from "../../src/executer/WithScopedExecuter.js";
-import * as ContextObjectModule from "../../src/executer/ContextObjectExecuter.js";
-import * as ContextDeconstructorModule from "../../src/executer/ContextDeconstructorExecuter.js";
-import * as EsprimaModule from "../../src/executer/EsprimaExecuter.js";
+import Executer from "../../src/Executer.js";
 
 /**
- * The one thing every executer shares: the interface (SPECIFICATION.md 9.1, 9.2).
+ * The executer interface: the class `Executer` every implementation builds on (SPECIFICATION.md
+ * 9.1).
  *
- * Nothing else is asked of all four. Every executer is a solution of its own, and what it can do is
- * tested in its own directory beside this file, against its own guarantees. What its module exports
- * is part of the public surface and pinned in `test/spec/8-the-public-surface.Test.js`, that it is an
- * `Executer` among it; what is left here is that importing the module registers the executer it
- * exports, under the name it exports.
+ * Whether an implementation keeps the interface - its module registers it on import, exports it and
+ * its name - is asked in that implementation's own directory beside this file, never in a list of
+ * all of them: a new executer brings the question along with its own suite.
  */
 
-const MODULES = [WithScopedModule, ContextObjectModule, ContextDeconstructorModule, EsprimaModule];
+describe("The executer interface - Executer", () => {
 
-for (const module of MODULES) {
-
-	describe(`The executer interface [${module.EXECUTERNAME}]`, () => {
-
-		it("registers the executer it exports under its name on import", async () => {
-			expect(getExecuter(module.EXECUTERNAME) === module.default).toBe(true);
-		});
+	// a resolver without a context has none (4.2), so an executer has no context to offer
+	it("carries no default context", async () => {
+		const executer = new Executer({ execution: () => null });
+		expect("defaultContext" in executer).toBe(false);
 	});
-}
+
+	it("runs the execution it was built with", async () => {
+		const executer = new Executer({ execution: (aStatement, aContext) => `${aStatement}|${aContext.marker}` });
+		expect(executer.execute("statement", { marker: "context" })).toBe("statement|context");
+	});
+
+	it("throws when an executer without an execution is asked to execute", async () => {
+		const executer = new Executer();
+		let error = null;
+		try {
+			executer.execute("statement", {});
+		} catch (e) {
+			error = e;
+		}
+		expect(error != null).toBe(true);
+	});
+});

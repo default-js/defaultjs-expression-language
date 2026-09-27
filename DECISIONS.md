@@ -19,17 +19,73 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-27 — Is the suite laid out by section of the specification, or by component?
+
+**Decision:** **By component.** Each component is tested on its own under `test/<component>/`,
+named with the full component name in lower case — `expressionscanner`, `resolvercontexthandle`,
+`expressionresolver`, `executerregistry`, `codecache` — and called with what it is handed in use.
+Inside, one file per topic; the header of a file names the sections of `SPECIFICATION.md` it pins.
+`test/package/surface.Test.js` is the list of public members, `test/executer/interface.Test.js` the
+class `Executer`. In detail:
+
+- **The scanner is a module of its own**, `src/ExpressionScanner.js` — `scan` for a text,
+  `parseExpression` for the single expression of `resolve`. Internal: `index.js` does not export it.
+- **`TestExecuter` is an instance per case** — `new TestExecuter()` answers the statement,
+  `new TestExecuter(fn)` what `fn` answers. No shared state, no registration, no helper beside it; a
+  case about a static entry point sets `ExpressionResolver.defaultExecuter` itself.
+- **A rule is tested where it lives, once.** The chain walk is asked of `ResolverContextHandle`
+  directly; the resolver suite keeps one representative case per place where it connects to another
+  component (`test/expressionresolver/wiring.Test.js`).
+- **Whether an executer keeps the interface is asked in its own suite**, in
+  `test/executer/<executer>/interface.Test.js`. No test lists or loops over the executers.
+- **`it.fails` marks a requirement that is wanted and not implemented yet**, in any component suite
+  and never in an executer's. A fixed limit is pinned by an ordinary `it` that checks the limit. **No
+  release carries an `it.fails`.**
+
+**Reasoning:** Frank's, on 2026-09-26 and 2026-09-27 (B-43) — the move the executer suites made the day
+before, carried through the rest of the package. Every case of `test/spec/` went through
+`ExpressionResolver`, so a case about where an expression ends also tested the resolver, and a case
+about the chain walk also tested the proxy through a resolver built around it; a failure did not say
+which component broke. The scanner was the one component that could not be called on its own — it
+was private to `ExpressionResolver.js` — so it moved into a module of its own rather than becoming an
+export of the resolver.
+
+The shared `TestExecuter` carried a record and an answer across a whole file and needed a reset after
+every case; an instance per case cannot leak into the next one. A first version with a helper for the
+default executer beside the class was simplified at Frank's request: the class alone answers every
+case, and the helper hid two lines each case can write.
+
+The interface loop was Frank's catch after the move: a new executer would have had to be entered into
+a list in somebody else's file, and a forgotten entry turns nothing red. In its own suite, the
+question comes along with the directory.
+
+The tie between a case and its rule, which Frank kept on 2026-09-05, survives in the file headers
+rather than in the file names.
+
+**Alternatives:** Keeping `test/spec/` one file per section — rejected, it tests components together.
+One file per component with the section in the describe — rejected for files per topic, as the
+executer suites have. Exporting the scanner from `ExpressionResolver.js` — rejected, `src/` is
+published as-is and it would have become API. `vi.fn` as the executer — rejected, it widens the
+assertion surface `TESTING.md` keeps narrow, and an answer function does the same. Thinning the
+cases in the same move — deferred to B-44, so that the move can be counted.
+
+**Consequences:** Measured on the move: 315 cases before and after, coverage identical in every
+file; the scanner adds two lines and one function (`parseExpression`) and costs nothing measurable in
+`npm run bench`. A rule that spans components has cases in more than one suite, and only the headers
+lead from `SPECIFICATION.md` to them. `src/ExpressionScanner.js` is a published file (`CHANGELOG.md`)
+whose shape nothing promises. The `scan` suite reads the occurrences `scan` answers today; B-45
+changes that signature.
+
 ## 2026-09-26 — Is an executer measured against a shared catalogue, or tested as a solution of its own?
 
 **Decision:** **As a solution of its own.** Each executer has its own suite under
 `test/executer/<executer>/`, and it tests only what that executer guarantees. A case hands the
 executer what it is handed in use and nothing else — `execute(aStatement, aContext)`, a bare
 statement and a plain data context — and builds no `ExpressionResolver`. The four share the
-interface and nothing else: `test/executer/interface.Test.js` asks each whether importing its module
-registers it, and nothing else in the suite loops over them. What an executer does not do is
-documented with it in `README.md`, not pinned by a test. The chain walk and every other rule of the
-resolver are tested in `test/spec/` without a real executer — against `TestExecuter`, or against the
-context the resolver hands over. `SPECIFICATION.md` part B keeps the interface, the list of
+interface and nothing else, and whether one keeps it is asked in its own suite (2026-09-27). What an
+executer does not do is documented with it in `README.md`, not pinned by a test. The chain walk and
+every other rule of the resolver are tested without a real executer, in the suite of the component
+that keeps them (2026-09-27). `SPECIFICATION.md` part B keeps the interface, the list of
 implementations and their tuning; the capability sections and their counts are gone.
 
 **Reasoning:** Frank's, on 2026-09-26 (B-39). The capability catalogue compared four implementations
@@ -59,8 +115,8 @@ nothing red — the guard a `no` cell gave is given up deliberately, and `README
 change has to be written. A `yes` that held only by accident became no guarantee: a write the esprima
 executer cannot run was "contained", a write the deconstructor never carries back left a frozen key
 "unchanged" — those were dropped rather than promised. Case bodies repeat across the four suites on
-purpose, each in its own dialect; sharing a body would be sharing a feature set. `it.fails` has one
-meaning left: in `test/spec/`, a rule the resolver does not keep yet. The benchmarks keep a list of
+purpose, each in its own dialect; sharing a body would be sharing a feature set. `it.fails` stays out
+of an executer's suite. The benchmarks keep a list of
 the four executers (`test/PerformanceTests/Executers.js`), because comparing them is what a benchmark
 is for.
 
@@ -267,7 +323,7 @@ Two things follow, and the second is the price of the first:
   cannot be released. That is a stronger commitment than the document made before, when it described
   the work in progress and said which parts were missing.
 - **The gap between document and code lives in two places only**: `BACKLOG.md`, which says what is
-  left, and the `it.fails` markers in `test/spec/`, which pin each missing rule and turn the gate red
+  left, and the `it.fails` markers in the component suites, which pin each missing rule and turn the gate red
   the day it arrives.
 
 **Reasoning:** Frank's, on 2026-09-05. The document had become four documents in one — a
@@ -278,7 +334,7 @@ three.
 
 Writing it as though everything exists is the same argument from the other end: a specification that
 describes its own incompleteness is a status report, and status is what `BACKLOG.md` is for. The
-markers in `test/spec/` already carry that meaning per case, so nothing is lost by removing the prose
+`it.fails` markers already carry that meaning per case, so nothing is lost by removing the prose
 version of it — and the loss would be real if the two ever disagreed.
 
 **Alternatives:** Keeping the *Not yet implemented* markers so a consumer cannot read about something
@@ -315,7 +371,7 @@ Three consequences inside part A, all of them Frank's findings:
   through.
 - **6.6 gains a statement the document never made**: the three data methods write into the object the
   caller handed over. Read off the code and then measured — `updateData` and `deleteData` through the
-  context, `mergeContext` through `Object.assign` on it — and pinned by three cases in `test/spec/`.
+  context, `mergeContext` through `Object.assign` on it — and pinned in `test/resolvercontexthandle/write.Test.js`.
 
 **Reasoning:** Section 6 mixed the two axes: rules of the resolver and what one executer happens to do
 stood in one run of sections, and a reader could not tell which was which. A reader picking an
@@ -369,11 +425,11 @@ and 6.7 says the same about `buildSecure`.
 
 ## 2026-09-01 — What does the suite prove when a case answers a value?
 
-**Decision:** In `test/spec/` nothing is evaluated. `TestExecuter` answers the **statement it was
-handed**, so a case reads the resolver's own work out of the result and nothing else. Where a rule
-is about what the resolver does *with* a result, the result is set — `answerWith(fn)` for one case,
-`answersFromContext()` for a file that needs the value a context carries. What needs a statement to
-be *evaluated* is an executer's work and is tested with that executer.
+**Decision:** The suite of a component that hands statements to an executer evaluates nothing.
+`TestExecuter` answers the **statement it was handed**, so a case reads the resolver's own work out of
+the result and nothing else. Where a rule is about what the resolver does *with* a result, the result
+is set — `new TestExecuter(fn)` for the case, since 2026-09-27 one instance per case. What needs a
+statement to be *evaluated* is an executer's work and is tested with that executer.
 
 **Reasoning:** Frank's, on reading the result: a case must not test two things at once. The first
 case of 3.1 said both *the expression was delimited correctly* and *the statement was evaluated
@@ -391,12 +447,12 @@ executer's work.
 An evaluating `TestExecuter` had a second cost: a case could rely on it without anybody noticing,
 because it behaved like a real implementation. Section 7 wrote statements that *happened* to fail
 under the default executer, so a changed default could have taken the failure away and left the cases
-green for nothing. They throw through `answerWith` and assert what the resolver does with an error,
+green for nothing. They throw through the `TestExecuter` and assert what the resolver does with an error,
 which is what section 7 is about.
 
 **Alternatives:** Keeping the evaluation and living with the double meaning — it hid a broken scanner
 behind a working executer and the other way round. Teaching the `TestExecuter` just enough for
-`test/spec/` — rejected, since "just enough" grows with every case that finds it convenient, which is
+the resolver suite — rejected, since "just enough" grows with every case that finds it convenient, which is
 how an evaluating one comes about.
 
 **Consequences:** A case that needs a value sets it rather than finding a statement that produces it.
@@ -472,7 +528,7 @@ holding the default back for it would mean holding it back indefinitely.
 
 **Consequences:** A write from inside an expression stops persisting for everyone who did not pick
 an executer — conformant per 6.5, silent, and the reason the entry in `CHANGELOG.md` carries a
-migration note rather than a line. The suite pins the default by name (`test/spec/9.2-the-implementations.Test.js`), so the next change of default turns
+migration note rather than a line. The suite pins the default by name (`test/expressionresolver/default-executer.Test.js`), so the next change of default turns
 the gate red instead of announcing itself through unrelated failures — which is how this one was
 found. `WithScopedExecuter` is off the default path but stays in `src/executer/index.js` and in the
 bundle; whether it is removed for 3.0.0 is not decided here.
@@ -682,7 +738,7 @@ would have to be maintained against the language.
 wrong: where a regular expression legitimately follows `)` or `]` — `${ (() => { if (a) /x/.test(b)
 })() }` is the shape — the `/` is read as division. Nothing is cut unless that literal also carries
 a brace. The everyday cases are safe in both directions, because division follows a value and a
-literal does not. `test/spec/3.1-delimiters.Test.js` pins both directions, and the division test is there to
+literal does not. `test/expressionscanner/delimiters.Test.js` pins both directions, and the division test is there to
 keep the heuristic honest rather than to prove a fix.
 
 ## 2026-08-24 — How does a test state a rule the code does not keep yet?
@@ -692,8 +748,9 @@ while it fails, and the moment the behaviour becomes correct the test **fails fo
 forces the marker to be removed in the same change that lands the fix. Every such test carries a
 comment naming the `BACKLOG.md` entry it waits for. Before a marker is written down, the test is
 run **once without it** and its failure message is read against what the specification predicts.
-This is how `test/spec/` was built between 2026-08-22 and 2026-08-24, and it is how any later test
-for an agreed but unimplemented rule is written.
+This is how the conformance suite was built between 2026-08-22 and 2026-08-24, and it is how any
+later test for an agreed but unimplemented rule is written. Where such a test may stand, and that no
+release carries one, is the entry of 2026-09-27.
 
 **Reasoning:** Fourteen places where the code and `SPECIFICATION.md` disagree had to be pinned
 before any of them was fixed — several touch the same three files and some interact, so fixing
