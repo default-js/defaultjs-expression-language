@@ -8,6 +8,26 @@ import { ExpressionResolver } from "../../index.js";
  * contextChain describe a state that changes over a resolver's lifetime, chain is structural.
  */
 
+// 5.5 sets no depth limit. chain and effectiveChain used to recurse once per link and overflowed
+// the stack somewhere between 10,000 and 100,000 links.
+const DEEP = 100000;
+
+// a chain of the given depth, "/root/r1/…", every link handed a context; answers its leaf
+const deepChain = (aDepth) => {
+	let resolver = new ExpressionResolver({ name: "root", context: {} });
+	for (let i = 1; i < aDepth; i++) resolver = new ExpressionResolver({ name: `r${i}`, context: {}, parent: resolver });
+
+	return resolver;
+};
+
+// the path deepChain builds
+const deepPath = (aDepth) => {
+	let path = "/root";
+	for (let i = 1; i < aDepth; i++) path += `/r${i}`;
+
+	return path;
+};
+
 describe("ExpressionResolver - inspecting the chain", () => {
 
 	it("chain names every link from the root down", async () => {
@@ -88,5 +108,13 @@ describe("ExpressionResolver - inspecting the chain", () => {
 		const root = new ExpressionResolver({ context: null, name: "root" });
 		const leaf = new ExpressionResolver({ context: null, name: "leaf", parent: root });
 		expect(leaf.contextChain.length).toBe(0);
+	});
+
+	it("chain names every link however deep the chain is", async () => {
+		expect(deepChain(DEEP).chain).toBe(deepPath(DEEP));
+	});
+
+	it("effectiveChain names every link providing a context however deep the chain is", async () => {
+		expect(deepChain(DEEP).effectiveChain).toBe(deepPath(DEEP));
 	});
 });

@@ -19,6 +19,98 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-27 — Does a function in `ExpressionResolver.js` that never awaits drop `async`?
+
+**Decision:** No, not for that reason alone. The static `resolve` and `resolveText` keep `async`.
+What mattered was a different shape: an `async` function that **returns a call to itself** without
+awaiting it. The scope walk of the module-level `resolve` was one and is a loop since this day.
+
+**Reasoning:** Measured on Frank's question, with `TestExecuter`, `time: 2000`, two runs, the second
+in reversed order. The static entry points only hand on a promise. Taking `async` off them needs a
+`try`/`Promise.reject` around the body, because 4.1 promises a *rejection* for a first argument of
+the wrong type and a thrown `TypeError` would escape synchronously - and it changed nothing beyond
+the spread: `resolve` +1.5 / +2.4 %, `resolveText` +5.1 / -2.9 %. One promise more or less per call
+is lost in the work of a resolution. The recursive scope walk was the opposite case: one `async`
+frame, one promise and the adoption of a returned promise **per resolver climbed**, and the calls
+nested synchronously until the named resolver was reached. Against `HEAD`, hz, run 1 / run 2:
+
+| Case | depth 1 | depth 10 | depth 100 | depth 1,000 |
+| --- | --- | --- | --- | --- |
+| prefix found at the root | -7.1 / +2.4 % | +31.5 / +33.5 % | +307 / +300 % | +830 / +838 % |
+| prefix nobody carries | +0.2 / +0.1 % | +104 / +97 % | +819 / +806 % | +992 / +1,004 % |
+| no prefix | +0.2 / +0.5 % | +1.8 / -2.3 % | -1.5 / -2.0 % | -1.0 / +0.1 % |
+
+And it overflowed the stack between 1,000 and 10,000 resolvers, which broke 5.3 - two cases in
+`test/expressionresolver/scope.Test.js` pin that at 100,000.
+
+**Alternatives:** Dropping `async` wherever there is no `await`, as a rule - rejected on the numbers
+above, and because `async` is what turns a `throw` into the rejection the specification promises.
+
+**Consequences:** Where a walk along the chain is written, it is a loop, not a recursion - neither
+a synchronous one nor an `async` one. The getters `chain` and `effectiveChain` recursed
+synchronously and overflowed between 10,000 and 100,000 resolvers; they are loops since the same
+day, pinned in `test/expressionresolver/chain-inspection.Test.js`. No benchmark exercises a scope prefix; the numbers above come from a
+probe that was not kept.
+
+## 2026-09-27 — Does `resolveText` scan and replace in one pass?
+
+**Decision:** Not for now. `scan` keeps answering an array of occurrences and `resolveText` keeps
+walking it; the one-pass version was implemented, measured and reverted. Frank wants to come back
+to the topic, so B-45 stays open with the questions this left.
+
+**Reasoning:** The one pass was meant to save the array and one object per occurrence, in memory
+and in time. Memory was agreed beforehand to stay an assumption read off the code; the acceptance
+rule was that the change stays where no case gets slower. It got slower in every shape tried.
+
+What was agreed for the callback shape, and holds for any later attempt: the pass keeps 3.1 (a text
+without an expression is answered unchanged) and 3.2 in full (the escaping backslash is consumed,
+the delimiter stands, the resolver never sees it); the resolver keeps evaluation, default value,
+the cast to text and 7, for which the scanner hands over the expression as written. The scanner
+knows nothing about errors, executers or default values.
+
+All measured in one batch against the source of `HEAD` copied beside it, two runs, differences
+counted only where both runs agree on the direction and exceed the spread between them:
+
+- **Callback — `replace(aText, aReplace)` answering `Promise<string>`**, under the four real
+  executers, 20 expressions in about 1.5 KB. Fully `async`, `plain` (no expression) was 10-25 %
+  slower in every run — the promise of the `async` function. A synchronous `indexOf` return brought
+  `plain` back to parity, and the texts carrying expressions stayed 0-8 % slower, `distinct` in 8 of
+  8 per run over five runs. Order was checked by running the new version first: no bias.
+- **Decomposed with `TestExecuter`**, which evaluates nothing, so the resolver's own share is
+  measured (±1.4 %): the two passes calling each occurrence through the same callback cost 0-4 %,
+  the one pass with it 4-7 %, `return await` changed nothing, and leaving out the substring of the
+  written expression changed nothing. The cost is the asynchronous callback — a promise and a frame
+  per occurrence — not the array.
+- **Cursor** — one reused object per text, `next()` moving it to the following occurrence and filling
+  `before` (escaping backslash consumed), `scope`, `statement`, `expression`; the loop and its `await`
+  stay in `resolveText`. Nothing is allocated per occurrence.
+- **Over longer texts**, `TestExecuter`, hz, run 1 / run 2, then the resolver once more in reversed
+  order:
+
+  | Expressions / chars | Scanner alone: two passes · callback · cursor | `resolveText`: two passes · callback · cursor | reversed order |
+  | --- | --- | --- | --- |
+  | 20 / 1,510 | 504k / 499k · 368k / 373k · 509k / 495k | 54.8k / 52.3k · 53.2k / 51.8k · 52.7k / 52.1k | 55.5k / 56.4k · 52.4k / 50.5k · 53.9k / 52.2k |
+  | 200 / 15,290 | 54.6k / 53.8k · 42.1k / 40.8k · 54.5k / 54.4k | 5,744 / 5,512 · 5,207 / 5,175 · 5,265 / 5,389 | 5,599 / 5,415 · 5,397 / 4,971 · 5,252 / 5,162 |
+  | 2,000 / 154,890 | 5,196 / 5,301 · 4,032 / 4,063 · 5,384 / 5,350 | 570 / 563 · 507 / 526 · 522 / 534 | 580 / 553 · 540 / 514 · 563 / 519 |
+
+  Scanning scales linearly in every shape. On its own the cursor equals the array and the callback
+  costs 23-27 %. At `resolveText` the two passes are fastest in every run at every size, the cursor
+  trailing by 2-8 % and the callback by 2-11 %. Scanning is about a tenth of `resolveText`: 0.19 ms of
+  1.8 ms at 2,000 expressions.
+
+**Alternatives:** Keeping the callback and accepting 4-7 % on the resolver's share — rejected by the
+acceptance rule. Keeping the cursor, which saves the allocation and is on par in the small case —
+rejected for now because it trails at 200 and 2,000 expressions and nobody knows why yet. Letting the
+scanner catch a failing callback and leave the expression standing, which would save a promise per
+occurrence — rejected before measuring: it makes the scanner carry 7 on the resolver's behalf
+(2026-08-30).
+
+**Consequences:** A later attempt starts from the open questions in B-45, above all why a scan
+interleaved with the awaits costs more than the same scan run up front. Whatever it tries is measured
+at `resolveText` and over long texts, not at the scanner alone: the scanner in isolation was the one
+place where the cursor looked like a win. The larger lever is probably not the scanner at all but the
+work per statement.
+
 ## 2026-09-27 — Is the suite laid out by section of the specification, or by component?
 
 **Decision:** **By component.** Each component is tested on its own under `test/<component>/`,

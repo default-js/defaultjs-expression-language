@@ -255,6 +255,19 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **A scope prefix failed on a deep chain, and slowed down with every resolver it climbed.** The
+  walk to the resolver a prefix names recursed once per resolver passed, so somewhere between 1,000
+  and 10,000 resolvers `resolve("${name::…}")` rejected with `RangeError: Maximum call stack size
+  exceeded`, and `resolveText` left the expression standing as though its statement had failed. The
+  same happened for a prefix no resolver carries, which climbs to the root before it answers
+  `undefined`. The walk is a loop now: no depth limit, and at depth 10 a prefixed expression resolves
+  about a third faster, at depth 1,000 about nine times as fast. Resolution without a prefix is
+  unchanged.
+
+- **`chain` and `effectiveChain` failed on a deep chain.** Both built their path by recursing into
+  the parent, and somewhere between 10,000 and 100,000 resolvers raised `RangeError: Maximum call
+  stack size exceeded`. They walk the chain in a loop now, as `contextChain` already did.
+
 - **A frozen context object broke every operation that enumerates a context.** `Object.keys`, a
   spread, `JSON.stringify` and `Object.getOwnPropertyNames` over a context raised
   `TypeError: 'ownKeys' on proxy: trap returned extra keys but proxy target is non-extensible`

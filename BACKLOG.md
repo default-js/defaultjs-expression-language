@@ -45,9 +45,9 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-44, B-30, B-38 |
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
-| 5 | Do not lose performance | standing rule, see `AGENTS.md` | **B-45**, B-07, B-25, B-26, B-27, B-40 |
+| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-45, B-07, B-25, B-26, B-27, B-40 |
 
-**Markers, counted 2026-09-27** (`npm test`: 314 passed, 1 expected fail, 315 cases). One `it.fails`
+**Markers, counted 2026-09-27** (`npm test`: 318 passed, 1 expected fail, 319 cases). One `it.fails`
 is left, in `test/expressionresolver/static-entry-points.Test.js`, and it pins B-33, the only entry
 that still blocks. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing else in
 the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
@@ -92,7 +92,7 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | |
 | B-41 | The default executer logs its generated code on every cache miss | decision | defect | |
 | B-44 | Review the component suites for necessity | agreed | test | |
-| B-45 | `resolveText` walks a text twice — scan and replace in one pass | agreed, **high priority, next** | refactor | |
+| B-45 | `resolveText` walks a text twice — scan and replace in one pass | investigate | refactor | |
 
 ---
 
@@ -104,42 +104,34 @@ B-33 — the entry stands in its own section below.
 
 ### B-45 · `resolveText` walks a text twice — scan and replace in one pass
 
-- **Status:** agreed 2026-09-27 — **high priority, next**, Frank's call
+- **Status:** investigate — implemented, measured and reverted 2026-09-27; Frank wants to come back
+  to it
 - **Kind:** refactor · **Spec:** 3.1, 3.2, 4.3, 7
-- **Records:** `CHANGELOG.md` if the shape of `src/ExpressionScanner.js` changes, `DECISIONS.md`
+- **Records:** `DECISIONS.md` (2026-09-27, "Does `resolveText` scan and replace in one pass?"),
+  `CHANGELOG.md` if the shape of `src/ExpressionScanner.js` changes
 
-`resolveText` runs two loops over one text: `scan` in `src/ExpressionScanner.js` collects every
-occurrence into an array of objects, then `resolveText` walks that array and builds the text. The
-array and one object per occurrence exist only to be read once. The goal is less memory and less
-time: `scan` is handed a function that resolves one occurrence and answers the processed text
-directly, in one pass.
+`resolveText` runs two loops over one text: `scan` collects every occurrence into an array of
+objects, then `resolveText` walks that array and builds the text. The idea was to save the array
+and the objects by doing both in one pass. Two shapes were built and measured — a callback handed to
+the scanner and a cursor — and neither is faster than the two passes at `resolveText`; the numbers,
+the variants and the division of rules that was agreed for them are in `DECISIONS.md`.
 
-To settle before implementing, each changes the work:
+Open when the topic comes back:
 
-- **Asynchrony.** Resolving an occurrence is async, so the pass awaits the function. The occurrences
-  stay resolved one after the other and in order — 4.3 evaluates every occurrence on its own, and a
-  side effect has to mean what it says.
-- **Who keeps which rule.** Today the scanner decides escaped or not and where an expression ends;
-  the resolver consumes the escaping backslash (3.2), leaves a text without an expression standing
-  (3.1), and leaves a failed expression standing as written (7). Which of those move into the pass
-  and which stay with the function it is handed — the scanner should still know nothing about
-  executers, scopes or default values.
-- **The scanner suite.** The `scan` cases of `test/expressionscanner/` (22 of 29) read the
-  occurrences `scan` answers today and get rewritten against the new signature — through the
-  function handed in, which sees each occurrence.
-- **Measuring.** Time against `ResolveText`, over at least two runs; a difference counts only where
-  both runs agree on its direction and it exceeds the spread between them. **Memory has no
-  measurement yet**; how the saving is shown has to be agreed before the change, or it stays an
-  assumption. The baseline, taken 2026-09-27 right after the scanner moved into its own module, hz,
-  executers in the order with-scoped / context-object / context-deconstruction / esprima:
+- **Why the cursor loses at the resolver** (2-8 %) although it equals the array when scanning
+  alone. Not established; the one difference is that scanning runs interleaved with the awaits
+  instead of in one tight loop up front.
+- **Where the time goes.** Scanning is about a tenth of `resolveText` (0.19 ms of 1.8 ms at 2,000
+  expressions); the rest is the work per statement. Unmeasured candidate: the `setTimeout` /
+  `clearTimeout` pair `execute` sets up for the long-running warning on every statement.
+- **Memory** was agreed to stay an assumption; nothing measured it.
 
-  | Benchmark | Run 1 | Run 2 |
-  | --- | --- | --- |
-  | text, 20 distinct expressions | 37,520 / 44,415 / 15,807 / 41,466 | 35,667 / 43,025 / 15,394 / 43,574 |
-  | text, one expression 20 times | 36,230 / 48,358 / 17,224 / 48,468 | 34,396 / 28,697 / 14,953 / 46,289 |
-  | text, no expression at all | 4,106,786 / 4,173,409 / 4,153,674 / 4,133,077 | 4,270,976 / 4,174,348 / 4,068,190 / 4,274,756 |
-  | text, expressions carrying literals | 29,474 / 46,142 / 15,578 / 45,011 | 41,204 / 44,794 / 16,463 / 44,218 |
- A `parent` that is not an `ExpressionResolver` is silently dropped
+The probes are not kept. To rebuild them: copy the source under test with `git show` into a
+directory under `test/PerformanceTests/` (Vite serves nothing outside the repository), rewrite its
+relative imports, and compare against `index.js` in one bench file with `TestExecuter` in place of a
+real executer — with a real one its cost hides the resolver's share.
+
+### B-03 · A `parent` that is not an `ExpressionResolver` is silently dropped
 
 - **Status:** decision
 - **Kind:** defect · **Spec:** 4.2

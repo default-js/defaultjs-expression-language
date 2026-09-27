@@ -66,10 +66,14 @@ const withDefault = (aResult, aDefault) => {
 };
 
 const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpression, aFilter, aDefault) {
-	// a scope no link of the chain carries answers undefined, and the default applies to it like
-	// to any other result - see SPECIFICATION.md 5.4
-	if (aFilter && aResolver.name != aFilter)
-		return aResolver.parent ? resolve(aExecuter, aResolver.parent, aExpression, aFilter, aDefault) : withDefault(undefined, aDefault);
+	// 5.3: climbs in a loop rather than by recursion - one call per resolver climbed cost a promise
+	// each and overflowed the stack on a deep chain. A scope no link of the chain carries answers
+	// undefined, and the default applies to it like to any other result - see SPECIFICATION.md 5.4
+	if (aFilter)
+		while (aResolver.name != aFilter) {
+			aResolver = aResolver.parent;
+			if (!aResolver) return withDefault(undefined, aDefault);
+		}
 
 	return withDefault(await execute(aExecuter, aExpression, aResolver.context), aDefault);
 };
@@ -167,7 +171,15 @@ export default class ExpressionResolver {
 	 * @returns {string}
 	 */
 	get chain() {
-		return this.parent ? `${this.parent.chain}/${this.name}` : `/${this.name}`;
+		// a loop, not a recursion into the parent: a deep chain overflowed the stack
+		let path = "";
+		let resolver = this;
+		while (resolver) {
+			path = `/${resolver.name}${path}`;
+			resolver = resolver.parent;
+		}
+
+		return path;
 	}
 
 	/**
@@ -180,8 +192,15 @@ export default class ExpressionResolver {
 	 * @returns {string}
 	 */
 	get effectiveChain() {
-		const parentEffectiveChain = this.parent ? this.parent.effectiveChain : "";
-		return this.#contextHandle.providesData ? `${parentEffectiveChain}/${this.name}` : parentEffectiveChain;
+		// a loop, not a recursion into the parent: a deep chain overflowed the stack
+		let path = "";
+		let resolver = this;
+		while (resolver) {
+			if (resolver.contextHandle.providesData) path = `/${resolver.name}${path}`;
+			resolver = resolver.parent;
+		}
+
+		return path;
 	}
 
 	/**

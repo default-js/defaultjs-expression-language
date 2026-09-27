@@ -15,6 +15,18 @@ import TestExecuter from "../TestExecuter.js";
 // answers the value the context carries under the statement - a lookup, not an evaluation
 const lookup = () => new TestExecuter((aStatement, aContext) => aContext[aStatement]);
 
+// 5.3 sets no depth limit. The walk to a named resolver used to recurse once per resolver climbed
+// and overflowed the stack somewhere between 1,000 and 10,000 resolvers; this depth is well past it.
+const DEEP = 100000;
+
+// a chain of the given depth under a root named "root", answering its leaf
+const deepChain = (aDepth) => {
+	let resolver = new ExpressionResolver({ name: "root", context: { value: "from root" }, executer: lookup() });
+	for (let i = 1; i < aDepth; i++) resolver = new ExpressionResolver({ name: `r${i}`, parent: resolver });
+
+	return resolver;
+};
+
 describe("ExpressionResolver - lookup with a prefix", () => {
 
 	it("addresses the resolver carrying the name", async () => {
@@ -61,6 +73,10 @@ describe("ExpressionResolver - lookup with a prefix", () => {
 		const leaf = new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root });
 		expect(await leaf.resolveText("${root::leafOnly}", "fallback")).toBe("fallback");
 	});
+
+	it("climbs to the ancestor the prefix names however deep the chain is", async () => {
+		expect(await deepChain(DEEP).resolve("${root::value}")).toBe("from root");
+	});
 });
 
 // The resolver does not exist, so there is nothing to hand a statement to; the answer is the
@@ -87,5 +103,11 @@ describe("ExpressionResolver - a prefix no resolver carries", () => {
 		const resolver = new ExpressionResolver({ name: "scope", context: { value: "from scope" }, executer: lookup() });
 		const result = await resolver.resolve("${nowhere::value}", "fallback");
 		expect(result).toBe("fallback");
+	});
+
+	// The walk passes every resolver up to the root before it gives up, so a deep chain takes it
+	// further than any prefix that is found.
+	it("answers the default value however deep the chain is", async () => {
+		expect(await deepChain(DEEP).resolve("${nowhere::value}", "fallback")).toBe("fallback");
 	});
 });
