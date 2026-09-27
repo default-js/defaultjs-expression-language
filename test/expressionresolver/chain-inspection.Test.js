@@ -37,27 +37,14 @@ describe("ExpressionResolver - inspecting the chain", () => {
 		expect(leaf.chain).toBe("/root/middle/leaf");
 	});
 
-	it("chain carries the generated name of an unnamed link, never null", async () => {
-		const root = new ExpressionResolver({ context: { value: 1 } });
-		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: root });
-		expect(leaf.chain.includes("null")).toBe(false);
-		expect(leaf.chain.endsWith("/leaf")).toBe(true);
-	});
-
 	// The expectation coincides with what the code answers today, so this one cannot tell the two
 	// apart. It is here because it is the half of 5.5 that is easiest to get wrong when the rule
-	// is implemented: an empty object is a context.
+	// is implemented: an empty object is a context - what the context holds does not decide anything.
 	it("effectiveChain names a link built with an empty object", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ context: {}, name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
 		expect(leaf.effectiveChain).toBe("/root/middle/leaf");
-	});
-
-	// same, and for the same reason: what the context holds does not decide anything.
-	it("effectiveChain names a link whose context holds only a name no expression can reach", async () => {
-		const root = new ExpressionResolver({ context: { class: 1 }, name: "root" });
-		expect(root.effectiveChain).toBe("/root");
 	});
 
 	it("effectiveChain skips a link built with context null", async () => {

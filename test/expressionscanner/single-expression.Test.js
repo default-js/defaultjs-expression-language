@@ -37,10 +37,8 @@ describe("ExpressionScanner - the single expression of resolve", () => {
 		expect(parseExpression("a + b").statement).toBe("a + b");
 	});
 
-	it("recognizes the scope prefix in the delimited form", () => {
-		expect(parseExpression("${scope::value}").scope).toBe("scope");
-	});
-
+	// That the delimited form carries a prefix is scope-prefix.Test.js, which asks every rule of 3.3
+	// of parseExpression.
 	it("does not recognize a scope prefix without the delimiters", () => {
 		expect(parseExpression("scope::value").statement).toBe("scope::value");
 	});

@@ -11,10 +11,6 @@ import ResolverContextHandle from "../../src/ResolverContextHandle.js";
 
 describe("ResolverContextHandle - the global object as a context", () => {
 
-	it("answers a global name from a handle over the global object", () => {
-		expect(new ResolverContextHandle(globalThis).proxy.Math === Math).toBe(true);
-	});
-
 	it("answers a global name from a handle below a global one", () => {
 		const root = new ResolverContextHandle(globalThis);
 		const leaf = new ResolverContextHandle({ own: "from leaf" }, root);
@@ -31,8 +27,8 @@ describe("ResolverContextHandle - the global object as a context", () => {
 	});
 
 	// Not wrapped: what a resolver answers for `getData()` is this proxy, so it answers the global
-	// object itself, and a write through it is an ordinary global write - which follows from the
-	// identity and needs no case of its own.
+	// object itself. Reading a global name from it and writing through it are ordinary global
+	// accesses, which follow from the identity and need no case of their own.
 	it("answers the global object itself as its proxy", () => {
 		expect(new ResolverContextHandle(globalThis).proxy === globalThis).toBe(true);
 	});

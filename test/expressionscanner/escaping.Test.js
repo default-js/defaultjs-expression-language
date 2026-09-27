@@ -20,11 +20,8 @@ describe("ExpressionScanner - a backslash before the $ escapes the expression", 
 
 	const expression = "${value}";
 
-	// The rule itself: an escaped occurrence is marked, so that nothing hands it to an executer.
-	it("marks an expression behind one backslash as escaped", () => {
-		expect(escapedOf(`\\${expression}`)).toBe("true");
-	});
-
+	// The rule itself: an escaped occurrence is marked, so that nothing hands it to an executer - and
+	// only that one.
 	it("escapes only the occurrence that carries the backslash", () => {
 		expect(escapedOf(`\\${expression} ${expression}`)).toBe("true|false");
 	});

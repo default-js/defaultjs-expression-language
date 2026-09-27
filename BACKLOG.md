@@ -44,11 +44,11 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | --- | --- | --- | --- |
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 | B-28, B-29 (follow-up decisions) |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
-| 3 | Raise test coverage | largely done | B-44, B-30 |
+| 3 | Raise test coverage | largely done | B-30 |
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-27, B-40 |
 
-**Markers, counted 2026-09-27** (`npm test`: 355 passed, 355 cases). No `it.fails` is left and no
+**Markers, counted 2026-09-27** (`npm test`: 328 passed, 328 cases). No `it.fails` is left and no
 entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
 the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
 is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
@@ -88,7 +88,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-36 | The instance entry points and the data methods take input of the wrong type without a rule | decision | gap | | |
 | B-37 | `setupExecuter` without a size sets 1000, not the 5000 an executer starts with | decision | gap | | |
 | B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | | |
-| B-44 | Review the component suites for necessity | agreed | test | | |
 | B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | | |
 | B-50 | A line comment at the end of a statement breaks `EsprimaExecuter` | decision | executer | | low |
 | B-51 | A statement that begins with a line comment answers `undefined` | decision | executer | | |
@@ -566,24 +565,15 @@ for is done.
 
 ## Tests
 
-### B-44 · Review the component suites for necessity
-
-- **Status:** agreed 2026-09-26 — B-43 is done since 2026-09-27
-- **Kind:** test
-
-B-43 moved the cases of `test/spec/` into one suite per component and deliberately thinned nothing.
-Afterwards each suite gets the review the executer suites had: a case stays where a change to that
-component's own code could break it. Every case dropped is named with its reason, and coverage is
-checked against B-30 afterwards.
-
 ### B-30 · Coverage, and what is still uncovered
 
 - **Status:** investigate — none of it is a missing test for a rule
 - **Kind:** test
 
-Measured 2026-09-27 with `npm run test:coverage`, 315 cases: statements **93.04 %** (535/575),
-branches **90.78 %** (266/293), functions **91.96 %** (103/112), lines **95.95 %** (475/495) — the
-counts moved with the new `src/ExpressionScanner.js`, not with any case. Update
+Measured 2026-09-27 with `npm run test:coverage`, 328 cases: statements **93.75 %** (601/641),
+branches **91.76 %** (301/328), functions **92.03 %** (104/113), lines **96.21 %** (534/555) — the
+counts moved with the comment scanning and the argument checks of 4.1, not with any case; the review
+of the component suites (B-44) left every line, function and branch as covered as before. Update
 these numbers when the picture changes rather than adding another baseline. Uncovered lines:
 
 1. `src/Utils.js`, all of it — B-17.
@@ -599,6 +589,11 @@ these numbers when the picture changes rather than adding another baseline. Unco
 6. The reserved-callee branch of the esprima rewrite (`EsprimaExecuter.js:49`,
    `CALLEXPRESSION__RESERVED__CALLEES`): no case ever calls `fetch(…)` or `console(…)` bare — the two
    global cases ask `typeof`, and `console.log(…)` has a member as callee. Found 2026-09-26.
+7. **New on 2026-09-27:** the non-ASCII half of `isNameCharacter` in `ExpressionScanner.js`, which
+   3.3 leaves to `\s`. No case puts whitespace past ASCII — a no-break space, say — into a scope name.
 
 `src/version.js` is generated; its 0 % is noise. The 27 open branches sit in the scanner's state
-machine and in `EsprimaExecuter` — combinations of literal states, not rules without a test.
+machine, in `EsprimaExecuter`, and in four input guards of `ExpressionResolver.js` — a statement that
+is not a string, an empty key in `updateData` and `deleteData`, a text that is not a string in the
+instance `resolveText`. The guards are B-36's; the rest are combinations of literal states, not rules
+without a test.

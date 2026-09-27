@@ -21,16 +21,10 @@ const statementsOf = (aText) => scan(aText).map((occurrence) => occurrence.state
 
 describe("ExpressionScanner - an expression ends at the matching closing brace", () => {
 
-	it("takes an object literal inside the expression as part of the statement", () => {
-		expect(statementsOf("${ {a: 1}.a }")).toBe("{a: 1}.a");
-	});
-
+	// The scanner does not tell an object literal from a block, so this one case stands for every
+	// construct that nests braces.
 	it("ends the expression at the matching brace, not at the last one", () => {
-		expect(cut("a ${ {v: 2}.v } b")).toBe("${ {v: 2}.v }");
-	});
-
-	it("carries the braces of an arrow function body across", () => {
-		expect(statementsOf("${ (() => { return 3; })() }")).toBe("(() => { return 3; })()");
+		expect(cut("a ${ {v: 2}.v } b }")).toBe("${ {v: 2}.v }");
 	});
 
 	it("does not end at the brace of a nested template literal", () => {
@@ -63,10 +57,6 @@ describe("ExpressionScanner - an expression ends at the matching closing brace",
 		expect(cut("a ${ x b ${value}")).toBe("${value}");
 	});
 
-	it("finds only the expression that opened second", () => {
-		expect(statementsOf("a ${ x b ${value}")).toBe("value");
-	});
-
 	it("does not count a brace inside a regular expression literal", () => {
 		expect(statementsOf("a ${ /}/.source } b")).toBe("/}/.source");
 	});
@@ -89,17 +79,14 @@ describe("ExpressionScanner - an expression ends at the matching closing brace",
 
 describe("ExpressionScanner - a comment hides what it holds", () => {
 
-	// Each kind in both positions: the division-or-regex rule once read the slashes of a comment and
-	// decided per position whether a brace counted (DECISIONS.md, 2026-09-27, "Does the expression
-	// scanner recognize comments?"). The block comment where a literal could stand passed before the
-	// fix as well, read as a regular expression literal - it stays as the counterpart of the case
-	// behind an operand.
+	// The division-or-regex rule once read the slashes of a comment and decided per position whether a
+	// brace counted (DECISIONS.md, 2026-09-27, "Does the expression scanner recognize comments?"), so
+	// each kind is asked where a slash would be division. A line comment is asked where a literal could
+	// stand as well: read as a literal, its two slashes close at once and the brace counts. A block
+	// comment there has no such case - read as a literal it hides the brace too, so the case stayed
+	// green whichever way the scanner read it.
 	it("does not count a brace inside a block comment that follows an operand", () => {
 		expect(cut("a ${ 1 /* } */ } b")).toBe("${ 1 /* } */ }");
-	});
-
-	it("does not count a brace inside a block comment where a literal could stand", () => {
-		expect(cut("a ${ /* } */ 1 } b")).toBe("${ /* } */ 1 }");
 	});
 
 	it("does not count a brace behind a line comment that follows an operand", () => {

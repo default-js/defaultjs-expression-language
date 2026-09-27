@@ -40,6 +40,15 @@ describe("ExpressionResolver - both entry points answer a promise", () => {
 		await answer;
 	});
 
+	// A text without an expression is where a synchronous shortcut would be tempting, and the static
+	// resolveText, being async itself, would wrap it and hide it.
+	it("instance resolveText answers a promise for a text without an expression", async () => {
+		const resolver = new ExpressionResolver({ context: {}, executer: new TestExecuter() });
+		const answer = resolver.resolveText("no expression");
+		expect(answer instanceof Promise).toBe(true);
+		await answer;
+	});
+
 	it("awaits a promise value before answering it", async () => {
 		ExpressionResolver.defaultExecuter = new TestExecuter(() => Promise.resolve("awaited"));
 		expect(await ExpressionResolver.resolve("${ promised }", {})).toBe("awaited");

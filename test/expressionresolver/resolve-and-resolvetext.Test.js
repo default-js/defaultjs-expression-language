@@ -22,25 +22,11 @@ afterAll(() => {
 describe("ExpressionResolver - resolve answers a value, resolveText answers a text", () => {
 
 	// What the resolver has to keep is the type of the answer, whoever produced it - so the answer
-	// is set rather than computed.
+	// is set rather than computed. The resolver never looks at the type of a result, so one type
+	// stands for every other.
 	it("resolve keeps the type of the result", async () => {
 		ExpressionResolver.defaultExecuter = new TestExecuter(() => 2);
 		expect(await ExpressionResolver.resolve("${ result }", {})).toBe(2);
-	});
-
-	it("resolve answers an object as an object", async () => {
-		ExpressionResolver.defaultExecuter = lookup();
-		const result = await ExpressionResolver.resolve("${ values }", { values: [1, 2] });
-		expect(result instanceof Array).toBe(true);
-	});
-
-	// Carried over from test/ExecuterTests/: a function is a value like any other, and what the
-	// caller gets back is the function itself rather than a copy, a binding or its result.
-	it("resolve answers a function as a function", async () => {
-		ExpressionResolver.defaultExecuter = lookup();
-		const result = await ExpressionResolver.resolve("${ fn }", { fn: () => "from function" });
-		expect(typeof result).toBe("function");
-		expect(result()).toBe("from function");
 	});
 
 	it("resolveText casts the value towards string", async () => {
@@ -54,24 +40,14 @@ describe("ExpressionResolver - resolve answers a value, resolveText answers a te
 		expect(result).toBe("one and two");
 	});
 
-	// The rule from the executer side: the same expression standing twice is handed over twice, not
-	// resolved once and substituted. The counting getter below shows what a caller notices; this
-	// one states the rule without needing a side effect to see it.
+	// Every occurrence is evaluated on its own (4.3): the same expression standing twice is handed
+	// over twice, not resolved once and substituted - which is what makes `${counter++}` twice
+	// increment twice, without the case needing a side effect to see it.
 	it("hands over every occurrence, not every distinct expression", async () => {
 		const handed = [];
 		ExpressionResolver.defaultExecuter = new TestExecuter((aStatement) => handed.push(aStatement));
 		await ExpressionResolver.resolveText("${value} ${value}", { value: "resolved" });
 		expect(handed.join("|")).toBe("value|value");
-	});
-
-	// Counted through a getter: a lookup reads it once per occurrence, and nothing has to be written.
-	it("resolveText evaluates every occurrence on its own", async () => {
-		ExpressionResolver.defaultExecuter = lookup();
-		let reads = 0;
-		const context = { get counter() { return reads++; } };
-		const expression = "${counter}";
-		const result = await ExpressionResolver.resolveText(`${expression} ${expression}`, context);
-		expect(result).toBe("0 1");
 	});
 });
 

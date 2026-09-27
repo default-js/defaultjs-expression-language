@@ -29,12 +29,6 @@ const deepChain = (aDepth) => {
 
 describe("ExpressionResolver - lookup with a prefix", () => {
 
-	it("addresses the resolver carrying the name", async () => {
-		const resolver = new ExpressionResolver({ name: "scope", context: { value: "from scope" }, executer: lookup() });
-		const result = await resolver.resolveText("${scope::value}");
-		expect(result).toBe("from scope");
-	});
-
 	it("addresses the resolver the call is made on", async () => {
 		const root = new ExpressionResolver({ context: { value: "from root" }, name: "root", executer: lookup() });
 		const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: root });
@@ -61,17 +55,13 @@ describe("ExpressionResolver - lookup with a prefix", () => {
 		expect(await leaf.resolveText("${middle::rootOnly}")).toBe("from root");
 	});
 
+	// That the context handed over does not see a resolver below the addressed one is the handle's
+	// rule, `test/resolvercontexthandle/lookup.Test.js`.
 	it("answers from the first resolver carrying the name, climbing towards the root", async () => {
 		const outer = new ExpressionResolver({ context: { value: "from outer" }, name: "dup", executer: lookup() });
 		const inner = new ExpressionResolver({ context: { value: "from inner" }, name: "dup", parent: outer });
 		const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: inner });
 		expect(await leaf.resolveText("${dup::value}")).toBe("from inner");
-	});
-
-	it("does not see a resolver below the one the prefix names", async () => {
-		const root = new ExpressionResolver({ context: { rootOnly: "from root" }, name: "root", executer: lookup() });
-		const leaf = new ExpressionResolver({ context: { leafOnly: "from leaf" }, name: "leaf", parent: root });
-		expect(await leaf.resolveText("${root::leafOnly}", "fallback")).toBe("fallback");
 	});
 
 	it("climbs to the ancestor the prefix names however deep the chain is", async () => {
@@ -96,17 +86,8 @@ describe("ExpressionResolver - a prefix no resolver carries", () => {
 		expect(await leaf.resolveText("${nowhere::value}", "fallback")).toBe("fallback");
 	});
 
-	// Cannot tell the implementations apart, verified 2026-08-29: before the prefix was parsed at
-	// all, "nowhere::value" reached the executer as a statement, failed to compile and the default
-	// applied through the error path instead of through 5.4. Same answer, different reason.
-	it("resolve answers the default value where no resolver carries the prefix", async () => {
-		const resolver = new ExpressionResolver({ name: "scope", context: { value: "from scope" }, executer: lookup() });
-		const result = await resolver.resolve("${nowhere::value}", "fallback");
-		expect(result).toBe("fallback");
-	});
-
 	// The walk passes every resolver up to the root before it gives up, so a deep chain takes it
-	// further than any prefix that is found.
+	// further than any prefix that is found. Asked through resolve, the case for that entry point.
 	it("answers the default value however deep the chain is", async () => {
 		expect(await deepChain(DEEP).resolve("${nowhere::value}", "fallback")).toBe("fallback");
 	});

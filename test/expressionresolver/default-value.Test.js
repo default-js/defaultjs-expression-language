@@ -35,19 +35,11 @@ describe("ExpressionResolver - the default value", () => {
 		expect(await ExpressionResolver.resolve(RESULT, {}, "fallback")).toBe("fallback");
 	});
 
+	// One falsy value stands for all of them: the resolver asks for null and undefined, and a check
+	// by truthiness would replace 0, "" and false alike.
 	it("does not replace 0", async () => {
 		ExpressionResolver.defaultExecuter = new TestExecuter(() => 0);
 		expect(await ExpressionResolver.resolve(RESULT, {}, "fallback")).toBe(0);
-	});
-
-	it("does not replace an empty string", async () => {
-		ExpressionResolver.defaultExecuter = new TestExecuter(() => "");
-		expect(await ExpressionResolver.resolve(RESULT, {}, "fallback")).toBe("");
-	});
-
-	it("does not replace false", async () => {
-		ExpressionResolver.defaultExecuter = new TestExecuter(() => false);
-		expect(await ExpressionResolver.resolve(RESULT, {}, "fallback")).toBe(false);
 	});
 
 	it("honours undefined passed as the default", async () => {
@@ -67,15 +59,10 @@ describe("ExpressionResolver - the default value", () => {
 		expect(await ExpressionResolver.resolveText("${ a } ${ b }", {}, "fallback")).toBe("fallback two");
 	});
 
+	// A default takes the place of the value and is cast towards string with it (4.3), which is
+	// `resolve-and-resolvetext.Test.js`.
 	it("renders undefined and null literally in resolveText without a default", async () => {
 		ExpressionResolver.defaultExecuter = new TestExecuter((aStatement) => (aStatement === "a" ? undefined : null));
 		expect(await ExpressionResolver.resolveText("${ a } ${ b }", {})).toBe("undefined null");
-	});
-
-	// 4.3 casts towards string, and 4.4 puts the default where the value would have stood, so a
-	// default that is an object is cast like any other value.
-	it("casts a default that is an object towards string in resolveText", async () => {
-		ExpressionResolver.defaultExecuter = new TestExecuter(() => undefined);
-		expect(await ExpressionResolver.resolveText(RESULT, {}, { a: 1 })).toBe("[object Object]");
 	});
 });

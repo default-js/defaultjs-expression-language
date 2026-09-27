@@ -2,15 +2,15 @@ import { describe, it, expect, afterAll } from "vitest";
 import { ExpressionResolver } from "../../index.js";
 import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/executer/ContextDeconstructorExecuter.js";
 import Executer from "../../src/Executer.js";
-import EsprimaExecuter from "../../src/executer/EsprimaExecuter.js";
+import getExecuter from "../../src/ExecuterRegistry.js";
 import TestExecuter from "../TestExecuter.js";
 
 /**
  * ExpressionResolver - the constructor, the instance entry points, name and parent.
  * SPECIFICATION.md 4.2, 5.1.
  *
- * What an omitted context means is pinned here only as far as the constructor decides it: the
- * resolver has none, whichever executer it runs. The lookup itself is the handle's.
+ * What an omitted or a null context means is the handle's (6.3), and which resolvers provide one is
+ * `chain-inspection.Test.js`.
  */
 
 // answers the value the context carries under the statement - a lookup, not an evaluation
@@ -23,35 +23,20 @@ afterAll(() => {
 
 describe("ExpressionResolver - the instance entry points", () => {
 
-	// Carried over from the time an executer offered a default context, and green before
-	// defaultContext was removed: the constructor had stopped reading it already. EsprimaExecuter is
-	// the one whose default was the global object, so it is the executer that would show a relapse.
-	// Nothing is executed - getData reads the context the constructor built.
-	it("gives a resolver built without a context none, whichever executer it runs", async () => {
-		const resolver = new ExpressionResolver({ executer: EsprimaExecuter });
-		expect(resolver.getData("document")).toBeUndefined();
-		expect(resolver.effectiveChain).toBe("");
-	});
-
-	// The key exists and holds undefined, so the lookup succeeds and 4.4 applies.
+	// The key exists and holds undefined, so the lookup succeeds and 4.4 applies. The instance
+	// resolveText takes its default the same way - `scope.Test.js` passes one where no resolver
+	// carries the prefix.
 	it("resolve takes expression and default positionally", async () => {
 		const resolver = new ExpressionResolver({ context: { value: undefined }, executer: lookup() });
 		const result = await resolver.resolve("${ value }", "fallback");
 		expect(result).toBe("fallback");
 	});
 
-	it("resolveText takes text and default positionally", async () => {
-		const resolver = new ExpressionResolver({ context: { value: "resolved" }, executer: lookup() });
-		const result = await resolver.resolveText("a ${ value } b", "fallback");
-		expect(result).toBe("a resolved b");
-	});
-
+	// Identity rather than an answer, like the cases below: the rule is which executer the resolver
+	// holds, and a resolution would ask that executer to evaluate.
 	it("takes the executer by its registered name", async () => {
-		const resolver = new ExpressionResolver({ context: { value: "resolved" }, executer: ContextDeconstructorExecuterName });
-		const result = await resolver.resolve("${ value }");
-		// spelled bare on purpose: the executer is named in the call, so this is that executer's
-		// dialect rather than the default one
-		expect(result).toBe("resolved");
+		const resolver = new ExpressionResolver({ context: {}, executer: ContextDeconstructorExecuterName });
+		expect(resolver.executer === getExecuter(ContextDeconstructorExecuterName)).toBe(true);
 	});
 
 	// An instance addresses an executer as unambiguously as a registered name does, and the static
@@ -119,13 +104,6 @@ describe("ExpressionResolver - the instance entry points", () => {
 		ExpressionResolver.defaultExecuter = new TestExecuter();
 		const resolver = new ExpressionResolver();
 		expect(await resolver.resolve("${ anything }")).toBe("anything");
-	});
-
-	// An empty context is one that carries no name - which is what the lookup shows, without asking
-	// anybody to evaluate a `typeof`.
-	it("treats context: null as an empty context", async () => {
-		const resolver = new ExpressionResolver({ context: null, executer: lookup() });
-		expect(await resolver.resolve("${ missing }")).toBeUndefined();
 	});
 });
 

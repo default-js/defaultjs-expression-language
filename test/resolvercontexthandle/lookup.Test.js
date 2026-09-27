@@ -36,6 +36,7 @@ describe("ResolverContextHandle - lookup without a prefix", () => {
 		expect(leaf.proxy.value).toBeUndefined();
 	});
 
+	// A method is found by the same walk; the getter is the case that also shows it is called.
 	it("reaches a getter inherited through the prototype chain", () => {
 		class Data {
 			get value() {
@@ -43,15 +44,6 @@ describe("ResolverContextHandle - lookup without a prefix", () => {
 			}
 		}
 		expect(new ResolverContextHandle(new Data()).proxy.value).toBe("from getter");
-	});
-
-	it("reaches a method inherited through the prototype chain", () => {
-		class Data {
-			greet() {
-				return "from method";
-			}
-		}
-		expect(typeof new ResolverContextHandle(new Data()).proxy.greet).toBe("function");
 	});
 });
 

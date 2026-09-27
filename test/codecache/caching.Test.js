@@ -37,7 +37,7 @@ describe("CodeCache - caching", () => {
 		expect(cache.get("expression")).toBe(null);
 	});
 
-	it(`replaces the code of an existing key without adding an entry`, () => {
+	it(`replaces the code of an existing key`, () => {
 		const cache = new CodeCache({ size: 10 });
 		const replacement = code("second");
 
@@ -45,6 +45,21 @@ describe("CodeCache - caching", () => {
 		cache.set("expression", replacement);
 
 		expect(cache.get("expression")).toBe(replacement);
+	});
+
+	it(`keeps one entry per key when its code is replaced`, () => {
+		// size 10 trims at 11 keys. A second entry for the replaced key would be the oldest one of
+		// the twelve, and evicting it would take the key along although its other entry is the
+		// most recently used.
+		const cache = new CodeCache({ size: 10 });
+		cache.set("expression", code("first"));
+		cache.set("expression", code("second"));
+		fill(cache, 9);
+
+		cache.get("expression");
+		cache.set("k9", code("k9"));
+
+		expect(cache.has("expression")).toBe(true);
 	});
 
 	it(`evicts the least recently used entry, not the least recently written one`, () => {
@@ -96,27 +111,6 @@ describe("CodeCache - caching", () => {
 		// and not because the cache is still disabled.
 		expect(cache.has("fresh")).toBe(true);
 		expect(cache.has("k0")).toBe(false);
-	});
-
-	it(`caches again after being re-enabled`, () => {
-		const cache = new CodeCache({ size: 10 });
-		const compiled = code("hit");
-
-		cache.setup({ size: 0 });
-		cache.setup({ size: 10 });
-		cache.set("expression", compiled);
-
-		expect(cache.get("expression")).toBe(compiled);
-	});
-
-	it(`caches after a size of 0 was passed to the constructor`, () => {
-		const cache = new CodeCache({ size: 0 });
-		const compiled = code("hit");
-
-		cache.setup({ size: 10 });
-		cache.set("expression", compiled);
-
-		expect(cache.get("expression")).toBe(compiled);
 	});
 
 	it(`keeps the most recently used entries when the size is lowered`, () => {

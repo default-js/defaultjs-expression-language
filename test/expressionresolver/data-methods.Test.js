@@ -1,18 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { ExpressionResolver } from "../../index.js";
-import TestExecuter from "../TestExecuter.js";
 
 /**
  * ExpressionResolver - getData, updateData, deleteData and mergeContext. SPECIFICATION.md 6.6.
  *
  * None of it executes a statement. Which resolver of the chain each of them addresses is the rule
  * they share - see DECISIONS.md, 2026-08-22. That a write lands in the object the caller handed
- * over is the handle's, and tested in `test/resolvercontexthandle/write.Test.js`. Where a case asks
- * what a statement is handed afterwards, the answer is a lookup in that context.
+ * over is the handle's, and tested in `test/resolvercontexthandle/write.Test.js`; that a statement is
+ * handed a context which follows a write is `wiring.Test.js`.
  */
-
-// answers the value the context carries under the statement - a lookup, not an evaluation
-const lookup = () => new TestExecuter((aStatement, aContext) => aContext[aStatement]);
 
 describe("ExpressionResolver - reading and writing from outside", () => {
 
@@ -27,20 +23,11 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(leaf.getData() === leaf.context).toBe(true);
 	});
 
+	// The key is handed to the context unchanged, so which keys a context carries is the handle's -
+	// `test/resolvercontexthandle/context-shape.Test.js`.
 	it("getData reads along the chain by the rule of 5.2", async () => {
 		const { leaf } = buildChain();
 		expect(leaf.getData("value")).toBe("from root");
-	});
-
-	// A context carries every key JavaScript says it carries - DECISIONS.md, 2026-09-22.
-	it("getData reads a key that is not a variable name", async () => {
-		const resolver = new ExpressionResolver({ context: { "test-test": "dashed" }, name: "root" });
-		expect(resolver.getData("test-test")).toBe("dashed");
-	});
-
-	it("getData reads a key named like a reserved word", async () => {
-		const resolver = new ExpressionResolver({ context: { class: "reserved" }, name: "root" });
-		expect(resolver.getData("class")).toBe("reserved");
 	});
 
 	it("getData with a filter reads from the addressed link", async () => {
@@ -136,19 +123,6 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		leaf.mergeContext({ value: "from leaf" });
 		expect(root.getData("value")).toBe("from root");
 		expect(leaf.getData("value")).toBe("from leaf");
-	});
-
-	// mergeContext, not updateData: a filterless updateData changes the value where the key lives,
-	// which is the parent here. Defining a key on this resolver and shadowing the parent from here
-	// on is what mergeContext does - and the context a statement is handed has to follow both ways.
-	it("shadows a value of the parent for a statement until the shadowing key is deleted", async () => {
-		const parent = new ExpressionResolver({ context: { test: "test" }, executer: lookup() });
-		const resolver = new ExpressionResolver({ context: {}, parent });
-		resolver.mergeContext({ test: "success" });
-		expect(await resolver.resolve("${test}")).toBe("success");
-		expect(await parent.resolve("${test}")).toBe("test");
-		resolver.deleteData("test");
-		expect(await resolver.resolve("${test}")).toBe("test");
 	});
 
 	it("mergeContext with a filter merges into the addressed link", async () => {
