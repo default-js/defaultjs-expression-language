@@ -153,7 +153,7 @@ Every test file imports what it uses — `import { describe, it, expect, beforeA
 
 ## Benchmarks
 
-`test/PerformanceTests/` holds four `*.bench.js` files run by `npm run bench`, never by `npm test` — `include` matches only `test/**/*Test.js`, so a benchmark can never fail the gate. Three measure resolution over a chain: `ColdResolve` with the code cache switched off so every call recompiles, `WarmResolve` with it on, `RandomScope` with a context on every link and a randomly chosen name. `ResolveText` measures the instance `resolveText` over four texts; no benchmark calls a static entry point. Each runs under every executer, taken from `Executers.js` — comparing them is what a benchmark is for, so the list lives here and nowhere in the test suite.
+`test/PerformanceTests/` holds five `*.bench.js` files run by `npm run bench`, never by `npm test` — `include` matches only `test/**/*Test.js`, so a benchmark can never fail the gate. Three measure resolution over a chain: `ColdResolve` with the code cache switched off so every call recompiles, `WarmResolve` with it on, `RandomScope` with a context on every link and a randomly chosen name. `ResolveText` measures the instance `resolveText` over four texts; no benchmark calls a static entry point. Those four run under every executer, taken from `Executers.js` — comparing them is what a benchmark is for, so the list lives here and nowhere in the test suite. `ResolveTextShare` runs `resolveText` under `TestExecuter` instead, so the resolver's own share is measured without an executer's cost hiding it — the instrument for a change to the resolver's text path.
 
 Two things about `vitest bench` cost an hour once, verified against 4.1.11 — do not rediscover them:
 

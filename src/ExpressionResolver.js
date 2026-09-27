@@ -4,12 +4,10 @@ import getExecuterType from "./ExecuterRegistry.js";
 import DefaultExecuter from "./executer/ContextDeconstructorExecuter.js";
 import ResolverContextHandle from "./ResolverContextHandle.js";
 import Executer from "./Executer.js";
-import { scan, parseExpression, normalize } from "./ExpressionScanner.js";
+import { scan, parseExpression } from "./ExpressionScanner.js";
 
 /** @type {Executer} */
 let DEFAULT_EXECUTER = DefaultExecuter;
-
-const EXECUTION_WARN_TIMEOUT = 1000;
 
 const DEFAULT_NOT_DEFINED = new DefaultValue();
 const toDefaultValue = (value) => {
@@ -28,26 +26,14 @@ let NAME_COUNTER = 0;
 const generateName = () => `ER${++NAME_COUNTER}`;
 
 const execute = async function (anExecuter, aStatement, aContext) {
-	// 3.4: an empty statement answers undefined, the same as `return;` in JavaScript
+	// 3.4: an empty statement answers undefined, the same as `return;` in JavaScript. The scanner
+	// hands every statement over trimmed, and an empty one as null.
 	if (aStatement == null) return undefined;
 	if (typeof aStatement !== "string") return aStatement;
-	aStatement = normalize(aStatement);
-	if (aStatement == null) return undefined;
 
 	// an error is deliberately not caught here: section 7 gives the two entry points different
 	// answers to it, so each of them handles it for itself
-	const timeout = setTimeout(
-		() =>
-			console.warn(`Long running statement:
-				"${aStatement}"
-			`),
-		EXECUTION_WARN_TIMEOUT,
-	);
-	try {
-		return await anExecuter.execute(aStatement, aContext);
-	} finally {
-		clearTimeout(timeout);
-	}
+	return await anExecuter.execute(aStatement, aContext);
 };
 
 const warnFailedStatement = (aStatement, anError) => {
@@ -83,8 +69,6 @@ const isConfiguration = (aValue) => aValue !== null && typeof aValue === "object
 
 // 4.1: a configuration counts as passing a default where it carries the key, whatever it holds
 const defaultOf = (aConfiguration) => ("defaultValue" in aConfiguration ? aConfiguration.defaultValue : DEFAULT_NOT_DEFINED);
-
-const toText = (aValue) => (typeof aValue === "undefined" ? "undefined" : aValue === null ? "null" : aValue);
 
 /**
  * ExpressionResolver
@@ -381,7 +365,7 @@ export default class ExpressionResolver {
 				text += aText.substring(occurrence.start, occurrence.end);
 			} else {
 				try {
-					text += toText(await resolve(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue));
+					text += await resolve(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue);
 				} catch (e) {
 					// 7: an expression whose statement failed stands as written, and the default value
 					// does not cover it. The rest of the text keeps rendering.

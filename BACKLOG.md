@@ -45,7 +45,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-44, B-30, B-38 |
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
-| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-45, B-07, B-25, B-26, B-27, B-40 |
+| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-27, B-40 |
 
 **Markers, counted 2026-09-27** (`npm test`: 318 passed, 1 expected fail, 319 cases). One `it.fails`
 is left, in `test/expressionresolver/static-entry-points.Test.js`, and it pins B-33, the only entry
@@ -92,7 +92,7 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | |
 | B-41 | The default executer logs its generated code on every cache miss | decision | defect | |
 | B-44 | Review the component suites for necessity | agreed | test | |
-| B-45 | `resolveText` walks a text twice — scan and replace in one pass | investigate | refactor | |
+| B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | |
 
 ---
 
@@ -101,35 +101,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 B-33 — the entry stands in its own section below.
 
 ## Resolver
-
-### B-45 · `resolveText` walks a text twice — scan and replace in one pass
-
-- **Status:** investigate — implemented, measured and reverted 2026-09-27; Frank wants to come back
-  to it
-- **Kind:** refactor · **Spec:** 3.1, 3.2, 4.3, 7
-- **Records:** `DECISIONS.md` (2026-09-27, "Does `resolveText` scan and replace in one pass?"),
-  `CHANGELOG.md` if the shape of `src/ExpressionScanner.js` changes
-
-`resolveText` runs two loops over one text: `scan` collects every occurrence into an array of
-objects, then `resolveText` walks that array and builds the text. The idea was to save the array
-and the objects by doing both in one pass. Two shapes were built and measured — a callback handed to
-the scanner and a cursor — and neither is faster than the two passes at `resolveText`; the numbers,
-the variants and the division of rules that was agreed for them are in `DECISIONS.md`.
-
-Open when the topic comes back:
-
-- **Why the cursor loses at the resolver** (2-8 %) although it equals the array when scanning
-  alone. Not established; the one difference is that scanning runs interleaved with the awaits
-  instead of in one tight loop up front.
-- **Where the time goes.** Scanning is about a tenth of `resolveText` (0.19 ms of 1.8 ms at 2,000
-  expressions); the rest is the work per statement. Unmeasured candidate: the `setTimeout` /
-  `clearTimeout` pair `execute` sets up for the long-running warning on every statement.
-- **Memory** was agreed to stay an assumption; nothing measured it.
-
-The probes are not kept. To rebuild them: copy the source under test with `git show` into a
-directory under `test/PerformanceTests/` (Vite serves nothing outside the repository), rewrite its
-relative imports, and compare against `index.js` in one bench file with `TestExecuter` in place of a
-real executer — with a real one its cost hides the resolver's share.
 
 ### B-03 · A `parent` that is not an `ExpressionResolver` is silently dropped
 
@@ -285,7 +256,8 @@ execution even when the statement touches no name.
 line per cache miss; one `npm run bench` on 2026-09-26 printed it 29 761 times. It also distorts
 every measurement with a cold cache taken since — a console write costs more than a resolution
 (the reason the large-context warning moved to compile time, 2026-09-22). Found while documenting
-the executers on 2026-09-26; `src/` was out of that scope.
+the executers on 2026-09-26; `src/` was out of that scope. **At `f33461f` (2026-09-27) `DEBUG` is
+`false` again**, and that day's `npm run bench` printed no such line — likely closed, Frank's call.
 
 ### B-13 · Should the `ctx` prefix of `ContextObjectExecuter` be configurable?
 
@@ -493,6 +465,18 @@ under `[Unreleased]` among them, which a reader meets without a definition; `src
 
 ## Benchmarks
 
+### B-47 · `readExpression` allocates a stack array for every expression
+
+- **Status:** idea — left over from B-45, unmeasured
+- **Kind:** refactor · **Spec:** 3.1
+
+`readExpression` in `src/ExpressionScanner.js` starts every expression with `const stack = [CODE]`
+and pushes for every `{`, although most expressions never nest. Candidates: a depth counter for
+code and a stack only once a literal opens, or one array reused across the expressions of a text.
+To be measured with `ResolveTextShare`, old and new alternating (`DECISIONS.md`, 2026-09-27, "Does
+`resolveText` scan and replace in one pass?"): scanning is a small share of the resolver's work,
+so the gain is bounded by it.
+
 ### B-40 · What the name cache costs and saves when reading and writing along a chain
 
 - **Status:** agreed 2026-09-22 — Frank's order, measure before anything is changed
@@ -554,6 +538,10 @@ resolvers live for the whole file, and a collection that walks that set costs hu
 milliseconds; with `DEPTHS` cut to `[10, 1000]` it disappears. A property of the benchmark, not of
 the library. Reusing the tail of the deepest chain is deliberate — a bench file has nowhere to put
 setup (`AGENTS.md`, Benchmarks).
+
+Seen on 2026-09-27 outside that pattern as well (`npm run bench` at `f33461f`): at depth 1 000 in
+`ColdResolve`, and in `ResolveText` under `with-scoped-executer`, a file that builds no chain at all.
+Whether the chain of another file stays live in the same browser page is not checked.
 
 ### B-38 · Rules without a test that pins them
 

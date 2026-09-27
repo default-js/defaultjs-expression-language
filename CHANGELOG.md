@@ -238,6 +238,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Removed
 
+- **No warning for a statement that runs longer than a second.** Every statement used to start a
+  timer that wrote `Long running statement: …` to the console after one second and was cleared when
+  the statement finished. The timer cost more than the rest of the resolver's own work per
+  statement together; without it `resolveText` does about 3.6 times as much of that work in the
+  same time. A consumer who wants to know about slow statements measures around `resolve` or
+  `resolveText`. See `DECISIONS.md`, 2026-09-27.
+
 - **`Executer` no longer has a default context.** The option `defaultContext` of
   `new Executer({ … })` and the getter `executer.defaultContext` are gone. A resolver built without
   a context has none of its own, whichever executer it runs: leaving `context` out is the same as

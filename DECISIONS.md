@@ -19,6 +19,25 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-27 — Does a statement that runs longer than a second still produce a warning?
+
+**Decision:** No. `execute` starts no timer any more, the rule is out of `SPECIFICATION.md` 7, and
+the case that pinned it is gone. Frank's decision, B-46.
+
+**Reasoning:** The warning cost a `setTimeout` and a `clearTimeout` for every statement, slow or
+not, to report the rare one that is. Measured with `test/PerformanceTests/ResolveTextShare.bench.js`
+(`TestExecuter`, so the resolver's own share): 20 distinct expressions went from 47.9k-51.5k to
+177k-181k hz without the timer, about 3.6× — across sessions and not alternated, but far beyond any
+spread seen that day. No other change to the text path came near it.
+
+**Alternatives:** One timer per `resolveText` call instead of one per statement — unmeasured; it
+would name the text rather than the statement, which is what the warning was for. Keeping the
+warning behind an option — nobody asked for one.
+
+**Consequences:** A hanging statement is silent; a consumer who wants to know measures around the
+entry point. The time a statement takes is no concern of the resolver any more — an executer or a
+caller that wants a watchdog brings its own.
+
 ## 2026-09-27 — Does a function in `ExpressionResolver.js` that never awaits drop `async`?
 
 **Decision:** No, not for that reason alone. The static `resolve` and `resolveText` keep `async`.
@@ -54,62 +73,79 @@ probe that was not kept.
 
 ## 2026-09-27 — Does `resolveText` scan and replace in one pass?
 
-**Decision:** Not for now. `scan` keeps answering an array of occurrences and `resolveText` keeps
-walking it; the one-pass version was implemented, measured and reverted. Frank wants to come back
-to the topic, so B-45 stays open with the questions this left.
+**Decision:** No. `scan` answers an array of occurrences and `resolveText` walks it — two passes.
+Built on `readExpression(aText, aStart)`, a synchronous function that reads the one expression
+whose `$` stands at `aStart` and answers the occurrence `{ start, end, escaped, scope, statement }`
+itself, so each expression costs one object. Settled on B-45, which is closed with this entry.
 
-**Reasoning:** The one pass was meant to save the array and one object per occurrence, in memory
-and in time. Memory was agreed beforehand to stay an assumption read off the code; the acceptance
-rule was that the change stays where no case gets slower. It got slower in every shape tried.
+**Reasoning:** The one pass was meant to save the array and the objects. The acceptance rule was
+that it stays where no case gets slower; it got slower in every shape tried, twice over:
 
-What was agreed for the callback shape, and holds for any later attempt: the pass keeps 3.1 (a text
-without an expression is answered unchanged) and 3.2 in full (the escaping backslash is consumed,
-the delimiter stands, the resolver never sees it); the resolver keeps evaluation, default value,
-the cast to text and 7, for which the scanner hands over the expression as written. The scanner
-knows nothing about errors, executers or default values.
+- **First batch**, with the per-statement timer still in `execute`: a callback handed to the
+  scanner (`replace(aText, aReplace)`, an `async` callback per expression) cost 0-8 % under the real
+  executers and 4-7 % of the resolver's share; a cursor — one reused object, `next()` per
+  occurrence — trailed the two passes by 2-8 % at 200 and 2,000 expressions for a reason nobody
+  found. On its own the scanner was about a tenth of `resolveText`.
+- **On today's base** — no timer (above), char codes, the scope prefix read by hand, no second trim
+  — both shapes built on the same `readExpression` and green under the full suite, then measured with
+  `test/PerformanceTests/ResolveTextShare.bench.js` (`TestExecuter`, the resolver's own share), four
+  pairs, the order alternated, hz, one pass → two passes: 20 distinct 202k-204k → 235k-248k,
+  20 × one expression 214k-218k → 255k-266k, literals 170k-182k → 200k-213k, 200 distinct
+  18.6k-19.9k → 23.5k-23.9k, 2,000 distinct 1.8k-1.9k → 2.2k; escaped 1.53M-1.61M → 1.08M-1.09M,
+  no expression 4.33M-4.61M → 4.14M-4.28M. No range overlaps. Without the timer the `async`
+  callback costs about a sixth of the resolver's work per resolved expression — a promise and a
+  frame each — and the one pass wins only where nothing is resolved.
+- **The scan folded into the `async` loop itself** (no callback, one function) cost 5-18 % against
+  the separate synchronous scan, presumably because the character loop then runs in a function whose
+  locals live across an `await` — not verified. The character loop stays a synchronous function.
 
-All measured in one batch against the source of `HEAD` copied beside it, two runs, differences
-counted only where both runs agree on the direction and exceed the spread between them:
+What was agreed for the callback shape, and holds for any later attempt: the pass keeps 3.1 and 3.2
+in full, the resolver keeps evaluation, default value, the cast to text and 7, for which the scanner
+hands over the expression as written. The scanner knows nothing about errors, executers or default
+values.
 
-- **Callback — `replace(aText, aReplace)` answering `Promise<string>`**, under the four real
-  executers, 20 expressions in about 1.5 KB. Fully `async`, `plain` (no expression) was 10-25 %
-  slower in every run — the promise of the `async` function. A synchronous `indexOf` return brought
-  `plain` back to parity, and the texts carrying expressions stayed 0-8 % slower, `distinct` in 8 of
-  8 per run over five runs. Order was checked by running the new version first: no bias.
-- **Decomposed with `TestExecuter`**, which evaluates nothing, so the resolver's own share is
-  measured (±1.4 %): the two passes calling each occurrence through the same callback cost 0-4 %,
-  the one pass with it 4-7 %, `return await` changed nothing, and leaving out the substring of the
-  written expression changed nothing. The cost is the asynchronous callback — a promise and a frame
-  per occurrence — not the array.
-- **Cursor** — one reused object per text, `next()` moving it to the following occurrence and filling
-  `before` (escaping backslash consumed), `scope`, `statement`, `expression`; the loop and its `await`
-  stay in `resolveText`. Nothing is allocated per occurrence.
-- **Over longer texts**, `TestExecuter`, hz, run 1 / run 2, then the resolver once more in reversed
-  order:
+**Alternatives:** The one pass, for the 40-50 % it gains on escaped expressions and the few percent
+on text without an expression — rejected: escaped expressions are rare, resolved ones are the work.
+It becomes the better choice only if the callback stops costing a promise per expression, which
+`await` in the scanner rules out. Letting the scanner catch a failing callback — rejected before
+measuring: it makes the scanner carry 7 on the resolver's behalf (2026-08-30).
 
-  | Expressions / chars | Scanner alone: two passes · callback · cursor | `resolveText`: two passes · callback · cursor | reversed order |
-  | --- | --- | --- | --- |
-  | 20 / 1,510 | 504k / 499k · 368k / 373k · 509k / 495k | 54.8k / 52.3k · 53.2k / 51.8k · 52.7k / 52.1k | 55.5k / 56.4k · 52.4k / 50.5k · 53.9k / 52.2k |
-  | 200 / 15,290 | 54.6k / 53.8k · 42.1k / 40.8k · 54.5k / 54.4k | 5,744 / 5,512 · 5,207 / 5,175 · 5,265 / 5,389 | 5,599 / 5,415 · 5,397 / 4,971 · 5,252 / 5,162 |
-  | 2,000 / 154,890 | 5,196 / 5,301 · 4,032 / 4,063 · 5,384 / 5,350 | 570 / 563 · 507 / 526 · 522 / 534 | 580 / 553 · 540 / 514 · 563 / 519 |
+**Consequences:** A change to the text path is measured with `ResolveTextShare`, old and new
+alternating with the order swapped, several pairs: under the real executers the spread between runs
+(2-10 %) hides the resolver's share, and two builds of the same code differ by up to about 5 %. The
+whole cycle, `HEAD` of that morning against the result, `ResolveText.bench.js`, two pairs: the
+default executer 15.7k-16.6k → 23.8k-23.9k at 20 distinct expressions, `context-object` and
+`esprima` about 3.5×, `with-scoped` about 2.8×, text without an expression unchanged.
 
-  Scanning scales linearly in every shape. On its own the cursor equals the array and the callback
-  costs 23-27 %. At `resolveText` the two passes are fastest in every run at every size, the cursor
-  trailing by 2-8 % and the callback by 2-11 %. Scanning is about a tenth of `resolveText`: 0.19 ms of
-  1.8 ms at 2,000 expressions.
+## 2026-09-27 — Is the scope prefix read one way for a text and the single expression alike?
 
-**Alternatives:** Keeping the callback and accepting 4-7 % on the resolver's share — rejected by the
-acceptance rule. Keeping the cursor, which saves the allocation and is on par in the small case —
-rejected for now because it trails at 200 and 2,000 expressions and nobody knows why yet. Letting the
-scanner catch a failing callback and leave the expression standing, which would save a promise per
-occurrence — rejected before measuring: it makes the scanner carry 7 on the resolver's behalf
-(2026-08-30).
+**Decision:** No — two implementations of the one rule of 3.3, Frank's decision. A text reads the
+prefix forwards from the start, only as far as the first character a name cannot carry
+(`splitScopeAndStatement`, used by `scan`); the single expression of `resolve` searches the first
+`::` with `indexOf` and checks backwards from it to the start, leaving at the first character a name
+cannot carry (`splitScopeAndStatementBySeparator`, used by `parseExpression`). Neither runs a
+regular expression any more; whitespace past ASCII is still decided by `\s`.
 
-**Consequences:** A later attempt starts from the open questions in B-45, above all why a scan
-interleaved with the awaits costs more than the same scan run up front. Whatever it tries is measured
-at `resolveText` and over long texts, not at the scanner alone: the scanner in isolation was the one
-place where the cursor looked like a win. The larger lever is probably not the scanner at all but the
-work per statement.
+**Reasoning:** Measured in one probe file with all three side by side, so no build lies between
+them, the content between the delimiters, 200 per call, hz, regular expression · forwards ·
+`indexOf` backwards: short, no scope 168k-181k · 193k-218k · 250k-259k; short, scoped 95k-100k ·
+120k-128k · 85k-117k; a quoted `::` 222k-234k · 302k-313k · 193k-203k; a 500-character chain
+166k-176k · 179k-188k · 165k-174k; 500 characters of words and spaces 11k · 4k · 154k-165k; a
+multi-line, indented statement 103k-107k · 78k-81k · 154k-160k. Forwards wins where it can stop
+early — a prefix, a quoted `::`, a chain; `indexOf` wins where a statement opens with a long run of
+name characters, which the forward loop walks at about 2.5 ns a character. Neither loses to the
+regular expression except forwards on the long runs.
+
+**Alternatives:** One implementation for both. The objection was heard before the decision: the
+measurements follow the shape of a statement, not the entry point, and a multi-line statement —
+the forward loop's worst case, half the speed of `indexOf` — is as common in a text as in `resolve`.
+`indexOf` for both would lose 7-30 % only where a statement is cheap anyway. At `resolveText` the
+choice did not move beyond the spread, apart from the case carrying a quoted `::`; the split is
+about 20 ns of the 240 ns an expression costs the resolver.
+
+**Consequences:** 3.3 has two implementations that can drift apart, so every case of
+`test/expressionscanner/scope-prefix.Test.js` is asked of both — through `scan` and through
+`parseExpression`. A change to the rule changes both functions and both halves of that file.
 
 ## 2026-09-27 — Is the suite laid out by section of the specification, or by component?
 
@@ -165,8 +201,8 @@ cases in the same move — deferred to B-44, so that the move can be counted.
 file; the scanner adds two lines and one function (`parseExpression`) and costs nothing measurable in
 `npm run bench`. A rule that spans components has cases in more than one suite, and only the headers
 lead from `SPECIFICATION.md` to them. `src/ExpressionScanner.js` is a published file (`CHANGELOG.md`)
-whose shape nothing promises. The `scan` suite reads the occurrences `scan` answers today; B-45
-changes that signature.
+whose shape nothing promises. The `scan` suite reads the occurrences `scan` answers; that shape
+stayed when B-45 was settled (2026-09-27, two passes).
 
 ## 2026-09-26 — Is an executer measured against a shared catalogue, or tested as a solution of its own?
 

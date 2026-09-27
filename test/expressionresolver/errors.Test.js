@@ -106,16 +106,4 @@ describe("ExpressionResolver - what the warnings say", () => {
 		const error = await catchError(() => resolver.resolve(`\${ ${STATEMENT} }`));
 		expect(error === raised).toBe(true);
 	});
-
-	// The threshold is one second, so this test cannot be quicker than that.
-	it("names a statement that runs longer than a second, without affecting the resolution", async () => {
-		const executer = new TestExecuter(() => new Promise((resolve) => setTimeout(() => resolve("late"), 1200)));
-		const resolver = new ExpressionResolver({ context: {}, name: "root", executer });
-		let result = null;
-		const warnings = await collectWarnings(async () => {
-			result = await resolver.resolve(`\${ ${STATEMENT} }`, "fallback");
-		});
-		expect(result).toBe("late");
-		expect(warnings.some((warning) => warning.includes(STATEMENT))).toBe(true);
-	});
 });

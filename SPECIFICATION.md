@@ -507,9 +507,6 @@ A **form that an entry point rejects itself** follows the same line: `resolve` t
 reject a first argument of neither call form with a `TypeError` (4.1), while in a text anything that
 is not an expression is text and no error arises at all (3.1).
 
-A statement that takes longer than one second produces a warning naming it. The resolution is
-not affected.
-
 ## 8. Public surface
 
 Everything listed here is public and may be used, the purely informative parts included: they
