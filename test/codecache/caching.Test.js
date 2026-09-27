@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import CodeCache from "../../src/CodeCache.js";
+import { catchError } from "../TestUtils.js";
 
 /**
  * CodeCache - storing, evicting, and switching the cache off and on. SPECIFICATION.md 9.3.
@@ -123,5 +124,43 @@ describe("CodeCache - caching", () => {
 		expect(cache.has("k0")).toBe(true);
 		expect(cache.has("k9")).toBe(true);
 		expect(cache.has("k8")).toBe(false);
+	});
+});
+
+describe("CodeCache - the size", () => {
+
+	// The size is not readable, so it shows in what is evicted: 5000 trims at 5500 entries, back down
+	// to the 5000 most recently used.
+	it(`starts with a size of 5000`, () => {
+		const cache = new CodeCache();
+		fill(cache, 5500);
+
+		expect(cache.has("k499")).toBe(false);
+		expect(cache.has("k500")).toBe(true);
+	});
+
+	// A default size taken on every call would shrink a cache larger than that default at once.
+	it(`keeps its size when setup is handed no size`, () => {
+		const cache = new CodeCache({ size: 2000 });
+		fill(cache, 2000);
+
+		cache.setup({});
+
+		expect(cache.has("k0")).toBe(true);
+	});
+
+	it(`rejects a size that is not a finite number`, async () => {
+		for (const size of ["10", null, NaN, Infinity]) {
+			const error = await catchError(() => new CodeCache({ size }));
+			expect(error instanceof TypeError).toBe(true);
+		}
+	});
+
+	// Rounding shows only in when the cache trims: 19 trims at 20 entries, 19.5 would wait for 21.
+	it(`rounds a fraction down`, () => {
+		const cache = new CodeCache({ size: 19.5 });
+		fill(cache, 20);
+
+		expect(cache.has("k0")).toBe(false);
 	});
 });

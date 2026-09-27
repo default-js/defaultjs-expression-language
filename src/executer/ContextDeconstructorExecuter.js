@@ -5,7 +5,7 @@ import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 
 let DEBUG = false;
 export const EXECUTERNAME = "context-deconstruction-executer";
-const EXPRESSION_CACHE = new CodeCache({ size: 5000 });
+const EXPRESSION_CACHE = new CodeCache();
 
 /**
  * How many names a context may carry before this executer says that binding them all costs. Every

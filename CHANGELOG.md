@@ -238,6 +238,48 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   either. Where no resolver provides a context, `effectiveChain` is the empty string. See
   `SPECIFICATION.md` 5.1 and 5.5.
 
+- **The constructor rejects a `parent`, a `context` or a `name` it cannot use.** Each raises a
+  `TypeError` naming the option, where the mistake used to surface somewhere else or not at all:
+  - a `parent` that is not an `ExpressionResolver` — a context object, a resolver from another copy
+    of the package — was dropped, which left a resolver without a chain whose executer answered
+    `undefined`. `null` and `undefined` still mean no parent;
+  - a `context` that is a primitive raised from inside the property cache for `"abc"`, `42` or
+    `true`, while `0`, `""` and `false` became an empty context that counted as providing one. Any
+    object is a context, and `null` or `undefined` still mean none. The static entry points build
+    their resolver through the constructor and reject such a context as well;
+  - a `name` must obey the character rule of a scope prefix — ASCII letters, digits, whitespace, `-`
+    and `_` — so that every name can be addressed by one; a name carrying `.`, `:` or `/`, an empty or
+    whitespace-only name and one that is no string are rejected. `""` and `0` used to get a generated
+    name. A passed name is kept **trimmed**: `" root "` is the resolver `root`.
+
+  See `SPECIFICATION.md` 4.2 and 5.1.
+
+- **The `filter` of the data methods is read like a scope prefix.** `getData`, `updateData`,
+  `deleteData` and `mergeContext` trim it, and a filter that is empty or whitespace only means no
+  filter, where `"  "` used to throw as a name no resolver carries. A filter that is no string raises
+  a `TypeError`. See `SPECIFICATION.md` 6.6.
+
+- **The instance `resolve` and `resolveText` reject an argument that is not a string.** Both reject
+  with a `TypeError`, as the static entry points do, and no default value applies. `resolveText(42)`
+  used to answer `42`, and `resolve(42)` raised a `TypeError` from inside the scanner and logged it
+  as a failed statement; no warning is written now, since no statement ran. See `SPECIFICATION.md`
+  4.2.
+
+- **The data methods take every property key, and reject what is none.** `getData`, `updateData`
+  and `deleteData` take a string, `""` included, a symbol or a number, and `0` addresses the first
+  element of an array. They used to treat every falsy key as missing: `getData(0)` and `getData("")`
+  answered the whole context, `updateData` and `deleteData` did nothing. Without a key — `null` or
+  `undefined` — `getData` still answers the whole context, while `updateData` and `deleteData` raise
+  a `TypeError`, as all three do for a key of another type. `mergeContext` still ignores `null` and
+  `undefined` and raises a `TypeError` for a primitive, which it used to ignore. See
+  `SPECIFICATION.md` 6.6.
+
+- **`setupExecuter` rejects a `size` that is not a finite number.** A string, `null`, `NaN` or
+  `Infinity` raises a `TypeError`. Before, such a size was taken as it was: `null` switched the cache
+  off, and `"abc"` or `NaN` left it without an upper bound, so it never evicted anything again. A
+  fraction is rounded down. See
+  `SPECIFICATION.md` 9.3.
+
 ### Removed
 
 - **No warning for a statement that runs longer than a second.** Every statement used to start a
@@ -263,6 +305,10 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   it in.
 
 ### Fixed
+
+- **`setupExecuter` without a `size` shrank the cache.** Every executer starts its code cache at
+  5000 entries, but `setupExecuter()` or `setupExecuter({})` set it to 1000 and evicted the rest. An
+  option left out now changes nothing. See `SPECIFICATION.md` 9.3.
 
 - **A scope prefix failed on a deep chain, and slowed down with every resolver it climbed.** The
   walk to the resolver a prefix names recursed once per resolver passed, so somewhere between 1,000

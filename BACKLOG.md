@@ -48,7 +48,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-27, B-40 |
 
-**Markers, counted 2026-09-27** (`npm test`: 328 passed, 328 cases). No `it.fails` is left and no
+**Markers, counted 2026-09-27** (`npm test`: 366 passed, 366 cases). No `it.fails` is left and no
 entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
 the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
 is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
@@ -57,9 +57,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
 | ID | Title | Status | Kind | 3.0.0 | Prio |
 | --- | --- | --- | --- | --- | --- |
-| B-03 | A `parent` that is not an `ExpressionResolver` is silently dropped | decision | defect | | |
-| B-04 | A context that is not an object throws from inside the property cache | decision | gap | | |
-| B-05 | The data methods of 6.6 raise a `TypeError` over a sealed or a frozen context | decision | gap | | |
 | B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
 | B-08 | `EsprimaExecuter` cannot reach a context value from inside a nested function | decision | executer | | low |
 | B-09 | `RESERVED_NAMES` in the esprima executer misspells `global` | agreed | defect | | low |
@@ -70,7 +67,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-14 | `"type": "module"` plus an `exports` field | decision | tooling | | |
 | B-15 | Was a `Context` export meant to exist on the public API? | decision | gap | | |
 | B-16 | The `module` entry produces a bundle nothing can consume | decision | defect | | |
-| B-17 | `src/Utils.js` is dead code, and it is published | decision | defect | | |
 | B-18 | Move `espree` 10 → 11? | decision | tooling | | low |
 | B-19 | `generate-license.config.json` sets a key that does not exist | decision | defect | | |
 | B-20 | Every code example in `README.md` uses a default import that does not exist | agreed | docs | | |
@@ -84,9 +80,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-28 | What happens to Dependabot while the v3 cycle runs | decision | tooling | | |
 | B-29 | Move the build from webpack to Vite? | decision | tooling | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
-| B-35 | A name the caller passes is checked against nothing | decision | gap | | |
-| B-36 | The instance entry points and the data methods take input of the wrong type without a rule | decision | gap | | |
-| B-37 | `setupExecuter` without a size sets 1000, not the 5000 an executer starts with | decision | gap | | |
 | B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | | |
 | B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | | |
 | B-50 | A line comment at the end of a statement breaks `EsprimaExecuter` | decision | executer | | low |
@@ -99,49 +92,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 None open.
 
 ## Resolver
-
-### B-03 · A `parent` that is not an `ExpressionResolver` is silently dropped
-
-- **Status:** decision
-- **Kind:** defect · **Spec:** 4.2
-- **Records:** `DECISIONS.md`, `CHANGELOG.md`
-
-The constructor keeps `parent` only if it passes `instanceof ExpressionResolver` and takes `null`
-otherwise, so a wrong value — a context object, a resolver from another copy of the package,
-`undefined` from a missed lookup — yields a resolver without a chain, and every lookup that should
-climb answers the default. An unregistered `executer` name throws instead, which is the behaviour
-that makes the mistake visible. **Since the executer is inherited (2026-09-22) the dropped parent
-leaves a second trace:** the executer is taken from `parent.executer` *before* the `instanceof`
-check, so `new ExpressionResolver({ parent: {} })` holds `undefined` as its executer, the getter
-answers `undefined` against 4.2, and a child inherits it. Resolution still works only because the
-module-level `resolve` defaults `aExecuter` to `DEFAULT_EXECUTER`. Checking the normalized
-`this.#parent` instead of the raw option closes that half whichever way the question is decided.
-
-### B-04 · A context that is not an object throws from inside the property cache
-
-- **Status:** decision
-- **Kind:** gap · **Spec:** none — the specification says nothing about what a context may be
-- **Pinned by:** `test/resolvercontexthandle/context-shape.Test.js`, asserting only *that* it throws
-
-`ResolverContextHandle` keeps whatever it is handed except a falsy value (`data || {}`), so
-`context: "abc"`, `42` or `true` reaches `Reflect.ownKeys` on a primitive and throws
-`TypeError: Reflect.ownKeys called on non-object` from three frames below the constructor, while `0`
-and `false` silently become an empty context. To decide: reject with an error that names the
-mistake, coerce (`Object(context)`), or take an empty context as the falsy half already does.
-
-### B-05 · The data methods of 6.6 raise a `TypeError` over a sealed or a frozen context, and nothing says so
-
-- **Status:** decision
-- **Kind:** gap · **Spec:** 6.6
-- **Records:** `SPECIFICATION.md`
-
-`mergeData` writes with `Object.assign` and the handle's `set` trap assigns, both in strict-mode
-module code, so a write the object refuses raises. Over a sealed context `updateData` raises for a
-new key, `mergeContext` for a new key, `deleteData` even for an existing one; over a frozen context
-all four raise (measured 2026-09-07, node 22). 6.5 says the equivalent for a write from an expression
-("fails as it would on the object itself"), 6.6 says nothing for the supported path. The suite has no
-sealed context at all — `Object.seal` and `Object.preventExtensions` appear in no test. To decide:
-6.6 gains a sentence and cases follow it, or a refused change is swallowed.
 
 ### B-07 · A name found at the top of a resolver chain costs as much as one found at the bottom
 
@@ -325,15 +275,6 @@ points at the raw `./index.js`. It is also what forces `optimization.usedExports
 (`DECISIONS.md`, 2026-08-21). With a library configuration, tree shaking can come back; without the
 entry, two bundles are published instead of three.
 
-### B-17 · `src/Utils.js` is dead code, and it is published
-
-- **Status:** decision — delete, or make it an intended helper with a test and a readme mention
-- **Kind:** defect · **Spec:** 8 (not listed)
-- **Records:** `CHANGELOG.md`
-
-It exports `stringToHashcode`, which nothing imports — not `src/`, the entries, the tests, nor any
-bundle. It ships because `files` publishes `src/**` raw, and it is the largest uncovered file.
-
 ### B-18 · Decide whether to move `espree` 10 → 11
 
 - **Status:** decision
@@ -354,37 +295,6 @@ The file sets `"omitVersion": true`; `generate-license-file` 4.2.1 knows `omitVe
 (its `README.md` and `src/lib/cli/commands/main.d.ts`). The key is silently ignored, so
 `LICENSE-OF-THIRD-PARTY` carries versions and churns on every dependency bump. Fixing it changes a
 published file.
-
-### B-35 · A name the caller passes is checked against nothing
-
-- **Status:** decision
-- **Kind:** gap · **Spec:** 3.3, 5.1, 5.5
-
-5.1 holds a *generated* name to the character rule of 3.3 and says nothing about a passed one. The
-constructor takes any truthy value: a name carrying `.` or `:` can never be addressed by a scope
-prefix while a filter (6.6) still finds it, a `/` breaks the path `chain` answers (5.5), and `""` or
-`0` get a generated name instead. To decide: reject such a name, or state that only a name obeying
-3.3 is addressable by a prefix.
-
-### B-36 · The instance entry points and the data methods take input of the wrong type without a rule
-
-- **Status:** decision
-- **Kind:** gap · **Spec:** 4.2, 4.3, 6.6
-
-4.1 rejects a first argument of the wrong type with a `TypeError`; nothing is said for the instance.
-Measured 2026-09-22: `resolver.resolveText(42)` answers `42`, `resolver.resolve(42)` raises a
-`TypeError` out of `trim` and logs it as a failed statement, `mergeContext` ignores anything that is
-not an object, and `updateData` and `deleteData` ignore an empty key. To decide: one rule for all of
-them, most likely the one 4.1 already has.
-
-### B-37 · `setupExecuter` without a size sets 1000, not the 5000 an executer starts with
-
-- **Status:** decision
-- **Kind:** gap · **Spec:** 9.3
-
-Every executer builds its cache with `{ size: 5000 }`; `CodeCache.setup` defaults a missing `size` to
-1000, so `setupExecuter({})` or `setupExecuter()` shrinks the cache instead of leaving it alone. 9.3
-names neither number. To decide: which default is meant, and whether 9.3 states it.
 
 ## Documentation and naming
 
@@ -570,13 +480,13 @@ for is done.
 - **Status:** investigate — none of it is a missing test for a rule
 - **Kind:** test
 
-Measured 2026-09-27 with `npm run test:coverage`, 328 cases: statements **93.75 %** (601/641),
-branches **91.76 %** (301/328), functions **92.03 %** (104/113), lines **96.21 %** (534/555) — the
-counts moved with the comment scanning and the argument checks of 4.1, not with any case; the review
-of the component suites (B-44) left every line, function and branch as covered as before. Update
-these numbers when the picture changes rather than adding another baseline. Uncovered lines:
+Measured 2026-09-27 with `npm run test:coverage`, 366 cases: statements **95.02 %** (649/683),
+branches **94.35 %** (334/354), functions **92.30 %** (108/117), lines **96.74 %** (565/584), after
+the input rules of the decision round of that day (B-03 to B-37) were implemented. Update these
+numbers when the picture changes rather than adding another baseline. Uncovered lines:
 
-1. `src/Utils.js`, all of it — B-17.
+1. `stringToHashcode` in `src/Utils.js`. Nothing imports it; it stays, deliberately without a test
+   (Frank, 2026-09-27).
 2. The `setDebug` bodies of `ContextDeconstructorExecuter.js` and `EsprimaExecuter.js`. The surface
    test asserts they exist and deliberately never flips them: a debug switch has nothing observable.
 3. `set` and `delete` of `createGlobalCacheWrapper` in `ResolverContextHandle.js`. A global context
@@ -589,11 +499,11 @@ these numbers when the picture changes rather than adding another baseline. Unco
 6. The reserved-callee branch of the esprima rewrite (`EsprimaExecuter.js:49`,
    `CALLEXPRESSION__RESERVED__CALLEES`): no case ever calls `fetch(…)` or `console(…)` bare — the two
    global cases ask `typeof`, and `console.log(…)` has a member as callee. Found 2026-09-26.
-7. **New on 2026-09-27:** the non-ASCII half of `isNameCharacter` in `ExpressionScanner.js`, which
-   3.3 leaves to `\s`. No case puts whitespace past ASCII — a no-break space, say — into a scope name.
+7. **New on 2026-09-27:** `if (typeof aStatement !== "string") return aStatement;` in `execute` of
+   `ExpressionResolver.js`. Since the instance `resolve` rejects a non-string (4.2), every statement
+   reaching it is a string or null from the scanner, so the branch looks unreachable — check, then
+   delete it rather than cover it.
 
-`src/version.js` is generated; its 0 % is noise. The 27 open branches sit in the scanner's state
-machine, in `EsprimaExecuter`, and in four input guards of `ExpressionResolver.js` — a statement that
-is not a string, an empty key in `updateData` and `deleteData`, a text that is not a string in the
-instance `resolveText`. The guards are B-36's; the rest are combinations of literal states, not rules
-without a test.
+`src/version.js` is generated; its 0 % is noise. The 20 open branches sit in the scanner's state
+machine — combinations of literal states — and in the lines listed above; none is a rule without a
+test.

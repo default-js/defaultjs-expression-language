@@ -4,10 +4,11 @@ import { EXECUTERNAME as ContextDeconstructorExecuterName } from "../../src/exec
 import Executer from "../../src/Executer.js";
 import getExecuter from "../../src/ExecuterRegistry.js";
 import TestExecuter from "../TestExecuter.js";
+import { catchError } from "../TestUtils.js";
 
 /**
- * ExpressionResolver - the constructor, the instance entry points, name and parent.
- * SPECIFICATION.md 4.2, 5.1.
+ * ExpressionResolver - the constructor, the instance entry points, name and parent, and the options
+ * the constructor rejects. SPECIFICATION.md 4.2, 5.1.
  *
  * What an omitted or a null context means is the handle's (6.3), and which resolvers provide one is
  * `chain-inspection.Test.js`.
@@ -30,6 +31,22 @@ describe("ExpressionResolver - the instance entry points", () => {
 		const resolver = new ExpressionResolver({ context: { value: undefined }, executer: lookup() });
 		const result = await resolver.resolve("${ value }", "fallback");
 		expect(result).toBe("fallback");
+	});
+
+	// SPECIFICATION.md 4.2, as 4.1 has it for the static entry points: no statement ran, so the
+	// default does not apply. It passed before the rule as well, with the TypeError `trim` raised on a
+	// number; that it is the resolver's own rejection shows in errors.Test.js, where no warning names
+	// a failed statement.
+	it("resolve rejects an expression that is not a string, whatever default it carries", async () => {
+		const resolver = new ExpressionResolver({ context: {}, executer: new TestExecuter() });
+		const error = await catchError(() => resolver.resolve(42, "fallback"));
+		expect(error instanceof TypeError).toBe(true);
+	});
+
+	it("resolveText rejects a text that is not a string", async () => {
+		const resolver = new ExpressionResolver({ context: {}, executer: new TestExecuter() });
+		const error = await catchError(() => resolver.resolveText(42));
+		expect(error instanceof TypeError).toBe(true);
 	});
 
 	// Identity rather than an answer, like the cases below: the rule is which executer the resolver
@@ -138,5 +155,54 @@ describe("ExpressionResolver - name and parent", () => {
 		const root = new ExpressionResolver({ context: {}, name: "root" });
 		const leaf = new ExpressionResolver({ context: {}, name: "leaf", parent: root });
 		expect(leaf.parent === root).toBe(true);
+	});
+
+	// 5.1 holds a passed name to the rule of 3.3, which trims a prefix - so a name kept with its outer
+	// whitespace could never be addressed.
+	it("trims a name the caller passed", async () => {
+		const resolver = new ExpressionResolver({ context: {}, name: " root " });
+		expect(resolver.name).toBe("root");
+	});
+});
+
+// SPECIFICATION.md 4.2, 5.1 - a mistake in the calling code is rejected where it is made, rather than
+// answering as a resolver without a chain, over a context that is none, or under a name no prefix can
+// address. Only the type of the error is pinned, not its message.
+describe("ExpressionResolver - the constructor rejects what cannot mean an option", () => {
+
+	it("throws a TypeError on a parent that is not a resolver", async () => {
+		for (const parent of [{}, { name: "root", parent: null }, 42, "root"]) {
+			const error = await catchError(() => new ExpressionResolver({ context: {}, parent }));
+			expect(error instanceof TypeError).toBe(true);
+		}
+	});
+
+	it("throws a TypeError on a context that is a primitive, a falsy one included", async () => {
+		for (const context of ["abc", 42, true, Symbol("context"), 1n, 0, "", false]) {
+			const error = await catchError(() => new ExpressionResolver({ context }));
+			expect(error instanceof TypeError).toBe(true);
+		}
+	});
+
+	it("throws a TypeError on a name carrying a character outside the rule of 3.3", async () => {
+		for (const name of ["a.b", "a:b", "a/b", "Äpfel"]) {
+			const error = await catchError(() => new ExpressionResolver({ context: {}, name }));
+			expect(error instanceof TypeError).toBe(true);
+		}
+	});
+
+	// An empty name is a value that was passed, not a name left out - only null and undefined are.
+	it("throws a TypeError on a name that is empty or whitespace only", async () => {
+		for (const name of ["", "  "]) {
+			const error = await catchError(() => new ExpressionResolver({ context: {}, name }));
+			expect(error instanceof TypeError).toBe(true);
+		}
+	});
+
+	it("throws a TypeError on a name that is not a string", async () => {
+		for (const name of [42, 0, true, {}]) {
+			const error = await catchError(() => new ExpressionResolver({ context: {}, name }));
+			expect(error instanceof TypeError).toBe(true);
+		}
 	});
 });

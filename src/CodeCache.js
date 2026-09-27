@@ -7,8 +7,12 @@
 
 /**
  * @typedef {Object} CodeCacheOptions
- * @property {number} [size=1000] - Maximum number of entries in the cache. If set to 0 or less, caching is disabled.
+ * @property {number} [size] - Maximum number of entries in the cache, a fraction rounded down. If set
+ * to 0 or less, caching is disabled. Left out, the size stays as it is - SPECIFICATION.md 9.3.
  */
+
+/** The size every cache starts with - SPECIFICATION.md 9.3. */
+const START_SIZE = 5000;
 
 /**
  * CodeCache class to manage caching of generated code snippets.
@@ -34,27 +38,42 @@ export default class CodeCache {
 
 
 	/**
+	 * Starts with a size of 5000, then applies the options.
+	 *
 	 * @param {CodeCacheOptions} options
 	 */
 	constructor(options = {}) {
+		this.#resize(START_SIZE);
 		this.setup(options);
 	}
 
 	/**
-	 * Applies a new size. A size of 0 or less disables the cache and releases its entries,
-	 * a later positive size enables it again and starts empty.
+	 * Applies what the options carry and leaves everything else as it is. A size of 0 or less
+	 * disables the cache and releases its entries, a later positive size enables it again and starts
+	 * empty.
 	 *
 	 * @param {CodeCacheOptions} options
+	 * @throws {TypeError} where the size is not a finite number
 	 */
-	setup({ size = 1000 } = {}) {
-		this.#disabled = size <= 0;
+	setup({ size } = {}) {
+		if (size === undefined) return;
+		if (typeof size !== "number" || !Number.isFinite(size)) throw new TypeError(`The size of a code cache is a finite number, not ${String(size)}!`);
+
+		this.#resize(Math.floor(size));
+	}
+
+	/**
+	 * @param {number} aSize a whole number
+	 */
+	#resize(aSize) {
+		this.#disabled = aSize <= 0;
 		if (this.#disabled) {
 			this.#size = 0;
 			this.#maxSize = 0;
 			this.clear();
 		} else {
-			this.#size = size;
-			this.#maxSize = Math.floor(size * 1.1);
+			this.#size = aSize;
+			this.#maxSize = Math.floor(aSize * 1.1);
 			this.#trim();
 		}
 	}

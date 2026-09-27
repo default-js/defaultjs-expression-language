@@ -44,9 +44,9 @@ describe("ResolverContextHandle - writing into a frozen object", () => {
 
 	// SPECIFICATION.md 6.1, 6.5: the write fails as it would on the object itself. The frozen object
 	// cannot change whatever the handle does, so each case asks the handle instead: it must not keep
-	// the refused value anywhere else and answer it. Whether the failure is raised or swallowed is not
-	// asserted - that is the open decision of B-05. One case per way of writing, as above; the data
-	// methods of a resolver reach the handle through exactly these three.
+	// the refused value anywhere else and answer it. That the failure is raised is the describe below.
+	// One case per way of writing, as above; the data methods of a resolver reach the handle through
+	// exactly these three.
 	it("a write through the proxy is refused by a frozen object", async () => {
 		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
 		await catchError(() => {
@@ -67,5 +67,63 @@ describe("ResolverContextHandle - writing into a frozen object", () => {
 		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
 		await catchError(() => handle.mergeData({ value: "after" }));
 		expect(handle.proxy.value).toBe("before");
+	});
+});
+
+describe("ResolverContextHandle - a refused change raises what the object raises", () => {
+
+	// SPECIFICATION.md 6.6, B-05. The handle writes in strict-mode module code, so a change the object
+	// refuses raises the object's own TypeError; these cases pin that it is handed on, not swallowed.
+	// Written after the behaviour, which was measured on 2026-09-07 - they guard it, they prove no fix.
+	it("a write through the proxy raises over a frozen object", async () => {
+		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
+		const error = await catchError(() => {
+			handle.proxy.value = "after";
+		});
+		expect(error instanceof TypeError).toBe(true);
+	});
+
+	it("a delete through the proxy raises over a frozen object", async () => {
+		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
+		const error = await catchError(() => {
+			delete handle.proxy.value;
+		});
+		expect(error instanceof TypeError).toBe(true);
+	});
+
+	it("mergeData raises over a frozen object", async () => {
+		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
+		const error = await catchError(() => handle.mergeData({ value: "after" }));
+		expect(error instanceof TypeError).toBe(true);
+	});
+
+	it("a write of a new key through the proxy raises over a sealed object", async () => {
+		const handle = new ResolverContextHandle(Object.seal({ value: "before" }));
+		const error = await catchError(() => {
+			handle.proxy.fresh = "new";
+		});
+		expect(error instanceof TypeError).toBe(true);
+	});
+
+	it("a delete through the proxy raises over a sealed object", async () => {
+		const handle = new ResolverContextHandle(Object.seal({ value: "before" }));
+		const error = await catchError(() => {
+			delete handle.proxy.value;
+		});
+		expect(error instanceof TypeError).toBe(true);
+	});
+
+	it("mergeData of a new key raises over a sealed object", async () => {
+		const handle = new ResolverContextHandle(Object.seal({ value: "before" }));
+		const error = await catchError(() => handle.mergeData({ fresh: "new" }));
+		expect(error instanceof TypeError).toBe(true);
+	});
+
+	// mergeData assigns key by key, so what stands before the refused key is written.
+	it("mergeData keeps the keys written before the one the object refused", async () => {
+		const handed = Object.seal({ value: "before" });
+		const handle = new ResolverContextHandle(handed);
+		await catchError(() => handle.mergeData({ value: "after", fresh: "new" }));
+		expect(handed.value).toBe("after");
 	});
 });

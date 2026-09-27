@@ -1,3 +1,47 @@
+/**
+ * The helpers more than one component uses - AGENTS.md, Conventions. Internal to the package:
+ * index.js does not export them.
+ */
+
+/** Whitespace in the sense of `\s`. */
+export const WHITESPACE = /\s/;
+
+/**
+ * Whether a character may stand in a scope name - SPECIFICATION.md 3.3: an ASCII letter, a digit,
+ * "-", "_", or whitespace in the sense of `\s`, which past ASCII is left to the regular expression.
+ *
+ * @param {number} aCode the char code
+ * @returns {boolean}
+ */
+export const isNameCharacter = (aCode) => {
+	if (aCode < 0x80)
+		return (
+			(aCode >= 0x61 && aCode <= 0x7a) ||
+			(aCode >= 0x41 && aCode <= 0x5a) ||
+			(aCode >= 0x30 && aCode <= 0x39) ||
+			aCode === 0x2d ||
+			aCode === 0x5f ||
+			aCode === 0x20 ||
+			(aCode >= 0x09 && aCode <= 0x0d)
+		);
+
+	return WHITESPACE.test(String.fromCharCode(aCode));
+};
+
+/**
+ * Trims a string, and answers null for one that is empty.
+ *
+ * @param {?string} value
+ * @returns {?string}
+ */
+export const normalize = (value) => {
+	if (value) {
+		value = value.trim();
+		return value.length == 0 ? null : value;
+	}
+	return null;
+};
+
 export const stringToHashcode = (aString) => {
 	let hash = 0;
 	if (aString.length == 0) return hash;

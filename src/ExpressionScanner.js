@@ -6,6 +6,8 @@
  * Internal to the package: index.js does not export it.
  */
 
+import { WHITESPACE, isNameCharacter, normalize } from "./Utils.js";
+
 const EXPRESSION_START = "${";
 
 // the scanner states - everything that is not code hides the braces inside it, see
@@ -23,7 +25,6 @@ const LINE_COMMENT = 7;
 // these - the classic division-or-regex question, decided on the last character that is neither
 // whitespace nor part of a comment
 const BEFORE_DIVISION = /[a-zA-Z0-9_$)\]]/;
-const WHITESPACE = /\s/;
 
 // the characters the scanner decides on, compared as char codes rather than as one-character strings
 const BACKSLASH = 0x5c;
@@ -44,39 +45,6 @@ const CLOSE_BRACKET = 0x5d;
 const COLON = 0x3a;
 
 const SCOPE_SEPARATOR = "::";
-
-/**
- * Whether a character may stand in a scope name - SPECIFICATION.md 3.3: an ASCII letter, a digit,
- * "-", "_", or whitespace in the sense of `\s`, which past ASCII is left to the regular expression.
- */
-const isNameCharacter = (aCode) => {
-	if (aCode < 0x80)
-		return (
-			(aCode >= 0x61 && aCode <= 0x7a) ||
-			(aCode >= 0x41 && aCode <= 0x5a) ||
-			(aCode >= 0x30 && aCode <= 0x39) ||
-			aCode === 0x2d ||
-			aCode === 0x5f ||
-			aCode === 0x20 ||
-			(aCode >= 0x09 && aCode <= 0x0d)
-		);
-
-	return WHITESPACE.test(String.fromCharCode(aCode));
-};
-
-/**
- * Trims a statement, and answers null for one that is empty.
- *
- * @param {?string} value
- * @returns {?string}
- */
-export const normalize = (value) => {
-	if (value) {
-		value = value.trim();
-		return value.length == 0 ? null : value;
-	}
-	return null;
-};
 
 /**
  * Whether the "/" at aIndex opens a regular expression literal, decided on the character before it

@@ -85,7 +85,7 @@ export default class ResolverContextHandle {
 	 * @param {ResolverContextHandle} parent
 	 */
 	constructor(context, parent) {
-		this.#data = isNullOrUndefined(context) ? null : context || {};
+		this.#data = isNullOrUndefined(context) ? null : context;
 		this.#parent = parent ? parent : null;
 		this.#providesData = !isNullOrUndefined(context);
 
@@ -199,13 +199,12 @@ export default class ResolverContextHandle {
 	}
 
 	updateData(data) {
-		this.#data = isNullOrUndefined(data) ? null : data || {};
+		this.#data = isNullOrUndefined(data) ? null : data;
 		this.#providesData = !isNullOrUndefined(data);
 		this.#cache = this.#initPropertyCache();
 	}
 
 	mergeData(data) {
-		if (typeof data !== "object" || data == null) return;
 		this.#data ??= {};
 		Object.assign(this.#data, data);
 		this.#providesData = true;

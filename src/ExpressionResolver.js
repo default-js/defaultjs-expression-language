@@ -5,6 +5,7 @@ import DefaultExecuter from "./executer/ContextDeconstructorExecuter.js";
 import ResolverContextHandle from "./ResolverContextHandle.js";
 import Executer from "./Executer.js";
 import { scan, parseExpression } from "./ExpressionScanner.js";
+import { isNameCharacter, normalize } from "./Utils.js";
 
 /** @type {Executer} */
 let DEFAULT_EXECUTER = DefaultExecuter;
@@ -24,6 +25,57 @@ let NAME_COUNTER = 0;
  * @returns {string}
  */
 const generateName = () => `ER${++NAME_COUNTER}`;
+
+/**
+ * The name a resolver keeps: the one passed, trimmed and held to the rule of 3.3, or a generated one
+ * where none was passed - SPECIFICATION.md 5.1.
+ *
+ * @param {?string} aName
+ * @returns {string}
+ * @throws {TypeError} where the name is no string, empty, or carries a character 3.3 does not allow
+ */
+const toName = (aName) => {
+	if (aName == null) return generateName();
+	if (typeof aName !== "string") throw new TypeError(`The option name takes a string, not a ${typeof aName}!`);
+
+	const name = normalize(aName);
+	if (name == null) throw new TypeError("The option name takes a name, not an empty string!");
+	for (let index = 0; index < name.length; index++)
+		if (!isNameCharacter(name.charCodeAt(index))) throw new TypeError(`The name "${name}" carries a character a scope name cannot carry (SPECIFICATION.md 3.3)!`);
+
+	return name;
+};
+
+/**
+ * The scope name a filter of the data methods selects, read like a scope prefix: trimmed, and null
+ * where there is none - SPECIFICATION.md 6.6.
+ *
+ * @param {?string} aFilter
+ * @returns {?string}
+ * @throws {TypeError} where the filter is no string
+ */
+const toScope = (aFilter) => {
+	if (aFilter == null) return null;
+	if (typeof aFilter !== "string") throw new TypeError(`A filter is a scope name, not a ${typeof aFilter}!`);
+
+	return normalize(aFilter);
+};
+
+/**
+ * The property key a data method works with - a string, "" included, a symbol, or a number, which
+ * names the same property as its string and is looked up as one - SPECIFICATION.md 6.6.
+ *
+ * @param {string|number|symbol} aKey
+ * @returns {string|symbol}
+ * @throws {TypeError} where the key is none, or of a type no property key has
+ */
+const toKey = (aKey) => {
+	const type = typeof aKey;
+	if (type === "string" || type === "symbol") return aKey;
+	if (type === "number") return String(aKey);
+
+	throw new TypeError(`A key is a string, a number or a symbol, not ${aKey == null ? "missing" : `a ${type}`}!`);
+};
 
 const execute = async function (anExecuter, aStatement, aContext) {
 	// 3.4: an empty statement answers undefined, the same as `return;` in JavaScript. The scanner
@@ -110,20 +162,25 @@ export default class ExpressionResolver {
 	 * @param {{ context?: any; parent?: any; name?: any; executer?: (string|Executer); }} options
 	 * @param {object} [options.context] where none is passed, the resolver has no context of its own - 4.2
 	 * @param {ExpressionResolver} [options.parent=null]
-	 * @param {?string} [options.name=null] where none is passed, one is generated - 5.1
+	 * @param {?string} [options.name=null] kept trimmed; where none is passed, one is generated - 5.1
 	 * @param {(string|Executer)} [options.executer] the registered name of an executer, or an
 	 * `Executer` instance. A name that is not registered throws; an instance needs no registration,
 	 * because it addresses the executer directly. Without the option the resolver uses
 	 * `ExpressionResolver.defaultExecuter` - 4.2.
+	 * @throws {TypeError} where the parent is no resolver, the context a primitive, or the name breaks
+	 * the rule of 5.1 - 4.2
 	 */
 	constructor({ context, parent = null, name = null, executer } = {}) {
+		if (parent != null && !(parent instanceof ExpressionResolver)) throw new TypeError("The option parent takes an ExpressionResolver!");
+		if (context != null && typeof context !== "object" && typeof context !== "function") throw new TypeError(`The option context takes an object, not a ${typeof context}!`);
+		this.#name = toName(name);
+
 		if(executer instanceof Executer) this.#executer =  executer;
 		else if (typeof executer === "string") this.#executer = getExecuterType(executer);
 		else if(parent != null) this.#executer = parent.executer;
 		else this.#executer = ExpressionResolver.defaultExecuter;
-		
-		this.#parent = parent instanceof ExpressionResolver ? parent : null;
-		this.#name = name || generateName();		
+
+		this.#parent = parent;
 		this.#contextHandle = new ResolverContextHandle(context , this.#parent ? this.#parent.contextHandle : null);
 		this.#context = this.#contextHandle.proxy;
 	}
@@ -216,19 +273,19 @@ export default class ExpressionResolver {
 	 * a wrong name in an API call is a mistake in the calling code, unlike a scope prefix inside an
 	 * expression, which answers undefined (5.4). See SPECIFICATION.md 6.6.
 	 *
-	 * @param {?string} filter
+	 * @param {?string} aScope the filter as `toScope` reads it
 	 * @returns {ExpressionResolver}
 	 */
-	#findResolver(filter) {
-		if (!filter) return this;
+	#findResolver(aScope) {
+		if (!aScope) return this;
 
 		let resolver = this;
 		while (resolver) {
-			if (resolver.name === filter) return resolver;
+			if (resolver.name === aScope) return resolver;
 			resolver = resolver.parent;
 		}
 
-		throw new Error(`Filter "${filter}" matches no resolver of the chain!`);
+		throw new Error(`Filter "${aScope}" matches no resolver of the chain!`);
 	}
 
 	/**
@@ -260,10 +317,10 @@ export default class ExpressionResolver {
 	 * @returns {*}
 	 */
 	getData(key, filter) {
-		const resolver = this.#findResolver(filter);
-		if (!key) return resolver.context;
+		const resolver = this.#findResolver(toScope(filter));
+		if (key == null) return resolver.context;
 
-		return resolver.context[key];
+		return resolver.context[toKey(key)];
 	}
 
 	/**
@@ -278,11 +335,12 @@ export default class ExpressionResolver {
 	 * @param {?string} filter
 	 */
 	updateData(key, value, filter) {
-		const resolver = this.#findResolver(filter);
-		if (!key) return;
+		const property = toKey(key);
+		const scope = toScope(filter);
+		const resolver = this.#findResolver(scope);
 
-		const target = filter ? resolver : this.#resolverForKey(key) || this;
-		target.context[key] = value;
+		const target = scope ? resolver : this.#resolverForKey(property) || this;
+		target.context[property] = value;
 	}
 
 	/**
@@ -296,11 +354,12 @@ export default class ExpressionResolver {
 	 * @param {?string} filter
 	 */
 	deleteData(key, filter) {
-		const resolver = this.#findResolver(filter);
-		if (!key) return;
+		const property = toKey(key);
+		const scope = toScope(filter);
+		const resolver = this.#findResolver(scope);
 
-		const target = filter ? resolver : this.#resolverForKey(key);
-		if (target) delete target.context[key];
+		const target = scope ? resolver : this.#resolverForKey(property);
+		if (target) delete target.context[property];
 	}
 
 	/**
@@ -314,7 +373,11 @@ export default class ExpressionResolver {
 	 * @param {?string} filter
 	 */
 	mergeContext(context, filter) {
-		this.#findResolver(filter).contextHandle.mergeData(context);
+		const resolver = this.#findResolver(toScope(filter));
+		if (context == null) return;
+		if (typeof context !== "object" && typeof context !== "function") throw new TypeError(`mergeContext takes an object, not a ${typeof context}!`);
+
+		resolver.contextHandle.mergeData(context);
 	}
 
 	/**
@@ -326,6 +389,8 @@ export default class ExpressionResolver {
 	 * @returns {Promise<*>}
 	 */
 	async resolve(aExpression, aDefault) {
+		// 4.2: a mistake in the calling code, not a failed statement - so no warning and no default
+		if (typeof aExpression !== "string") throw new TypeError(`resolve takes an expression as a string, not a ${typeof aExpression}!`);
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		try {
 			// 4.3: the delimited form or a bare statement, told apart by the scanner
@@ -347,8 +412,8 @@ export default class ExpressionResolver {
 	 * @returns {Promise<*>}
 	 */
 	async resolveText(aText, aDefault) {
+		if (typeof aText !== "string") throw new TypeError(`resolveText takes a text as a string, not a ${typeof aText}!`);
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
-		if (typeof aText !== "string") return aText;
 
 		const occurrences = scan(aText);
 		if (!occurrences) return aText;

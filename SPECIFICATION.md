@@ -171,8 +171,21 @@ resolver.resolveText(aText, aDefault)                                      // �
 
 `parent` defaults to `null` and `name` to a generated name (5.1). Leaving `context` out,
 `context: null` and `context: undefined` are **the same thing**: the resolver has no context of its
-own (6.3), whichever executer it runs. `executer` takes the **registered name** of an executer or an
-**`Executer` instance**. A name is looked up in the registry and an unregistered one throws; an
+own (6.3), whichever executer it runs.
+
+The constructor **rejects with a `TypeError`**, naming the option, what is a mistake in the calling
+code rather than data:
+
+- a `parent` other than `null`, `undefined` or an `ExpressionResolver` — a resolver from another
+  copy of the package included, since the chain reaches into its private state;
+- a `context` that is a primitive — a string, a number, a boolean, a symbol or a bigint, `0`, `""`
+  and `false` included. Any object is a context (6.1), and `null` or `undefined` is none;
+- a `name` that breaks the rule of 5.1.
+
+The static entry points build their resolver through the constructor, so a context of the wrong type
+rejects their call as well.
+
+`executer` takes the **registered name** of an executer or an **`Executer` instance**. A name is looked up in the registry and an unregistered one throws; an
 instance is taken as it is and needs no registration, because it already addresses the executer.
 Anything that is neither is ignored, as though the option were left out.
 
@@ -185,6 +198,10 @@ built under it that does not name its own. The getter `executer` answers the one
 The instance methods stay **positional** and get no configuration form of their own. Everything a
 configuration would carry beyond the default value — the context and the executer — is already
 fixed on the instance and must not be overridable per call.
+
+`resolve` takes an expression and `resolveText` a text, each a **string**; anything else is
+**rejected with a `TypeError`**, as in 4.1. No statement ran, so no warning names one (7), and no
+default value applies.
 
 ### 4.3 `resolve` versus `resolveText`
 
@@ -239,7 +256,14 @@ promise is awaited before it is answered or inserted into a text.
 Every resolver carries a `name` and may carry a `parent`. A resolver sees its own context and
 the contexts of **all its parents**; it never sees the context of a resolver below it.
 
-A name is not optional. Where the caller passes none, the resolver **generates** one. The only
+A name the caller passes obeys the **same rule as a scope prefix** (3.3): a string of the characters
+3.3 allows, **trimmed** at both ends before it is kept, so `" root "` is the resolver `root`. A name
+that carries any other character, that is empty or whitespace only, or that is no string at all is
+rejected (4.2). So every name can be addressed by a prefix, and a chain path (5.5) can always be
+split back into its names.
+
+A name is not optional. Where the caller passes none — `null`, `undefined`, or the option left
+out — the resolver **generates** one. The only
 requirement on a generated name is that it is **unique** and obeys the character rule of 3.3; its
 shape is not part of this specification, and a consumer must not depend on it. `ER` plus a
 counter — `ER1`, `ER2` — is what the implementation uses. A generated name is addressable like
@@ -338,7 +362,7 @@ Three further rules hold for any context:
   resolver was built over a frozen object, the write fails as it would on the object itself.
 - **Any object works as a context**, a frozen or sealed one included, and so do an array, a `Map`, a
   `Set`, a `NodeList` and a DOM element. Which of them a given executer can run a statement over is
-  that executer's own (9.2).
+  that executer's own (9.2). A primitive is no context and is rejected (4.2).
 
 A context that **is** the global object is the exception to all of this; see 6.4.
 
@@ -417,7 +441,7 @@ intercept it. `buildSecure` (6.7) filters the context, not the globals.
 ### 6.6 Reading and writing from outside
 
 ```javascript
-resolver.getData(key, filter)             // → value, or the whole context when key is empty
+resolver.getData(key, filter)             // → value, or the whole context without a key
 resolver.updateData(key, value, filter)
 resolver.deleteData(key, filter)
 resolver.mergeContext(context, filter)
@@ -429,14 +453,24 @@ expression (6.5) their behaviour is guaranteed and identical under every execute
 **The three that write, write into the object the caller handed over.** A resolver keeps that object
 rather than a copy, so `updateData`, `deleteData` and `mergeContext` add, replace and remove keys on
 it, and code outside the resolver holding the same reference sees the change. A caller who does not
-want that hands over a copy.
+want that hands over a copy. A change the object refuses — any change to a frozen one, a new key or a
+deletion on a sealed one — **raises the error the object raises**, as a write from an expression
+does (6.1). `mergeContext` assigns key by key, so the keys before the refused one are already
+written when it raises.
+
+**A key** is what JavaScript takes as a property key: a string, `""` included, a symbol, or a number,
+so `0` addresses the first element of an array. Without a key — `null` or `undefined` — `getData`
+answers the whole context (below), while `updateData` and `deleteData` have nothing to write and
+reject with a `TypeError`. A key of any other type is rejected with a `TypeError` by all three.
 
 They act **on the chain**, not on one isolated resolver, and how far each one reaches is per method,
 listed below. The rule of section 1 — a value introduced further from the root never overwrites one nearer
 to it — describes the *expression* path; it is not a prohibition on these methods.
 
 `filter` is a scope name and selects **the one resolver** the call applies to, by the rule of 5.3.
-Without a filter it is the resolver the call was made on. A filter that matches no resolver in
+It is read like a scope prefix (3.3): trimmed, and empty or whitespace only it is no filter. Without
+a filter — that, `null` or `undefined` — it is the resolver the call was made on. A filter that is
+no string is rejected with a `TypeError`. A filter that matches no resolver in
 the chain is an **error and throws** — unlike a scope prefix inside an expression, which answers
 `undefined` (5.4): a wrong name in an API call is a mistake in the calling code, while a wrong
 name in an expression is data and must never stop a render (7).
@@ -467,7 +501,8 @@ wants one walks the chain and deletes per resolver.
 `mergeContext` assigns the keys of the passed object into the context of the addressed resolver — a
 **shallow** assignment, key by key, replacing what is there and adding what is not. No deep merge,
 and no search along the chain: keys that other resolvers carry are untouched, and a merged key
-shadows them from this resolver onwards (5.2).
+shadows them from this resolver onwards (5.2). `null` or `undefined` has nothing to merge and changes
+nothing; a primitive is rejected with a `TypeError`, as a context is (4.2).
 
 That makes `mergeContext` the counterpart to `updateData`, and the two cover the whole of writing
 from outside: `updateData` changes a value **where it lives**, `mergeContext` defines values
@@ -515,9 +550,10 @@ in it, and a single broken expression in it is a defect in that expression, not 
 the place where it can still be found.
 
 A **form that an entry point rejects itself** follows the same line: `resolve` throws a
-`SyntaxError` for a delimited input that does not end with `}` (4.3), both static entry points
-reject a first argument of neither call form with a `TypeError` (4.1), while in a text anything that
-is not an expression is text and no error arises at all (3.1).
+`SyntaxError` for a delimited input that does not end with `}` (4.3), an argument of the wrong type
+is rejected with a `TypeError` by the static entry points (4.1), the constructor and the instance
+entry points (4.2) and the data methods (6.6), while in a text anything that is not an expression
+is text and no error arises at all (3.1).
 
 ## 8. Public surface
 
@@ -587,3 +623,7 @@ is which resolver of the chain answers a lookup, or any other rule of part A.
 Each executer module exports `setupExecuter(options)`, which configures that executer's compiled
 code cache — `{ size }`, where `0` or less disables caching. Reaching it means importing the
 module directly, which is the intended usage and the reason the package publishes its sources.
+
+Every cache starts with a size of **5000**. An option left out changes nothing, so `setupExecuter()`
+and `setupExecuter({})` leave the size where it is. A `size` that is not a finite number is rejected
+with a `TypeError`; a fraction is rounded down.

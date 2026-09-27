@@ -19,6 +19,67 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-27 — What does the resolver do with input of the wrong type?
+
+**Decision:** Decided per input rather than by one blanket rule, and each case came out the same
+way: an argument that cannot mean what the call needs is **rejected with a `TypeError`** that names
+it, and `null` or `undefined` keep meaning "none passed" wherever they did. In detail, all in
+`SPECIFICATION.md` 4.2, 5.1, 6.1, 6.6, 7 and 9.3, Frank's decisions on B-03, B-04, B-05, B-35, B-36
+and B-37:
+
+- **`parent`** other than `null`, `undefined` or an `ExpressionResolver` throws. A resolver from a
+  second copy of the package is no exception: the chain reads its private fields.
+- **`context`** that is a primitive throws, `0`, `""` and `false` included. The check lives in the
+  constructor of `ExpressionResolver`, not in `ResolverContextHandle`, which keeps checking nothing
+  (2026-08-30); the `data || {}` there goes.
+- **A refused write** — frozen, sealed — raises what the object raises, from every data method.
+  `mergeContext` stays a key-by-key assignment and may have written part of its keys when it raises.
+- **`name`** obeys 3.3 and is trimmed on construction; any other character, an empty or
+  whitespace-only string and a non-string throw. **`filter`** is read like a scope prefix: trimmed,
+  empty or whitespace only means no filter, a non-string throws.
+- **The instance `resolve` and `resolveText`** reject a non-string like the static ones (4.1),
+  without the warning for a failed statement and without the default.
+- **`mergeContext`** ignores `null` and `undefined` and rejects a primitive. **A key** of
+  `getData`, `updateData`, `deleteData` is any string, `""` included, a symbol or a number, which is
+  looked up as its string, as JavaScript does; without one `getData` answers the whole context and
+  the two writers throw, and a key of another type throws in all three.
+- **`setupExecuter`** changes only what it is handed: no `size`, no change. The start size of 5000
+  lives in `CodeCache`. A `size` that is no finite number throws, a fraction is rounded down.
+
+Implemented the same day. The character rule of a name, `normalize` and the whitespace pattern moved
+from the scanner into `src/Utils.js`, the shared helper module, once the resolver needed them too.
+
+**Reasoning:** The package already had its answer for the static entry points — a wrong argument is
+a mistake in the calling code, and saying so at the call beats an error three frames down or a
+lookup that quietly answers the default (4.1, 7). Every silent case here turned a calling mistake
+into a wrong result somewhere else: a dropped parent yields a resolver without a chain and an
+`undefined` executer, `0` as a context counted as providing data, `setupExecuter({})` shrank a cache
+from 5000 to 1000, `getData(0)` answered the whole context instead of an array's first element. A
+name that 3.3 cannot address is only reachable by filter, and a `/` in one breaks the path `chain`
+answers, so the constructor holds a passed name to the rule a generated one already obeys. Trimming
+the name and the filter follows 3.3, which trims the prefix; a name kept with outer whitespace could
+never be addressed. `""` became a key everywhere once `0` did, since reading a key that cannot be
+written through the API is an asymmetry with no use.
+
+**Alternatives:** One rule for every input, decided up front — offered and declined in favour of
+deciding each input on its own. Duck typing the parent — a second copy of the package has private
+fields of its own, so the chain would break inside `#getPropertyDef`. Coercing a primitive context
+with `Object()` — a typo would then answer quietly. Swallowing a refused write, with or without a
+warning — 6.1 already says a write fails as it would on the object. An atomic `mergeContext` — a
+second pass over every key on every call, for a mistake the caller sees anyway. Passing a non-string
+through the instance `resolveText` — convenient for a caller who hands over unchecked values, but
+the static method rejects the same call. Keeping a filter exact — rejected by Frank: filter and
+prefix are one name rule.
+
+**Consequences:** Breaking for a consumer who relied on any silent case — each gets its line in
+`CHANGELOG.md` with the code. Every rule starts with a failing test. The data methods pay a type
+check and, with a filter, a trim per call. On the resolution path the instance `resolve` gains one
+`typeof` per call and the instance `resolveText` none, it asks already; measured with `npm run bench`
+before and after, as every hot-path change is. The handle's own `mergeData` guard becomes the
+resolver's.
+
+---
+
 ## 2026-09-27 — Does the expression scanner recognize comments?
 
 **Decision:** Yes. `/* … */` and `//` are states of the scanner, and a brace inside a comment never

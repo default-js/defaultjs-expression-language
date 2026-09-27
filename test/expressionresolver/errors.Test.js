@@ -97,6 +97,13 @@ describe("ExpressionResolver - what the warnings say", () => {
 		expect(warnings.some((warning) => warning.includes(STATEMENT))).toBe(true);
 	});
 
+	// An expression that is no string is a mistake in the calling code, and no statement ran (4.2).
+	it("names no failed statement where resolve rejects an expression that is not a string", async () => {
+		const resolver = new ExpressionResolver({ context: {}, name: "root", executer: throwing(new Error("from the executer")) });
+		const warnings = await collectWarnings(() => catchError(() => resolver.resolve(42)));
+		expect(warnings.length).toBe(0);
+	});
+
 	// The error the executer raised is the error the caller gets - not one the resolver wrapped or
 	// replaced. A SyntaxError is the case a consumer meets most often, because a statement that does
 	// not compile is how most failures start.

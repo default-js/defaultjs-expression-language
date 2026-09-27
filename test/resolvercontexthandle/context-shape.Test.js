@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import ResolverContextHandle from "../../src/ResolverContextHandle.js";
-import { catchError } from "../TestUtils.js";
 
 /**
  * ResolverContextHandle - what the proxy answers for the object it was handed. SPECIFICATION.md 6.1.
  *
  * Which shapes of context an executer can work with is that executer's own; this is about what the
- * handle makes of what it was handed.
+ * handle makes of what it was handed. A primitive is never handed to it: the resolver's constructor
+ * rejects one (4.2, `test/expressionresolver/construction.Test.js`), and the handle checks nothing.
  */
 
 describe("ResolverContextHandle - every access goes through the proxy", () => {
@@ -45,22 +45,4 @@ describe("ResolverContextHandle - every access goes through the proxy", () => {
 		expect(new ResolverContextHandle({}).proxy.valueOf === Object.prototype.valueOf).toBe(true);
 	});
 
-	// `data || {}` in the constructor turns a falsy context into an empty one, so 0, "" and false
-	// build a handle that carries no name of its own.
-	it("takes a falsy primitive as an empty context", () => {
-		for (const context of [0, "", false]) {
-			expect(new ResolverContextHandle(context).proxy.anything).toBeUndefined();
-		}
-	});
-
-	// ...while a truthy one reaches `Reflect.ownKeys`, which only takes objects. The handle therefore
-	// throws at construction, with an error from inside the property cache rather than one that names
-	// the mistake. Only that it throws is pinned; the message is not, so a decision to reject a
-	// primitive properly keeps this green. Open in BACKLOG.md: reject, coerce, or ignore.
-	it("throws on a truthy primitive as context", async () => {
-		for (const context of ["abc", 42, true]) {
-			const error = await catchError(() => new ResolverContextHandle(context));
-			expect(error instanceof Error).toBe(true);
-		}
-	});
 });

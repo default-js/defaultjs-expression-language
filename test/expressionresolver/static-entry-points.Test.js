@@ -35,6 +35,15 @@ describe("ExpressionResolver - the static entry points, positional form", () => 
 		expect(result).toBe("a resolved b");
 	});
 
+	// The static entry points build their resolver through the constructor, which rejects the context
+	// (4.2) - one case for the connection, the rule is construction.Test.js. It passed before the rule
+	// as well, with the TypeError `Reflect.ownKeys` raised from inside the handle.
+	it("rejects a context that is a primitive", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const error = await rejectionOf(ExpressionResolver.resolve("${ value }", 42));
+		expect(error instanceof TypeError).toBe(true);
+	});
+
 	it("decides the call form by the first argument alone, so a context may carry a key named context", async () => {
 		ExpressionResolver.defaultExecuter = new TestExecuter((aStatement, aContext) => aContext.context.value);
 		const result = await ExpressionResolver.resolve("${ context.value }", { context: { value: "resolved" } });
