@@ -382,8 +382,9 @@ export default class ExpressionResolver {
 	 * resolve an expression string to data
 	 *
 	 * Takes the arguments positionally, or one configuration object
-	 * `{ expression, context, defaultValue, timeout }` - SPECIFICATION.md 4.1. A first argument
-	 * that is neither a string nor an object rejects with a `TypeError`.
+	 * `{ expression, context, defaultValue, timeout }`, behind which every argument is ignored -
+	 * SPECIFICATION.md 4.1. A first argument that is neither a string nor an object, and a
+	 * configuration without a string under `expression`, reject with a `TypeError`.
 	 *
 	 * @static
 	 * @async
@@ -394,8 +395,9 @@ export default class ExpressionResolver {
 	 * @returns {Promise<*>}
 	 */
 	static async resolve(aExpression, aContext, aDefault, aTimeout) {
-		if(arguments.length === 1 && isConfiguration(arguments[0])) {
+		if (isConfiguration(arguments[0])) {
 			const { expression, context, timeout } = arguments[0];
+			if (typeof expression !== "string") throw new TypeError("ExpressionResolver.resolve takes a configuration carrying the expression as a string under the key expression!");
 			return ExpressionResolver.resolve(expression, context, defaultOf(arguments[0]), timeout);
 		}
 		if (typeof aExpression !== "string") throw new TypeError("ExpressionResolver.resolve takes a string or a configuration object!");
@@ -416,8 +418,9 @@ export default class ExpressionResolver {
 	 * replace expression at text
 	 *
 	 * Takes the arguments positionally, or one configuration object
-	 * `{ text, context, defaultValue, timeout }` - SPECIFICATION.md 4.1. A first argument that is
-	 * neither a string nor an object rejects with a `TypeError`.
+	 * `{ text, context, defaultValue, timeout }`, behind which every argument is ignored -
+	 * SPECIFICATION.md 4.1. A first argument that is neither a string nor an object, and a
+	 * configuration without a string under `text`, reject with a `TypeError`.
 	 *
 	 * @static
 	 * @async
@@ -428,8 +431,9 @@ export default class ExpressionResolver {
 	 * @returns {Promise<*>}
 	 */
 	static async resolveText(aText, aContext, aDefault, aTimeout) {		
-		if(arguments.length === 1 && isConfiguration(arguments[0])) {
+		if (isConfiguration(arguments[0])) {
 			const { text, context, timeout } = arguments[0];
+			if (typeof text !== "string") throw new TypeError("ExpressionResolver.resolveText takes a configuration carrying the text as a string under the key text!");
 			return ExpressionResolver.resolveText(text, context, defaultOf(arguments[0]), timeout);
 		}
 		if (typeof aText !== "string") throw new TypeError("ExpressionResolver.resolveText takes a string or a configuration object!");

@@ -20,7 +20,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `ExpressionResolver.resolveText({ text, context, defaultValue, timeout })` sit beside the
   positional form, which stays as it is. The first argument alone decides the form — a string or
   an object — so a context carrying a key named `context` is never mistaken for a configuration.
-  A default counts as passed where the key `defaultValue` is present. See `SPECIFICATION.md` 4.1.
+  Any argument behind a configuration is ignored. A configuration without a string under
+  `expression` or `text` is rejected with a `TypeError` naming the key. A default counts as passed
+  where the key `defaultValue` is present. See `SPECIFICATION.md` 4.1.
 
 - **The constructor takes an `Executer` instance, not only a registered name.**
   `new ExpressionResolver({ executer })` accepted a registered name and silently fell back to the

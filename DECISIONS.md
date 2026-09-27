@@ -19,6 +19,54 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-27 — What does a configuration have to carry?
+
+**Decision:** A string under `expression` or `text`, and nothing else is checked. Anything else under
+that key is rejected with a `TypeError` of its own that names the key, and `defaultValue` does not
+apply to it. `SPECIFICATION.md` 4.1 says so. Frank's decision, B-48.
+
+**Reasoning:** A configuration without a string is a mistake in the calling code, the same kind as a
+first argument of neither form, so it is treated alike. It gets its own message because the one it
+got before — "takes a string or a configuration object" — denied that a configuration had been
+passed at all, and sent the caller looking at the wrong argument. `context` and `timeout` stay
+unchecked so that both call forms keep meaning the same thing: a context that is no object is B-04
+for either form, a timeout that is no positive number is no timeout in either.
+
+**Alternatives:** Keeping the old message and only stating the requirement — the rule would hold,
+the diagnosis would stay wrong. Treating a missing key as an empty expression that runs through the
+resolver and lets the default apply — it would turn a calling mistake into a quiet result. Checking
+`timeout` as well, or rejecting unknown keys to catch typos like `defaultvalue` — either makes the
+configuration form stricter than the positional one, which nobody asked for.
+
+**Consequences:** An object under the key used to be read as a configuration once more, so a nested
+configuration worked by accident; it is rejected now. A typo in a key name goes unnoticed.
+
+---
+
+## 2026-09-27 — What does an argument behind a configuration object mean?
+
+**Decision:** Nothing. Both static entry points take the configuration form whenever the first
+argument is an object, and ignore every argument behind it. `SPECIFICATION.md` 4.1 says so. Frank's
+decision, B-33.
+
+**Reasoning:** The configuration is complete — it carries the expression or text, the context, the
+default and the timeout, so an argument behind it has nothing left it could mean. The form was
+already decided by the first argument alone; rejecting a trailing argument would add a second
+condition to that rule, which is exactly the defect: the code took the form only where the
+configuration was the sole argument, and rejected it otherwise with a message claiming it was no
+configuration at all.
+
+**Alternatives:** Rejecting a trailing argument with a `TypeError` of its own — it would catch a
+caller mixing both forms, at the price of a rule that is no longer "the first argument alone".
+Letting positional arguments fill in or override keys — it mixes the two forms, and a call would
+no longer say in one place what it does. Accepting only `undefined` behind a configuration — a rule
+for callers that forward their arguments, and nobody has asked for one.
+
+**Consequences:** A caller who mixes both forms gets no error; the positional part is silently
+dropped. What a configuration has to carry is decided separately (2026-09-27, above).
+
+---
+
 ## 2026-09-27 — Does a statement that runs longer than a second still produce a warning?
 
 **Decision:** No. `execute` starts no timer any more, the rule is out of `SPECIFICATION.md` 7, and

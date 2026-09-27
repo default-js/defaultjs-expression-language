@@ -47,9 +47,8 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-27, B-40 |
 
-**Markers, counted 2026-09-27** (`npm test`: 318 passed, 1 expected fail, 319 cases). One `it.fails`
-is left, in `test/expressionresolver/static-entry-points.Test.js`, and it pins B-33, the only entry
-that still blocks. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing else in
+**Markers, counted 2026-09-27** (`npm test`: 334 passed, 334 cases). No `it.fails` is left and no
+entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
 the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
 is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
@@ -84,7 +83,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-28 | What happens to Dependabot while the v3 cycle runs | decision | tooling | |
 | B-29 | Move the build from webpack to Vite? | decision | tooling | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | |
-| B-33 | A configuration object followed by another argument is rejected instead of taken | agreed | defect | yes |
 | B-35 | A name the caller passes is checked against nothing | decision | gap | |
 | B-36 | The instance entry points and the data methods take input of the wrong type without a rule | decision | gap | |
 | B-37 | `setupExecuter` without a size sets 1000, not the 5000 an executer starts with | decision | gap | |
@@ -98,7 +96,7 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
 ## Release blockers
 
-B-33 — the entry stands in its own section below.
+None open.
 
 ## Resolver
 
@@ -344,20 +342,6 @@ The file sets `"omitVersion": true`; `generate-license-file` 4.2.1 knows `omitVe
 (its `README.md` and `src/lib/cli/commands/main.d.ts`). The key is silently ignored, so
 `LICENSE-OF-THIRD-PARTY` carries versions and churns on every dependency bump. Fixing it changes a
 published file.
-
-### B-33 · A configuration object followed by another argument is rejected instead of taken
-
-- **Status:** agreed — the rule of 4.1 decides it
-- **Kind:** defect · **Spec:** 4.1 · **Blocks 3.0.0:** yes
-- **Pinned by:** `decides the call form by the first argument alone, even where another argument
-  follows` (`test/expressionresolver/static-entry-points.Test.js`)
-- **Records:** `CHANGELOG.md`
-
-4.1 decides the call form *by the first argument alone*. Both static entry points take the
-configuration form only when `arguments.length === 1`, so `resolve({ expression, context }, x)` falls
-through to the string check and rejects with a `TypeError` claiming the object is not a
-configuration. Settle while fixing: what extra arguments mean in the configuration form — the rule
-says only that they do not decide it.
 
 ### B-35 · A name the caller passes is checked against nothing
 

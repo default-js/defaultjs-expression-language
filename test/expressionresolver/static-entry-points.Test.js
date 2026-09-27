@@ -4,7 +4,7 @@ import TestExecuter from "../TestExecuter.js";
 
 /**
  * ExpressionResolver - the static entry points, in both call forms, and the rejection of a first
- * argument that is neither. SPECIFICATION.md 4.1.
+ * argument that is neither and of a configuration without a string. SPECIFICATION.md 4.1.
  *
  * The static entry points take no executer, so a case sets `ExpressionResolver.defaultExecuter`
  * itself and the file puts the previous one back.
@@ -12,6 +12,9 @@ import TestExecuter from "../TestExecuter.js";
 
 // answers the value the context carries under the statement - a lookup, not an evaluation
 const lookup = () => new TestExecuter((aStatement, aContext) => aContext[aStatement]);
+
+// a rejection answered as a value, so a case can inspect it
+const rejectionOf = (aPromise) => aPromise.then(() => null, (anError) => anError);
 
 const previousDefault = ExpressionResolver.defaultExecuter;
 afterAll(() => {
@@ -67,13 +70,18 @@ describe("ExpressionResolver - the static entry points, configuration form", () 
 		expect(Date.now() - start >= 90).toBe(true);
 	});
 
-	// The form is taken only where the configuration is the sole argument, so a trailing argument
-	// turns it into a rejection. Open in BACKLOG.md: "A configuration object followed by another
-	// argument is rejected instead of taken".
-	it.fails("decides the call form by the first argument alone, even where another argument follows", async () => {
+	// The arguments behind the configuration would each change the answer if taken: the context
+	// would answer "other", the default "fallback", and the timeout would outlast the case.
+	it("resolve ignores every argument behind a configuration", async () => {
 		ExpressionResolver.defaultExecuter = lookup();
-		const result = await ExpressionResolver.resolve({ expression: "${ value }", context: { value: "resolved" } }, undefined);
-		expect(result).toBe("resolved");
+		const result = await ExpressionResolver.resolve({ expression: "${ missing }", context: {} }, { missing: "other" }, "fallback", 60000);
+		expect(result).toBe(undefined);
+	});
+
+	it("resolveText ignores every argument behind a configuration", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const result = await ExpressionResolver.resolveText({ text: "a ${ missing } b", context: {} }, { missing: "other" }, "fallback", 60000);
+		expect(result).toBe("a undefined b");
 	});
 
 	// "a default value was passed" is the presence of the key defaultValue, independent of what it
@@ -85,7 +93,6 @@ describe("ExpressionResolver - the static entry points, a first argument of neit
 
 	// the rejection is told apart from an accidental TypeError by its message: resolve(123) raised a
 	// TypeError before, thrown by a string method called on a number
-	const rejectionOf = (aPromise) => aPromise.then(() => null, (anError) => anError);
 
 	it("resolve rejects a first argument that is neither a string nor an object", async () => {
 		const error = await rejectionOf(ExpressionResolver.resolve(123, {}, "fallback"));
@@ -103,5 +110,53 @@ describe("ExpressionResolver - the static entry points, a first argument of neit
 		const error = await rejectionOf(ExpressionResolver.resolve(null, {}));
 		expect(error instanceof TypeError).toBe(true);
 		expect(error.message.includes("configuration object")).toBe(true);
+	});
+});
+
+describe("ExpressionResolver - the static entry points, a configuration without a string", () => {
+
+	// the rejection is told apart from the one of a first argument by its message, which names the
+	// key; that one says "configuration object"
+
+	it("resolve rejects a configuration without an expression, whatever default it carries", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const error = await rejectionOf(ExpressionResolver.resolve({ context: {}, defaultValue: "fallback" }));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("under the key expression")).toBe(true);
+	});
+
+	it("resolve rejects a configuration whose expression is not a string", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const error = await rejectionOf(ExpressionResolver.resolve({ expression: 42, context: {} }));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("under the key expression")).toBe(true);
+	});
+
+	it("resolve does not take a configuration nested under the key expression", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const error = await rejectionOf(ExpressionResolver.resolve({ expression: { expression: "${ value }", context: { value: "resolved" } } }));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("under the key expression")).toBe(true);
+	});
+
+	it("resolveText rejects a configuration without a text, whatever default it carries", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const error = await rejectionOf(ExpressionResolver.resolveText({ context: {}, defaultValue: "fallback" }));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("under the key text")).toBe(true);
+	});
+
+	it("resolveText rejects a configuration whose text is not a string", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const error = await rejectionOf(ExpressionResolver.resolveText({ text: 42, context: {} }));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("under the key text")).toBe(true);
+	});
+
+	it("resolveText does not take a configuration nested under the key text", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const error = await rejectionOf(ExpressionResolver.resolveText({ text: { text: "a ${ value } b", context: { value: "resolved" } } }));
+		expect(error instanceof TypeError).toBe(true);
+		expect(error.message.includes("under the key text")).toBe(true);
 	});
 });

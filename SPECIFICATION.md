@@ -137,6 +137,15 @@ for a configuration. `null` is not an object in this sense. A first argument tha
 string nor an object is **rejected with a `TypeError`** saying so; it is a mistake in the calling
 code and is not treated as a failed statement, so no default value applies to it (7).
 
+A configuration carries the whole call, so every argument **behind** it is **ignored** — neither a
+context nor a default nor a timeout is taken from there, and none of them makes the call fail.
+
+A configuration carries a **string** under `expression` or `text`. Anything else there — the key
+missing, `null`, a number, an object — is **rejected with a `TypeError`** that names the key, for
+the same reason and with the same consequence as a first argument of neither form: no default value
+applies to it. An object under the key is not read as a configuration of its own. The other keys are
+not checked: `context` and `timeout` mean in a configuration what their positional counterparts mean.
+
 Both forms answer a promise, build a single resolver over the context and delegate to the
 instance methods. `aTimeout` / `timeout` is described in 4.5.
 
