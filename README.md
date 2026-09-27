@@ -270,7 +270,8 @@ rewrite walks: operands of an operator, `??`, member access (`${ user.address.ci
 inside a function written in the statement — an arrow or callback (`${ items.map((i) => i + tax) }`),
 a function expression, a default parameter, an async function — nor inside an object or array
 literal, a computed key, a spread, the branches of a ternary, the key of `a[b]`, a tagged template,
-or as the class of `new Cls()`. A class field does not run at all.
+or as the class of `new Cls()`. A class field does not run at all. A line comment at the end of a
+statement — `${ price // net\n }` — raises a `SyntaxError`; a block comment does not.
 
 **Globals.** Only `window`, `self`, `Object`, `Array`, `Map`, `Set`, `fetch` and `console` are
 reachable as bare names. Everything else becomes a context lookup: `${ Math.round(1.5) }`,

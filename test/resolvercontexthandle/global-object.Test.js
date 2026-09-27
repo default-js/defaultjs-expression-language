@@ -29,4 +29,11 @@ describe("ResolverContextHandle - the global object as a context", () => {
 		const leaf = new ResolverContextHandle({ own: "from leaf" }, root);
 		expect(Object.keys(leaf.proxy).join()).toBe("own");
 	});
+
+	// Not wrapped: what a resolver answers for `getData()` is this proxy, so it answers the global
+	// object itself, and a write through it is an ordinary global write - which follows from the
+	// identity and needs no case of its own.
+	it("answers the global object itself as its proxy", () => {
+		expect(new ResolverContextHandle(globalThis).proxy === globalThis).toBe(true);
+	});
 });

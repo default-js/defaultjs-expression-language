@@ -19,6 +19,44 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-27 — Does the expression scanner recognize comments?
+
+**Decision:** Yes. `/* … */` and `//` are states of the scanner, and a brace inside a comment never
+counts. A line comment ends at a line terminator — `\n`, `\r`, U+2028, U+2029 — as in JavaScript, not
+at a brace, so `${ a // note }` on one line is no expression and stands as text. A `${` inside a
+comment is hidden like one inside a literal. The division-or-regex rule decides on the character
+before a comment. Comments stay in the statement the executer receives. Frank's decision, B-49.
+
+**Reasoning:** The entry of 2026-08-29 left comments out on the assumption that a brace inside one
+then simply counts. Pinning that limit showed it held in half the positions only: the scanner read
+the slashes of a comment through the division-or-regex rule, so `1 /* } */` counted the brace and
+`/* } */ 1` hid it as a regular expression literal, and a line comment did the opposite —
+`1 // }\n` even ran to the end of the text and left no expression at all. A limit that depends on the
+character in front of the comment cannot be stated usefully, while recognizing comments costs two
+states and no lexer: `/*` always opens a comment in JavaScript and `//` never is an empty literal.
+Measured with `ResolveTextShare`, old and new alternating (new, old, new, one file each): 20 distinct
+expressions 199 534 / 195 241 / 191 868 hz, literals 158 746 / 143 163 / 160 152, 2,000 distinct
+1 647 / 1 716 / 1 737 — every difference inside the spread between runs. The extra work runs only on
+a `/` in code; the list of comment ranges `startsRegex` needs is allocated only where a comment
+stands. The case `expressions carrying comments`, added to `ResolveTextShare` afterwards, answers
+179 000–184 000 hz against 209 000–217 000 for `literals` in the same three runs; its expressions are
+longer, so the gap is not the cost of the comment states alone.
+
+**Alternatives:** Stating the limit as it is, position by position — correct, but a rule nobody
+writing a template can apply. Ending a line comment at a brace as well, so a one-line `${ a // x }`
+works — rejected: the brace would count inside a comment again, and the executer would receive a
+comment that no line break closes. Stripping comments from the statement — costs a copy per
+expression and changes what an executer and an error message see; which comments an executer can
+run is its own. Letting a `${` inside a comment start a new expression, as rule 3 of 3.1 does in
+code — a comment would then hide braces but not delimiters, two rules where one does.
+
+**Consequences:** `SPECIFICATION.md` 3.1 lost the comment limit and keeps one: a regular expression
+literal after `)` or `]` is read as division. A one-line expression ending in a line comment is text
+now — it was before as well, for another reason. The executers receive comments unchanged, which
+exposes two limits of their generated code: B-50, B-51.
+
+---
+
 ## 2026-09-27 — What does a configuration have to carry?
 
 **Decision:** A string under `expression` or `text`, and nothing else is checked. Anything else under
@@ -881,8 +919,8 @@ escaped delimiter cheaper to scan than an unescaped one, since no brace matching
 **Decision:** Yes. Inside a statement a `/` opens a regular expression literal unless the last
 character that is not whitespace is an identifier character, a digit, `)` or `]` — then it is
 division. Braces inside such a literal do not count towards the matching closing brace, and a
-character class hides a `/`. Comments stay out: a brace inside `/* … */` or behind `//` counts like
-any other, which `SPECIFICATION.md` 3.1 names as a limit.
+character class hides a `/`. Comments were left out at first; they are recognized since
+2026-09-27 — see "Does the expression scanner recognize comments?".
 
 **Reasoning:** Frank made the branch conditional on its cost, so it was measured both ways on
 2026-08-29, three runs each, immediately after the scanner replaced the regular expression. The two
@@ -905,12 +943,12 @@ expression in it never enters the state machine at all.
 With no cost to weigh, correctness decides alone: without the branch `${ /}/.test(x) }` ends at the
 brace inside the literal, and the statement is cut in the middle.
 
-**Alternatives:** Leaving regular expression literals out and documenting them as a limit next to
-comments, which is what the specification would have said had the measurement gone the other way.
+**Alternatives:** Leaving regular expression literals out and documenting them as a limit, which is
+what the specification would have said had the measurement gone the other way.
 A full JavaScript lexer instead of the heuristic — rejected as far more than 3.1 asks for, and it
 would have to be maintained against the language.
 
-**Consequences:** The scanner carries five states instead of three, and one heuristic that can be
+**Consequences:** The scanner carried five states instead of three, and one heuristic that can be
 wrong: where a regular expression legitimately follows `)` or `]` — `${ (() => { if (a) /x/.test(b)
 })() }` is the shape — the `/` is read as division. Nothing is cut unless that literal also carries
 a brace. The everyday cases are safe in both directions, because division follows a value and a

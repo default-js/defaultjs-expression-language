@@ -331,8 +331,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   cut the expression at the first inner brace. The worst of the three was the nested template
   literal: the inner placeholder was matched and substituted while the expression around it stood,
   which corrupted the text instead of leaving it alone. An expression now ends at its **matching**
-  closing brace, counted by a scanner that knows string, template and regular expression literals;
-  a brace inside one of them does not count. Comments are not examined — a documented limit. An
+  closing brace, counted by a scanner that knows string, template and regular expression literals
+  and block and line comments; a brace inside one of them does not count. A line comment ends at the
+  end of the line, as in JavaScript, so `${ a // note }` written on one line is not an expression. An
   opening delimiter that never finds its matching brace is not an expression, and the text stands
   as written. See `SPECIFICATION.md` 3.1.
 

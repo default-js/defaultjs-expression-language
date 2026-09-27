@@ -56,21 +56,24 @@ the statement and must be counted, not terminated on.
 
 Three rules bound that counting.
 
-**A brace inside a literal does not count.** `${ "}" }` is one expression whose statement is
-`"}"`, and the expression ends at the brace that follows it. The same holds for `'`, for a
-template literal and for a regular expression literal, and it holds in both directions: neither an
-opening nor a closing brace inside a literal changes the count.
+**A brace inside a literal or a comment does not count.** `${ "}" }` is one expression whose
+statement is `"}"`, and the expression ends at the brace that follows it. The same holds for `'`,
+for a template literal, for a regular expression literal, for a block comment `/* … */` and for a
+line comment `//`, and it holds in both directions: neither an opening nor a closing brace inside
+one of them changes the count. A line comment ends where JavaScript ends it, at a line terminator,
+and not at a brace — so `${ a // note }` written on one line never closes and is not an expression.
+Comments stay in the statement; what an executer does with them is its own (9.2).
 
-The rule has two limits. **Comments are not examined** — a brace inside `/* … */` or behind `//`
-counts like any other. And whether a `/` opens a regular expression literal or divides is decided by
-the character before it, so a literal that follows `)` or `]` — `${ (() => { if (a) /x/.test(b) })() }`
-is the shape — is read as division. Neither matters unless the comment or the literal also carries a
-brace.
+The rule has one limit. Whether a `/` opens a regular expression literal or divides is decided by
+the character before it, comments skipped, so a literal that follows `)` or `]` —
+`${ (() => { if (a) /x/.test(b) })() }` is the shape — is read as division. That matters only where
+the literal also carries a brace.
 
 **An opening `${` without a matching closing brace is not an expression.** The text stands as
 written, unchanged, and nothing is evaluated. There is no error and no partial replacement.
 
-**A `${` met outside a literal while a statement is still open starts a new expression.** The open
+**A `${` met outside a literal or a comment while a statement is still open starts a new
+expression.** The open
 one is abandoned and the text it covered stands as written. So `"a ${ x b ${value}"` answers
 `"a ${ x b "` with the second expression resolved behind it. Everything between the delimiters is
 meant to be JavaScript, and a second opening delimiter cannot be part of it.

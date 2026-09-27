@@ -16,10 +16,12 @@ const DOUBLE_QUOTED = 2;
 const TEMPLATE = 3;
 const REGEX = 4;
 const REGEX_CLASS = 5;
+const BLOCK_COMMENT = 6;
+const LINE_COMMENT = 7;
 
 // a "/" continues an expression instead of opening a regular expression when it follows one of
-// these - the classic division-or-regex question, decided on the last character that is not
-// whitespace
+// these - the classic division-or-regex question, decided on the last character that is neither
+// whitespace nor part of a comment
 const BEFORE_DIVISION = /[a-zA-Z0-9_$)\]]/;
 const WHITESPACE = /\s/;
 
@@ -32,6 +34,11 @@ const SINGLE_QUOTE = 0x27;
 const DOUBLE_QUOTE = 0x22;
 const BACKTICK = 0x60;
 const SLASH = 0x2f;
+const STAR = 0x2a;
+const LINE_FEED = 0x0a;
+const CARRIAGE_RETURN = 0x0d;
+const LINE_SEPARATOR = 0x2028;
+const PARAGRAPH_SEPARATOR = 0x2029;
 const OPEN_BRACKET = 0x5b;
 const CLOSE_BRACKET = 0x5d;
 const COLON = 0x3a;
@@ -71,12 +78,32 @@ export const normalize = (value) => {
 	return null;
 };
 
-const startsRegex = (aText, aIndex) => {
+/**
+ * Whether the "/" at aIndex opens a regular expression literal, decided on the character before it
+ * that is neither whitespace nor part of a comment.
+ *
+ * @param {string} aText
+ * @param {number} aIndex
+ * @param {?Array<number>} theComments the comments read so far as flat start and end index pairs, in
+ * the order they stand; null where the expression has none
+ * @returns {boolean}
+ */
+const startsRegex = (aText, aIndex, theComments) => {
 	let index = aIndex - 1;
-	while (index >= 0 && WHITESPACE.test(aText[index])) index--;
+	let comment = theComments ? theComments.length - 1 : -1;
+	while (index >= 0) {
+		while (index >= 0 && WHITESPACE.test(aText[index])) index--;
+		// a line comment may end in whitespace, so the walk can land inside it rather than on its end
+		if (comment < 0 || index < theComments[comment - 1] || index > theComments[comment]) break;
+
+		index = theComments[comment - 1] - 1;
+		comment -= 2;
+	}
 
 	return index < 0 || !BEFORE_DIVISION.test(aText[index]);
 };
+
+const endsLine = (aCode) => aCode === LINE_FEED || aCode === CARRIAGE_RETURN || aCode === LINE_SEPARATOR || aCode === PARAGRAPH_SEPARATOR;
 
 /*
  * Two splits take the text between the delimiters apart into the scope prefix of 3.3 and the
@@ -111,12 +138,12 @@ const countBackslashes = (aText, aIndex) => {
 
 /**
  * Reads the one expression whose "${" stands at aStart, counting braces but not the ones hidden
- * inside a literal, and takes it apart into scope prefix and statement.
+ * inside a literal or a comment, and takes it apart into scope prefix and statement.
  *
  * Answers the occurrence `scan` hands on, `end` the index directly after the matching closing brace;
  * null where the text ends before that brace, which per SPECIFICATION.md 3.1 means there is no
- * expression here at all; and, with `end` negated, the index of another "${" met outside a literal,
- * which starts an expression of its own and abandons this one.
+ * expression here at all; and, with `end` negated, the index of another "${" met outside a literal
+ * or a comment, which starts an expression of its own and abandons this one.
  *
  * @param {string} aText
  * @param {number} aStart
@@ -125,6 +152,8 @@ const countBackslashes = (aText, aIndex) => {
 const readExpression = (aText, aStart) => {
 	const length = aText.length;
 	const stack = [CODE];
+	let comments = null;
+	let commentStart = 0;
 	let index = aStart + 2;
 
 	while (index < length) {
@@ -142,7 +171,27 @@ const readExpression = (aText, aStart) => {
 				else if (char === DOUBLE_QUOTE) stack.push(DOUBLE_QUOTED);
 				else if (char === BACKTICK) stack.push(TEMPLATE);
 				else if (char === DOLLAR && aText.charCodeAt(index + 1) === OPEN_BRACE) return { start: aStart, end: -index, escaped: false, scope: null, statement: null };
-				else if (char === SLASH && startsRegex(aText, index)) stack.push(REGEX);
+				else if (char === SLASH) {
+					const next = aText.charCodeAt(index + 1);
+					if (next === STAR || next === SLASH) {
+						stack.push(next === STAR ? BLOCK_COMMENT : LINE_COMMENT);
+						commentStart = index;
+						index++;
+					} else if (startsRegex(aText, index, comments)) stack.push(REGEX);
+				}
+				break;
+			case BLOCK_COMMENT:
+				if (char === STAR && aText.charCodeAt(index + 1) === SLASH) {
+					stack.pop();
+					index++;
+					(comments ??= []).push(commentStart, index);
+				}
+				break;
+			case LINE_COMMENT:
+				if (endsLine(char)) {
+					stack.pop();
+					(comments ??= []).push(commentStart, index - 1);
+				}
 				break;
 			case SINGLE_QUOTED:
 				if (char === BACKSLASH) index++;
@@ -202,7 +251,7 @@ export const scan = (aText) => {
 
 		const occurrence = readExpression(aText, start);
 		// no matching brace: the text stands as written, and nothing behind it can be an
-		// expression either - a "${" outside a literal would have restarted the scan instead
+		// expression either - a "${" outside a literal or a comment would have restarted the scan instead
 		if (!occurrence) break;
 		if (occurrence.end < 0) {
 			start = -occurrence.end;

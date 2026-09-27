@@ -26,6 +26,7 @@ Each entry carries these fields; the ones that do not apply are left out.
 | **Status** | `decision` — needs a decision, which is Frank's · `agreed` — decided, ready to implement · `investigate` — the facts are not complete yet · `idea` — raised, not agreed |
 | **Kind** | `defect` · `gap` (behaviour nobody has specified) · `executer` (something one executer does not do, and might) · `feature` · `refactor` · `docs` · `bench` · `test` · `tooling` |
 | **Blocks 3.0.0** | `yes` where the release has to wait for it |
+| **Priority** | `low` — taken up after everything without it, with the reason; left out means normal |
 | **Spec** | the section of `SPECIFICATION.md` that is the target |
 | **Pinned by** | the test that marks the item, if any |
 | **Records** | what else moves when it is closed: `CHANGELOG.md`, `DECISIONS.md`, `SPECIFICATION.md` |
@@ -43,54 +44,54 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | --- | --- | --- | --- |
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 | B-28, B-29 (follow-up decisions) |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
-| 3 | Raise test coverage | largely done | B-44, B-30, B-38 |
+| 3 | Raise test coverage | largely done | B-44, B-30 |
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-27, B-40 |
 
-**Markers, counted 2026-09-27** (`npm test`: 334 passed, 334 cases). No `it.fails` is left and no
+**Markers, counted 2026-09-27** (`npm test`: 355 passed, 355 cases). No `it.fails` is left and no
 entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
 the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
 is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
 ## Overview
 
-| ID | Title | Status | Kind | 3.0.0 |
-| --- | --- | --- | --- | --- |
-| B-03 | A `parent` that is not an `ExpressionResolver` is silently dropped | decision | defect | |
-| B-04 | A context that is not an object throws from inside the property cache | decision | gap | |
-| B-05 | The data methods of 6.6 raise a `TypeError` over a sealed or a frozen context | decision | gap | |
-| B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | |
-| B-08 | `EsprimaExecuter` cannot reach a context value from inside a nested function | decision | executer | |
-| B-09 | `RESERVED_NAMES` in the esprima executer misspells `global` | agreed | defect | |
-| B-10 | A write to an unknown name inside an expression lands on `globalThis` | decision | executer | |
-| B-11 | `ContextDeconstructorExecuter` loses `this` inside a method of the context | decision | executer | |
-| B-12 | `ContextDeconstructorExecuter` reads every property of a context | decision | executer | |
-| B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | |
-| B-14 | `"type": "module"` plus an `exports` field | decision | tooling | |
-| B-15 | Was a `Context` export meant to exist on the public API? | decision | gap | |
-| B-16 | The `module` entry produces a bundle nothing can consume | decision | defect | |
-| B-17 | `src/Utils.js` is dead code, and it is published | decision | defect | |
-| B-18 | Move `espree` 10 → 11? | decision | tooling | |
-| B-19 | `generate-license.config.json` sets a key that does not exist | decision | defect | |
-| B-20 | Every code example in `README.md` uses a default import that does not exist | agreed | docs | |
-| B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | |
-| B-22 | The JSDoc of the whole package needs one pass | agreed | docs | |
-| B-23 | Check every method name against what it does and what it answers | agreed | refactor | |
-| B-24 | "Link" is out of the specification and still stands in every other file | decision | docs | |
-| B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | |
-| B-26 | No benchmark exercises the cache eviction | idea | bench | |
-| B-27 | `WarmResolve` and `ColdResolve` can report a mean two to four times too high at depth 10 | decision | bench | |
-| B-28 | What happens to Dependabot while the v3 cycle runs | decision | tooling | |
-| B-29 | Move the build from webpack to Vite? | decision | tooling | |
-| B-30 | Coverage, and what is still uncovered | investigate | test | |
-| B-35 | A name the caller passes is checked against nothing | decision | gap | |
-| B-36 | The instance entry points and the data methods take input of the wrong type without a rule | decision | gap | |
-| B-37 | `setupExecuter` without a size sets 1000, not the 5000 an executer starts with | decision | gap | |
-| B-38 | Rules without a test that pins them | agreed | test | |
-| B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | |
-| B-41 | The default executer logs its generated code on every cache miss | decision | defect | |
-| B-44 | Review the component suites for necessity | agreed | test | |
-| B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | |
+| ID | Title | Status | Kind | 3.0.0 | Prio |
+| --- | --- | --- | --- | --- | --- |
+| B-03 | A `parent` that is not an `ExpressionResolver` is silently dropped | decision | defect | | |
+| B-04 | A context that is not an object throws from inside the property cache | decision | gap | | |
+| B-05 | The data methods of 6.6 raise a `TypeError` over a sealed or a frozen context | decision | gap | | |
+| B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
+| B-08 | `EsprimaExecuter` cannot reach a context value from inside a nested function | decision | executer | | low |
+| B-09 | `RESERVED_NAMES` in the esprima executer misspells `global` | agreed | defect | | low |
+| B-10 | A write to an unknown name inside an expression lands on `globalThis` | decision | executer | | |
+| B-11 | `ContextDeconstructorExecuter` loses `this` inside a method of the context | decision | executer | | |
+| B-12 | `ContextDeconstructorExecuter` reads every property of a context | decision | executer | | |
+| B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
+| B-14 | `"type": "module"` plus an `exports` field | decision | tooling | | |
+| B-15 | Was a `Context` export meant to exist on the public API? | decision | gap | | |
+| B-16 | The `module` entry produces a bundle nothing can consume | decision | defect | | |
+| B-17 | `src/Utils.js` is dead code, and it is published | decision | defect | | |
+| B-18 | Move `espree` 10 → 11? | decision | tooling | | low |
+| B-19 | `generate-license.config.json` sets a key that does not exist | decision | defect | | |
+| B-20 | Every code example in `README.md` uses a default import that does not exist | agreed | docs | | |
+| B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
+| B-22 | The JSDoc of the whole package needs one pass | agreed | docs | | |
+| B-23 | Check every method name against what it does and what it answers | agreed | refactor | | |
+| B-24 | "Link" is out of the specification and still stands in every other file | decision | docs | | |
+| B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
+| B-26 | No benchmark exercises the cache eviction | idea | bench | | |
+| B-27 | `WarmResolve` and `ColdResolve` can report a mean two to four times too high at depth 10 | decision | bench | | |
+| B-28 | What happens to Dependabot while the v3 cycle runs | decision | tooling | | |
+| B-29 | Move the build from webpack to Vite? | decision | tooling | | |
+| B-30 | Coverage, and what is still uncovered | investigate | test | | |
+| B-35 | A name the caller passes is checked against nothing | decision | gap | | |
+| B-36 | The instance entry points and the data methods take input of the wrong type without a rule | decision | gap | | |
+| B-37 | `setupExecuter` without a size sets 1000, not the 5000 an executer starts with | decision | gap | | |
+| B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | | |
+| B-44 | Review the component suites for necessity | agreed | test | | |
+| B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | | |
+| B-50 | A line comment at the end of a statement breaks `EsprimaExecuter` | decision | executer | | low |
+| B-51 | A statement that begins with a line comment answers `undefined` | decision | executer | | |
 
 ---
 
@@ -173,6 +174,7 @@ the `with`-based executer; the default moved away from it on 2026-09-01.
 
 - **Status:** decision — close the gaps or accept them as the executer's limits
 - **Kind:** executer · **Spec:** none — `README.md`, *esprima-executer*
+- **Priority:** low — concerns `EsprimaExecuter` only (Frank, 2026-09-27)
 - **Records:** `CHANGELOG.md`
 
 The rewrite turns an identifier into `ctx?.name` only where the traversal reaches it.
@@ -188,6 +190,7 @@ over the rewrite closes the first two causes, not the third. Decide together wit
 
 - **Status:** agreed 2026-08-24 — rework the list as a whole, not the typo alone
 - **Kind:** defect · **Spec:** 6.4
+- **Priority:** low — concerns `EsprimaExecuter` only (Frank, 2026-09-27)
 - **Records:** `DECISIONS.md`, `CHANGELOG.md`
 
 `src/executer/EsprimaExecuter.js` lists `"gobal"`; everything not on the list is rewritten to
@@ -242,21 +245,6 @@ mode does the same through `callee`. The other three executers answer, and the p
 getter (6.2), so this is the executer's doing alone. The cost half: every getter runs on every
 execution even when the statement touches no name.
 
-### B-41 · The default executer logs its generated code on every cache miss
-
-- **Status:** decision — a leftover of debugging, or meant
-- **Kind:** defect · **Spec:** none
-- **Records:** `CHANGELOG.md` if it ships
-
-`src/executer/ContextDeconstructorExecuter.js` starts with `let DEBUG = true` since `6a7a41d`
-(2026-09-23, `false` before), and `generate` then writes `genererated code:` plus the source to
-`console.log` every time it compiles. It is the default executer, so every consumer gets one console
-line per cache miss; one `npm run bench` on 2026-09-26 printed it 29 761 times. It also distorts
-every measurement with a cold cache taken since — a console write costs more than a resolution
-(the reason the large-context warning moved to compile time, 2026-09-22). Found while documenting
-the executers on 2026-09-26; `src/` was out of that scope. **At `f33461f` (2026-09-27) `DEBUG` is
-`false` again**, and that day's `npm run bench` printed no such line — likely closed, Frank's call.
-
 ### B-13 · Should the `ctx` prefix of `ContextObjectExecuter` be configurable?
 
 - **Status:** idea — raised by Frank 2026-08-24
@@ -268,6 +256,30 @@ and intended (`DECISIONS.md`, 2026-08-24). But the identifier is hard-coded, and
 a property named `ctx` has no way out. Open with it: whether the option belongs on
 `setupExecuter(options)` next to `size`, and what happens to the code cache, which is keyed by the
 statement text alone — entries compiled under the old identifier would answer for the new one.
+
+### B-51 · A statement that begins with a line comment answers `undefined`
+
+- **Status:** decision — a limitation for `README.md`, or the generated code breaks the line
+- **Kind:** executer · **Spec:** none — `README.md`, per executer
+
+`WithScopedExecuter`, `ContextObjectExecuter` and `ContextDeconstructorExecuter` paste the statement
+directly behind `return` on the same line, so `// note\na` becomes `return // note` plus `a` on the next
+line, and automatic semicolon insertion returns nothing (measured 2026-09-27 with `execute`: each of
+the three answers `undefined`). Not new with the scanner learning comments — it handed on the same
+statement before. A line break in front of the statement would close it; whether that is worth its
+cost in every generated function is the question.
+
+### B-50 · A line comment at the end of a statement breaks `EsprimaExecuter`
+
+- **Status:** decision — close it, or document it as the executer's limit
+- **Kind:** executer · **Spec:** none — `README.md`, *esprima-executer*
+- **Priority:** low — concerns `EsprimaExecuter` only (Frank, 2026-09-27)
+- **Records:** `CHANGELOG.md` if it is closed
+
+`generate` wraps the statement as `async function fn({ctx}){return (${aStatement})}` on one line
+(`src/executer/EsprimaExecuter.js`), so a trailing `// note` comments out `)}` and the parse raises a
+`SyntaxError` (measured 2026-09-27: `a // note` raises, `a /* note */` and a leading `// note\na`
+answer). A line break before `)` would close it. Documented in `README.md` meanwhile.
 
 ## Public surface and packaging
 
@@ -327,6 +339,7 @@ bundle. It ships because `files` publishes `src/**` raw, and it is the largest u
 
 - **Status:** decision
 - **Kind:** tooling · **Spec:** none
+- **Priority:** low — concerns `EsprimaExecuter` only (Frank, 2026-09-27)
 - **Records:** `DECISIONS.md`
 
 `package.json` pins `espree` `^10.4.0`. Version 11 raises the **runtime** Node floor for consumers
@@ -395,7 +408,7 @@ It is what an AI system reads to learn the package.
 
 Read rule by rule against the code, the suite and a node probe on 2026-09-22. What it produced: the
 two release blockers - B-33, and the shadowing of `Object.prototype` names, closed the same day -
-the gaps B-35 to B-37, and the missing pins in B-38. Fixed in the
+the gaps B-35 to B-37, and six rules without a pin, pinned on 2026-09-27. Fixed in the
 text: *the stacking context* in section 2, *the global-write switch* in 4.2, four references to a
 section 1.3 that does not exist, and 3.3 now says **ASCII** letters, which is what `EXPRESSION_SCOPE` accepts — a prefix
 `Äpfel::` is not recognized, and whether it should be is Frank's to say.
@@ -526,27 +539,6 @@ setup (`AGENTS.md`, Benchmarks).
 Seen on 2026-09-27 outside that pattern as well (`npm run bench` at `f33461f`): at depth 1 000 in
 `ColdResolve`, and in `ResolveText` under `with-scoped-executer`, a file that builds no chain at all.
 Whether the chain of another file stays live in the same browser page is not checked.
-
-### B-38 · Rules without a test that pins them
-
-- **Status:** agreed — goal 3
-- **Kind:** test
-
-Found by the read-through of B-21. The code keeps each of them as far as it was checked, but nothing
-turns the gate red if that changes:
-
-1. 6.7 — the `deep` option of `buildSecure`; the four cases never pass it.
-2. 9.2 — `with-scoped-executer` announcing its deprecation on the first expression it resolves.
-3. 6.1, 6.5 — a write over a frozen context fails. The suites of `with-scoped` and `context-object`
-   ask it of an assignment in an expression; `updateData` over a frozen context is not asked at all,
-   and a sealed context is not in the suite (B-05).
-4. 6.4 — `getData()` on a resolver over the global object answers the global object itself, and a
-   write through it is an ordinary global write.
-5. 3.1 — the two limits: a brace inside a comment counts, a regular expression literal after `)` is
-   read as division.
-6. 8 — `setDebug` of `ContextDeconstructorExecuter.js`. Section 8 makes `setDebug` surface wherever
-   a module exports it; only the one of `EsprimaExecuter.js` is pinned, in
-   `test/executer/esprima/interface.Test.js`. Found 2026-09-27.
 
 ## Tooling
 

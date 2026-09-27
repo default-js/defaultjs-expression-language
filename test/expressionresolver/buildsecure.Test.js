@@ -36,6 +36,21 @@ describe("ExpressionResolver - buildSecure", () => {
 		expect(await secure.resolve("${ secret }")).toBeUndefined();
 	});
 
+	// Which value `deep` takes when it is left out is not a rule of 6.7, so both cases pass it.
+	it("filters a sub object as well with deep", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const secure = ExpressionResolver.buildSecure({ context: { sub: { open: "ok", secret: "hidden" } }, propFilter, option: { deep: true } });
+		const sub = await secure.resolve("${ sub }");
+		expect(sub.secret).toBeUndefined();
+	});
+
+	it("takes a sub object over unfiltered without deep", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const secure = ExpressionResolver.buildSecure({ context: { sub: { open: "ok", secret: "hidden" } }, propFilter, option: { deep: false } });
+		const sub = await secure.resolve("${ sub }");
+		expect(sub.secret).toBe("hidden");
+	});
+
 	// That a statement can still reach a global - buildSecure is no sandbox - is not a rule of 6.7
 	// but the executer's own, and is tested with each executer.
 

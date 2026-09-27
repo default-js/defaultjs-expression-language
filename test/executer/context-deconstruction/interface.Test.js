@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import Executer from "../../../src/Executer.js";
 import getExecuter from "../../../src/ExecuterRegistry.js";
-import executer, { EXECUTERNAME, setupExecuter } from "../../../src/executer/ContextDeconstructorExecuter.js";
+import executer, { EXECUTERNAME, setupExecuter, setDebug } from "../../../src/executer/ContextDeconstructorExecuter.js";
 
 /**
  * ContextDeconstructorExecuter - the interface. SPECIFICATION.md 8, 9.1, 9.2.
@@ -27,5 +27,9 @@ describe("ContextDeconstructorExecuter - the interface", () => {
 
 	it("exports the executer as its default export", async () => {
 		expect(executer instanceof Executer).toBe(true);
+	});
+
+	it("exports setDebug", async () => {
+		expect(typeof setDebug).toBe("function");
 	});
 });
