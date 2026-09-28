@@ -36,12 +36,12 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 - **`SPECIFICATION.md` ships with the package.** Part A states what the resolver does, rule by
   rule — expression syntax, the resolver chain and its scopes, the context and what it guarantees,
   error handling, and the whole public surface. Part B states the interface an executer implements,
-  the four the package ships and how to tune them. It describes the released package: every rule in
+  the three the package ships and how to tune them. It describes the released package: every rule in
   it holds by 3.0.0, and it carries no index of pending work.
 
 - **`README.md` documents every executer.** How each one runs a statement; how a statement
   addresses a context value under it — `${ctx.value}` under `context-object-executer`, the bare
-  name under the other three, so switching executer can mean rewriting expressions; which JavaScript
+  name under the other two, so switching executer can mean rewriting expressions; which JavaScript
   it runs, which shapes of context it runs over, what an assignment inside a statement leaves behind
   and which globals it reaches; and how to pick one for a chain and tune its code cache.
 
@@ -114,12 +114,12 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   object.** `SPECIFICATION.md` 6.5 carried that as a guarantee, conditional on a switch that was
   never implemented. It is **withdrawn** — whether a write stays off the global object is up to the
   executer in use (`SPECIFICATION.md` 6.5) — because the package cannot keep it: only an executer can
-  intercept an assignment, and three of the four shipped today let an unqualified one reach the
-  global object in at least one shape. Nothing about the code changed here — what changed is that
+  intercept an assignment, and two of the three shipped today let an unqualified one reach the
+  global object. Nothing about the code changed here — what changed is that
   the document now says what the code does. Concretely, and worth knowing for anyone who read the
   guarantee: under `with-scoped-executer` and `context-deconstruction-executer` (the default) a write
-  to a name no resolver of the chain carries creates a global; under `esprima-executer` it does so
-  from inside a function written in the statement; only `context-object-executer` contains it. An
+  to a name no resolver of the chain carries creates a global; only `context-object-executer`
+  contains it. An
   explicit `globalThis.x = 1` reaches the global object under every one of them. **This package does
   not sandbox the global object**, and `buildSecure` (6.7) never claimed to. The `allowGlobalWrite`
   switch that was to make the containment configurable is **not part of the specification**: its
@@ -299,10 +299,22 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   resolvers is the context of a resolver at the root of their chain. See `SPECIFICATION.md` 4.2,
   6.3 and 9.1.
 
-- **`esprima` is no longer a declared runtime dependency.** It was never imported — the two
-  references in `src/executer/EsprimaExecuter.js` are commented out, the executer parses with
-  `espree`. Nothing changes in an install: `escodegen` depends on `esprima` and still pulls
-  it in.
+- **`EsprimaExecuter` is gone.** `src/executer/EsprimaExecuter.js` and the executer name
+  `esprima-executer` no longer exist. It rewrote a statement's syntax tree onto the context without
+  knowing the context, and that approach cannot be made to work cleanly: it did not reach a context
+  value inside a function, a literal or a ternary, reached only a fixed list of globals, and could
+  not run an assignment to a context name. A consumer who used it moves to
+  `context-deconstruction-executer` (the default) or `context-object-executer`; `README.md`
+  describes both. See `DECISIONS.md`, 2026-09-28.
+
+- **The entry `browser-all-executers.js` and its bundles are gone.** They differed from
+  `browser.js` and `dist/browser-…` only by registering `EsprimaExecuter`. Load
+  `dist/browser-defaultjs-expression-language[.min].js` instead; it registers every executer the
+  package ships.
+
+- **`espree`, `escodegen` and `esprima` are no longer runtime dependencies.** The first two were
+  used by `EsprimaExecuter` alone, `esprima` was never imported. The package has one runtime
+  dependency left, `@default-js/defaultjs-common-utils`.
 
 ### Fixed
 
@@ -347,8 +359,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   only read its own context. Both caches apply the same rule now.
 
 - **A resolver built on the global object threw on every lookup.** `new ExpressionResolver({
-  context: globalThis })` — and every resolver built while `EsprimaExecuter` is the default,
-  since that executer declares the global object as its default context — answered `undefined`
+  context: globalThis })` answered `undefined`
   for every name, `${ Math.round(1.5) }` included. The property cache of a global context is a
   wrapper rather than a `Map`, and its lookup answered the value of the property where the caller
   expects the link holding it, so reading the property off that answer raised a `TypeError` that
@@ -428,27 +439,26 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   set, so the compiled expressions stayed in memory, and re-enabling never cleared the flag,
   which left that executer recompiling every expression for the rest of the page's life.
   `setupExecuter({ size: 0 })` now releases the entries, and a later positive size caches
-  again, starting empty. Affects all four executers.
+  again, starting empty. Affects every executer.
 
 - **`CodeCache` wrote a `console.debug` line into the consumer's console** every time it
   trimmed. The line is gone; nothing about the trim itself changed.
 
 - **The raw published sources could not be loaded as native ES modules.** `src/**`,
-  `index.js`, `browser.js` and `browser-all-executers.js` all ship raw through the `files`
-  array, and none of the three entries loaded without a bundler in front of them. Two
-  independent reasons: `browser.js` and `browser-all-executers.js` imported a binding
+  `index.js` and `browser.js` all ship raw through the `files` array, and neither entry
+  loaded without a bundler in front of it. Two independent reasons: `browser.js` imported a binding
   `Context` that `index.js` does not export, which a browser rejects with `SyntaxError: The
-  requested module './index.js' does not provide an export named 'Context'`; and four imports
+  requested module './index.js' does not provide an export named 'Context'`; and three imports
   carried no file extension — `./ExpressionResolver` and
   `@default-js/defaultjs-common-utils/src/ObjectUtils` in `src/ResolverContextHandle.js`,
-  `@default-js/defaultjs-common-utils/src/Global` in both browser entries — which the browser
+  `@default-js/defaultjs-common-utils/src/Global` in `browser.js` — which the browser
   and Node answer with `ERR_MODULE_NOT_FOUND`, because neither guesses the extension and the
   dependency's `exports` map takes the subpath literally. The second reason reached `index.js`
-  as well, the entry `main` points at. The unused import is gone and the four extensions are
+  as well, the entry `main` points at. The unused import is gone and the three extensions are
   in place; nothing else about any of the files changed, and the bundles are unaffected.
 
-- **`browser.js` and `browser-all-executers.js` were published with an unresolved version
-  placeholder.** Both files are part of the `files` array, so anyone importing the raw source
+- **`browser.js` was published with an unresolved version placeholder.** The file is part of the
+  `files` array, so anyone importing the raw source
   instead of a bundle got `GLOBAL.defaultjs.el.VERSION === "${version}"`. The version now comes
   from the generated module `src/version.js`, which ships with the package, so the raw sources
   and the bundles report the same value.
@@ -457,9 +467,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   It resolved to whatever happened to be published at install time and would have pulled
   a future major without any warning. The range is now `^1`.
 
-- **The expression cache ran at a fifth of its configured size in three of four executers.**
-  `WithScopedExecuter`, `ContextObjectExecuter` and `EsprimaExecuter` passed the cache option
-  as `aSize` instead of `size`, so the intended 5000 entries never applied and all three fell
+- **The expression cache ran at a fifth of its configured size in two of three executers.**
+  `WithScopedExecuter` and `ContextObjectExecuter` passed the cache option
+  as `aSize` instead of `size`, so the intended 5000 entries never applied and both fell
   back to the default of 1000 — trimming, and therefore recompiling, five times as often as
   designed. `ContextDeconstructorExecuter` was already correct. Expression-heavy pages hold
   more compiled expressions in memory now and recompile less.

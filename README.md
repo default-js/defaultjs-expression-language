@@ -19,7 +19,6 @@
     - [context-deconstruction-executer (the default)](#context-deconstruction-executer-the-default)
     - [context-object-executer](#context-object-executer)
     - [with-scoped-executer (deprecated)](#with-scoped-executer-deprecated)
-    - [esprima-executer](#esprima-executer)
   - [Development](#development)
   - [License](#license)
 
@@ -139,7 +138,7 @@ resolver answers a name is the resolver's work and the same under every executer
 is written, which JavaScript it may contain, and what an assignment inside it leaves behind are the
 executer's own — so switching executer can mean rewriting expressions.
 
-Four executers ship with the package. Each is a solution of its own, with its own strengths and its
+Three executers ship with the package. Each is a solution of its own, with its own strengths and its
 own limits, described below. They share only the interface in `src/Executer.js`.
 
 ### Choosing and tuning an executer
@@ -166,7 +165,7 @@ import { setupExecuter } from "@default-js/defaultjs-expression-language/src/exe
 setupExecuter({ size: 500 });
 ```
 
-What holds under all four: a statement stands in **expression position**, so `${ 1; 2 }` is not two
+What holds under all three: a statement stands in **expression position**, so `${ 1; 2 }` is not two
 statements; and the generated code runs in **sloppy mode**, so nothing here is a sandbox — a
 statement that asks for the global object by name, as in `${ globalThis.x = 1 }`, gets it.
 
@@ -236,7 +235,7 @@ Module `src/executer/WithScopedExecuter.js`, registered by every entry point. It
 deprecation on the first expression it runs.
 
 **How it works.** It runs the statement inside a `with` block over the context — the original
-strategy of this package, and the reason for the other three: `with` is deprecated and cannot run in
+strategy of this package, and the reason for the other two: `with` is deprecated and cannot run in
 strict mode.
 
 **Writing a statement.** Bare names, as with the default: `${ user.name }`. Everything legal in
@@ -248,41 +247,6 @@ when the statement reads it.
 **Writes.** An assignment to a name the chain carries behaves like one in JavaScript and lands on
 the resolver the statement ran on. An assignment to a name **no** resolver carries falls out of the
 `with` block and creates a global instead.
-
-### esprima-executer
-
-Module `src/executer/EsprimaExecuter.js`. **Not registered by default**, because its parser `espree`
-makes the browser bundle many times larger. Import the module, or load the
-`browser-all-executers-…` bundle, before naming it.
-
-```javascript
-import { EXECUTERNAME } from "@default-js/defaultjs-expression-language/src/executer/EsprimaExecuter.js";
-
-const resolver = new ExpressionResolver({ context: { price: 4 }, executer: EXECUTERNAME });
-```
-
-**How it works.** It parses the statement with `espree`, rewrites the identifiers it reaches into
-`ctx?.name`, and generates code again with `escodegen`.
-
-**Writing a statement.** Bare names: `${ price * amount }`. A context value is reached where the
-rewrite walks: operands of an operator, `??`, member access (`${ user.address.city }`,
-`${ user?.address }`), calls and their arguments, template literals, `await`. It is **not** reached
-inside a function written in the statement — an arrow or callback (`${ items.map((i) => i + tax) }`),
-a function expression, a default parameter, an async function — nor inside an object or array
-literal, a computed key, a spread, the branches of a ternary, the key of `a[b]`, a tagged template,
-or as the class of `new Cls()`. A class field does not run at all. A line comment at the end of a
-statement — `${ price // net\n }` — raises a `SyntaxError`; a block comment does not.
-
-**Globals.** Only `window`, `self`, `Object`, `Array`, `Map`, `Set`, `fetch` and `console` are
-reachable as bare names. Everything else becomes a context lookup: `${ Math.round(1.5) }`,
-`${ JSON.stringify(x) }`, `Date`, `Promise`, `document` and globals your page defines are not
-reached — go through `window`, as in `${ window.Math.round(1.5) }`.
-
-**What a context may be: anything**, as for `context-object-executer`.
-
-**Writes.** An assignment to a context name does not run: `${ count = 1 }`, `+=` and `++` raise.
-Nothing a statement writes reaches the context. A bare assignment inside a function written in the
-statement is not rewritten and creates a global.
 
 ## Development
 

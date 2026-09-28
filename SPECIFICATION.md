@@ -603,18 +603,16 @@ name or an `Executer` instance.
 | `with-scoped-executer` | `WithScopedExecuter.js` | a `with` block over the context |
 | `context-object-executer` | `ContextObjectExecuter.js` | the context as one object named `ctx` |
 | `context-deconstruction-executer` | `ContextDeconstructorExecuter.js` | the context destructured into parameters |
-| `esprima-executer` | `EsprimaExecuter.js` | parsed to an AST, identifiers rewritten onto `ctx` |
 
 The default is `context-deconstruction-executer`. `with-scoped-executer` is deprecated, because
 `with` is; it is still registered and reachable by name, and announces its deprecation on the first
-expression it resolves. `esprima-executer` is registered only when its module is imported
-explicitly, because its parser `espree` grows the browser bundle many times over.
+expression it resolves.
 
 Each implementation is a solution of its own. Which JavaScript a statement may contain, how it
 addresses a context value, which shapes of context it runs over, what an assignment inside it
 leaves behind and which globals it reaches are the executer's own, and `README.md` documents them for
 each one. An executer may demand its own spelling: `context-object-executer` hands the context over
-as the object `ctx`, so a property is addressed as `${ctx.value}` where the other three read
+as the object `ctx`, so a property is addressed as `${ctx.value}` where the other two read
 `${value}`, and switching executer can mean rewriting expressions. What an executer may not change
 is which resolver of the chain answers a lookup, or any other rule of part A.
 

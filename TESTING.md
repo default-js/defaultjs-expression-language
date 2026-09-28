@@ -18,7 +18,7 @@ Every part of the suite has one place:
 Ask **whose code decides it**, in this order:
 
 1. **One executer?** Then it goes into that executer's directory — `with-scoped`, `context-object`,
-   `context-deconstruction`, `esprima` — and only if the executer **guarantees** it. What an executer
+   `context-deconstruction` — and only if the executer **guarantees** it. What an executer
    does not do is written into its section of `README.md`, never into a test.
 2. **Whether an executer keeps the interface** — its module registers it on import and exports it,
    its name and `setupExecuter` — is that executer's guarantee too, in its own `interface.Test.js`.
@@ -88,9 +88,9 @@ Every case is an ordinary `it` that has to pass. There is no table, no state and
   What only exists through a chain — a write to a name an ancestor carries — is the resolver's.
 
 - **Only where the executer's own code decides.** A case is needed where a change to *that*
-  executer could break it: it runs the executer's own work — generating, rewriting, reading the
-  names of a context, caching — or pins a guarantee its README section states. Three of the four
-  paste the statement unchanged into the function they generate, so which construct runs and where
+  executer could break it: it runs the executer's own work — generating, reading the
+  names of a context, caching — or pins a guarantee its README section states. All three paste
+  the statement unchanged into the function they generate, so which construct runs and where
   a name is found is the engine's answer: one representative case, not one per construct.
 - **Only what the executer guarantees.** A behaviour that holds only by accident — a write
   "contained" because the executer cannot run the assignment at all, a frozen key "unchanged"
@@ -101,11 +101,6 @@ Every case is an ordinary `it` that has to pass. There is no table, no state and
 - **Never a case that pins what an executer does not do.** A limitation is documented in `README.md`.
   Where an executer guarantees *how* it fails — the deconstructor names the key it cannot bind —
   that is a guarantee and belongs in `errors`.
-
-**Where the executer rewrites the statement, every construct is asked twice** — `esprima` today —
-and the two questions live in two files: `syntax` asks whether a construct runs, with constants
-inside it; `context` asks whether the same construct still reaches a context value. A case that puts a context name inside a construct answers both at once, and a
-failure then does not say which broke.
 
 ## 5. Every case, wherever it lives
 

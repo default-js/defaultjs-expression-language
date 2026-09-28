@@ -42,13 +42,13 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 
 | # | Goal | Status | Open entries |
 | --- | --- | --- | --- |
-| 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 | B-28, B-29 (follow-up decisions) |
+| 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-28) | B-28, B-29 (follow-up decisions) |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-27, B-40 |
 
-**Markers, counted 2026-09-27** (`npm test`: 366 passed, 366 cases). No `it.fails` is left and no
+**Markers, counted 2026-09-28** (`npm test`: 320 passed, 320 cases). No `it.fails` is left and no
 entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
 the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
 is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
@@ -58,8 +58,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | ID | Title | Status | Kind | 3.0.0 | Prio |
 | --- | --- | --- | --- | --- | --- |
 | B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
-| B-08 | `EsprimaExecuter` cannot reach a context value from inside a nested function | decision | executer | | low |
-| B-09 | `RESERVED_NAMES` in the esprima executer misspells `global` | agreed | defect | | low |
 | B-10 | A write to an unknown name inside an expression lands on `globalThis` | decision | executer | | |
 | B-11 | `ContextDeconstructorExecuter` loses `this` inside a method of the context | decision | executer | | |
 | B-12 | `ContextDeconstructorExecuter` reads every property of a context | decision | executer | | |
@@ -67,7 +65,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-14 | `"type": "module"` plus an `exports` field | decision | tooling | | |
 | B-15 | Was a `Context` export meant to exist on the public API? | decision | gap | | |
 | B-16 | The `module` entry produces a bundle nothing can consume | decision | defect | | |
-| B-18 | Move `espree` 10 → 11? | decision | tooling | | low |
 | B-19 | `generate-license.config.json` sets a key that does not exist | decision | defect | | |
 | B-20 | Every code example in `README.md` uses a default import that does not exist | agreed | docs | | |
 | B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
@@ -82,7 +79,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
 | B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | | |
 | B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | | |
-| B-50 | A line comment at the end of a statement breaks `EsprimaExecuter` | decision | executer | | low |
 | B-51 | A statement that begins with a line comment answers `undefined` | decision | executer | | |
 
 ---
@@ -110,7 +106,7 @@ while `ownKeys` of the same proxy got faster, 3.1 ms against 9.4. Before, each e
 
 Under `WithScopedExecuter` a lookup scales with the full chain depth even when the name sits a few
 resolvers up: `RandomScope` at depth 100 000 answers 138 hz under `with-scoped` against 662 000 hz
-under `context-object` and 457 000 hz under `esprima` (2026-08-30). `#getPropertyDef` does stop at
+under `context-object` (2026-08-30). `#getPropertyDef` does stop at
 the first match; what walks the whole chain is a lookup that can never match —
 `proxy[Symbol.unscopables]`, which `with` asks on every binding, walks every resolver because the
 cache is keyed by string. Cheap fix if confirmed: answer non-string properties in `get`/`has`
@@ -118,40 +114,6 @@ without walking, or give the handle its own `Symbol.unscopables`. Costs every co
 the `with`-based executer; the default moved away from it on 2026-09-01.
 
 ## Executers
-
-### B-08 · `EsprimaExecuter` cannot reach a context value from inside a nested function
-
-- **Status:** decision — close the gaps or accept them as the executer's limits
-- **Kind:** executer · **Spec:** none — `README.md`, *esprima-executer*
-- **Priority:** low — concerns `EsprimaExecuter` only (Frank, 2026-09-27)
-- **Records:** `CHANGELOG.md`
-
-The rewrite turns an identifier into `ctx?.name` only where the traversal reaches it.
-`TRAVERSABLE_PROPERTIES` (`src/executer/EsprimaExecuter.js`) does not cover `properties`,
-`elements`, `test`/`consequent`/`alternate`, `tag`/`quasi`, the `property` of a computed member
-access, or function bodies (`IGNORED_TYPES`). So `${ {a: value}.a }`, `${ [value][0] }`,
-`${ flag ? a : b }`, `${ obj[key] }`, and every arrow, function expression, default parameter and
-async function that reads the context raise where the other three executers answer — measured. Two further causes: `ctx?.name` cannot be an assignment target or a `new` callee
-(`new ctx?.Cls()` is a syntax error), and `escodegen` 2.1.0 cannot generate a class field. One pass
-over the rewrite closes the first two causes, not the third. Decide together with B-09.
-
-### B-09 · `RESERVED_NAMES` in the esprima executer misspells `global`
-
-- **Status:** agreed 2026-08-24 — rework the list as a whole, not the typo alone
-- **Kind:** defect · **Spec:** 6.4
-- **Priority:** low — concerns `EsprimaExecuter` only (Frank, 2026-09-27)
-- **Records:** `DECISIONS.md`, `CHANGELOG.md`
-
-`src/executer/EsprimaExecuter.js` lists `"gobal"`; everything not on the list is rewritten to
-`ctx?.name`. The list is therefore the whole global surface of this executer: `Object`, `Array`,
-`Map`, `Set`, `console`, `fetch`, `window` are reachable; `Math`, `JSON`, `Date`, `Promise`,
-`document` and any global the application planted are not (`${ Math.round(1.5) }` raises a
-`TypeError`: `ctx?.Math` is `undefined`, and reading `round` off it throws). Direction, Frank's: derive the list from the names of `GLOBAL` instead of maintaining
-it by hand. Settle when writing it: the derived list is a snapshot taken at module load; it makes
-every global reachable, which removes the property 6.4 leans on (a typo and an empty value are
-indistinguishable); a context property must keep winning over a global of the same name; and the
-syntax entries — `await`, `async`, `this`, `typeof`, `instanceof`, `undefined` — are not globals and
-have to survive.
 
 ### B-10 · A write to an unknown name inside an expression lands on `globalThis`
 
@@ -165,8 +127,7 @@ the containment**, and **is an `allowGlobalWrite` switch worth having** — its 
 mean something under an executer able to intercept the assignment. If the switch comes, 6.5 gets it
 back, the configuration form of 4.1 and `buildSecure` (6.7) take it as an option, and this entry gets the release marker.
 What is measured: an unqualified `x = 1` on a name no resolver carries creates a global under
-`with-scoped`, `context-deconstructor` and `esprima` — the last one only inside a function body or
-an array pattern (`${ [name] = ["hit"] }`), which its rewrite does not reach; `context-object`
+`with-scoped` and `context-deconstructor`; `context-object`
 contains it, because its dialect writes through the proxy. A compound assignment (`x += 1`) cannot
 leak, it raises on the read. Nothing contains an explicit `globalThis.x = 1`. No executer runs its
 statement in strict mode, which the agreed fix of 2026-08-22 leaned on. A resolver whose context
@@ -179,7 +140,7 @@ statement in strict mode, which the agreed fix of 2026-08-22 leaned on. A resolv
 - **Records:** `CHANGELOG.md`
 
 A context that is a class instance — the shape a template engine hands in most often — answers
-`${ greet() }` under the other three executers, which keep the context as the receiver. The
+`${ greet() }` under the other two executers, which keep the context as the receiver. The
 deconstructor binds the method to a local and calls it bare, so `this` is `undefined` and a method
 reading its own state raises. It is the **default** executer, and the loss is silent.
 
@@ -190,7 +151,7 @@ reading its own state raises. It is the **default** executer, and the loss is si
 
 It destructures every name of the context, which calls every accessor on every execution. A context
 whose getter throws breaks every expression, including `${ 1 + 1 }`; an `arguments` object in strict
-mode does the same through `callee`. The other three executers answer, and the proxy itself reads no
+mode does the same through `callee`. The other two executers answer, and the proxy itself reads no
 getter (6.2), so this is the executer's doing alone. The cost half: every getter runs on every
 execution even when the statement touches no name.
 
@@ -218,18 +179,6 @@ the three answers `undefined`). Not new with the scanner learning comments — i
 statement before. A line break in front of the statement would close it; whether that is worth its
 cost in every generated function is the question.
 
-### B-50 · A line comment at the end of a statement breaks `EsprimaExecuter`
-
-- **Status:** decision — close it, or document it as the executer's limit
-- **Kind:** executer · **Spec:** none — `README.md`, *esprima-executer*
-- **Priority:** low — concerns `EsprimaExecuter` only (Frank, 2026-09-27)
-- **Records:** `CHANGELOG.md` if it is closed
-
-`generate` wraps the statement as `async function fn({ctx}){return (${aStatement})}` on one line
-(`src/executer/EsprimaExecuter.js`), so a trailing `// note` comments out `)}` and the parse raises a
-`SyntaxError` (measured 2026-09-27: `a // note` raises, `a /* note */` and a leading `// note\na`
-answer). A line break before `)` would close it. Documented in `README.md` meanwhile.
-
 ## Public surface and packaging
 
 ### B-14 · Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path
@@ -239,10 +188,10 @@ answer). A line break before `)` would close it. Documented in `README.md` meanw
 - **Pinned by:** `test/package/surface.Test.js` (the deep import of `Executer`)
 - **Records:** `DECISIONS.md`, `CHANGELOG.md`
 
-`defaultjs-common-utils` already went this way, so the two packages diverge. Reaching a non-default
-executer — and with it `setupExecuter(options)` — is done by importing its module directly
-(`…/src/executer/EsprimaExecuter.js`); that is intended (`DECISIONS.md`, 2026-08-20) and works only
-because there is no `exports` field. So an `exports` field must whitelist `./src/executer/*`.
+`defaultjs-common-utils` already went this way, so the two packages diverge. Tuning an executer —
+`setupExecuter(options)` — is done by importing its module directly
+(`…/src/executer/ContextObjectExecuter.js`); that is intended (`DECISIONS.md`, 2026-09-28) and works
+only because there is no `exports` field. So an `exports` field must whitelist `./src/executer/*`.
 `./src/Executer.js` needs the same treatment: section 8 lists `Executer` as public, but `index.js`
 exports only `ExpressionResolver` and `ExecuterRegistry` — whitelist it, or export it from
 `index.js`. Also open: tuning the *default* executer needs the same deep import although the
@@ -273,18 +222,7 @@ section 8 lists the getter `contextHandle` and none of the handle's members.
 sets no `output.library`, so the bundle exposes nothing. Bundlers do not use it either — `main`
 points at the raw `./index.js`. It is also what forces `optimization.usedExports: false`
 (`DECISIONS.md`, 2026-08-21). With a library configuration, tree shaking can come back; without the
-entry, two bundles are published instead of three.
-
-### B-18 · Decide whether to move `espree` 10 → 11
-
-- **Status:** decision
-- **Kind:** tooling · **Spec:** none
-- **Priority:** low — concerns `EsprimaExecuter` only (Frank, 2026-09-27)
-- **Records:** `DECISIONS.md`
-
-`package.json` pins `espree` `^10.4.0`. Version 11 raises the **runtime** Node floor for consumers
-to `^20.19 || ^22.13 || >=24` — a compatibility decision about the published package, not a
-toolchain bump. `espree` is only pulled in by `EsprimaExecuter`, which is not registered by default.
+entry, one bundle is published instead of two.
 
 ### B-19 · `generate-license.config.json` sets a key that does not exist
 
@@ -322,9 +260,8 @@ text: *the stacking context* in section 2, *the global-write switch* in 4.2, fou
 section 1.3 that does not exist, and 3.3 now says **ASCII** letters, which is what `EXPRESSION_SCOPE` accepts — a prefix
 `Äpfel::` is not recognized, and whether it should be is Frank's to say.
 
-Still open here: the bundle sizes in `AGENTS.md` and `DECISIONS.md` (11.5 KB and 355.6 KB) do not match `dist/` as committed on 2026-09-07 — 16.1 KiB and 365.5 KiB minified.
-Take the figures from the next `npm run build` rather than from this note. Frank has further points
-from reviewing the restructure; they are added here when they come.
+Still open here: Frank has further points from reviewing the restructure; they are added here when
+they come.
 
 ### B-22 · The JSDoc of the whole package needs one pass
 
@@ -351,11 +288,10 @@ together with B-23.
 Known so far: `#getPropertyDef` answers the handle carrying a name, and the variable it lands in is
 called `proxy`; `chain` and `effectiveChain` answer a string path, `contextChain` an array, and none
 of them a chain in the sense of section 2; `getData` without a key answers the whole context;
-`toText` replaces `undefined` and `null` by their word and converts nothing; `traverse` rewrites the
-AST it walks; `buildSecure` promises a security its own JSDoc denies; `setupExecuter` sets the cache
+`toText` replaces `undefined` and `null` by their word and converts nothing; `buildSecure` promises a security its own JSDoc denies; `setupExecuter` sets the cache
 size and nothing else; `normalize`, `startsRegex`, `parseScope` and `scanExpression` say less than
 they do; `registrate` is not an English word and is public; `getExecuterType` is the import alias of
-`getExecuter` and answers an instance; `EsprimaExecuter` parses with `espree`. Public ones —
+`getExecuter` and answers an instance. Public ones —
 `registrate`, the three chain getters, `buildSecure` — need a decision; private ones are a rename.
 
 ### B-24 · "Link" is out of the specification and still stands in every other file
@@ -480,15 +416,15 @@ for is done.
 - **Status:** investigate — none of it is a missing test for a rule
 - **Kind:** test
 
-Measured 2026-09-27 with `npm run test:coverage`, 366 cases: statements **95.02 %** (649/683),
-branches **94.35 %** (334/354), functions **92.30 %** (108/117), lines **96.74 %** (565/584), after
-the input rules of the decision round of that day (B-03 to B-37) were implemented. Update these
+Measured 2026-09-28 with `npm run test:coverage`, 320 cases: statements **95.31 %** (590/619),
+branches **95.46 %** (316/331), functions **93.20 %** (96/103), lines **96.60 %** (512/530), after
+`EsprimaExecuter` was removed. Update these
 numbers when the picture changes rather than adding another baseline. Uncovered lines:
 
 1. `stringToHashcode` in `src/Utils.js`. Nothing imports it; it stays, deliberately without a test
    (Frank, 2026-09-27).
-2. The `setDebug` bodies of `ContextDeconstructorExecuter.js` and `EsprimaExecuter.js`. The surface
-   test asserts they exist and deliberately never flips them: a debug switch has nothing observable.
+2. The `setDebug` body of `ContextDeconstructorExecuter.js`. The surface
+   test asserts it exists and deliberately never flips them: a debug switch has nothing observable.
 3. `set` and `delete` of `createGlobalCacheWrapper` in `ResolverContextHandle.js`. A global context
    is not proxied since 2026-08-30, so nothing routes a write through the wrapper — check whether
    the two methods still have a caller before covering them.
@@ -496,14 +432,11 @@ numbers when the picture changes rather than adding another baseline. Uncovered 
 5. **New on 2026-09-22:** the `return null` of `findPropertyDescriptor`, and the `get` of the
    descriptor the `getOwnPropertyDescriptor` trap hands out, which no case ever calls. Look at both
    before deciding whether they are reachable.
-6. The reserved-callee branch of the esprima rewrite (`EsprimaExecuter.js:49`,
-   `CALLEXPRESSION__RESERVED__CALLEES`): no case ever calls `fetch(…)` or `console(…)` bare — the two
-   global cases ask `typeof`, and `console.log(…)` has a member as callee. Found 2026-09-26.
-7. **New on 2026-09-27:** `if (typeof aStatement !== "string") return aStatement;` in `execute` of
+6. **New on 2026-09-27:** `if (typeof aStatement !== "string") return aStatement;` in `execute` of
    `ExpressionResolver.js`. Since the instance `resolve` rejects a non-string (4.2), every statement
    reaching it is a string or null from the scanner, so the branch looks unreachable — check, then
    delete it rather than cover it.
 
-`src/version.js` is generated; its 0 % is noise. The 20 open branches sit in the scanner's state
+`src/version.js` is generated; its 0 % is noise. The 15 open branches sit in the scanner's state
 machine — combinations of literal states — and in the lines listed above; none is a rule without a
 test.

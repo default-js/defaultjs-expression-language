@@ -19,6 +19,41 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-28 — Does the package keep `EsprimaExecuter`?
+
+**Decision:** No. `EsprimaExecuter` is removed, together with everything that existed only for it:
+the `esprima-executer` registration, the entry `browser-all-executers.js` and its bundles, and the
+runtime dependencies `espree` and `escodegen`. Frank's decision.
+
+What stays in force from the entry of 2026-08-20 that kept it unregistered: an executer module is
+reached by importing it directly, which is how `setupExecuter` is reached and the intended usage,
+so an `exports` field must keep `./src/executer/*` importable (`BACKLOG.md`).
+
+**Reasoning:** The approach cannot be made clean. The executer rewrote the statement's AST so that
+an identifier became `ctx?.name`, and it had to decide which identifiers to rewrite **without
+knowing the context**: `generate` saw the statement text alone, and the result was cached per
+statement, so it had to fit every context the statement would ever meet. Whatever it guessed was
+wrong somewhere. Rewriting every name it reached cut off every global not on a hand-kept list
+(`${ Math.round(1.5) }` raised); rewriting fewer leaves context names bare. Every construct the
+rewrite did not walk — function bodies, object and array literals, the branches of a ternary, a
+computed key — kept its names bare, and `ctx?.name` cannot be an assignment target or a `new`
+callee at all. Each of these was an open backlog entry; closing them one by one would have refined
+the guess, never removed it. On top, `espree` made the bundle carrying it about 31 times the size of
+the one without.
+
+**Alternatives:** Closing the gaps of the rewrite and deriving the reserved names from the global
+object — rejected for the reason above. Rewriting per context instead of per statement would know
+the names, but it gives up the code cache, which is what makes an executer affordable, and the names
+of a context can still change after compilation. An AST-based executer is worth another look only
+if it can decide per identifier at run time, which is what the other executers get from the engine.
+
+**Consequences:** Consumer-visible for 3.0.0: `esprima-executer` is no longer registered, and
+`browser-all-executers.js` with its `dist/` bundles is no longer published. The package ships three
+executers and one browser bundle. The rule in `TESTING.md` that asked a rewriting executer every
+construct twice went with it.
+
+---
+
 ## 2026-09-27 — What does the resolver do with input of the wrong type?
 
 **Decision:** Decided per input rather than by one blanket rule, and each case came out the same
@@ -114,7 +149,7 @@ code — a comment would then hide braces but not delimiters, two rules where on
 **Consequences:** `SPECIFICATION.md` 3.1 lost the comment limit and keeps one: a regular expression
 literal after `)` or `]` is read as division. A one-line expression ending in a line comment is text
 now — it was before as well, for another reason. The executers receive comments unchanged, which
-exposes two limits of their generated code: B-50, B-51.
+exposes a limit of their generated code: B-51.
 
 ---
 
@@ -387,19 +422,17 @@ decision removes.
 
 **Consequences:** A limitation has no test, so an executer that starts doing what it did not do turns
 nothing red — the guard a `no` cell gave is given up deliberately, and `README.md` is where such a
-change has to be written. A `yes` that held only by accident became no guarantee: a write the esprima
-executer cannot run was "contained", a write the deconstructor never carries back left a frozen key
-"unchanged" — those were dropped rather than promised. Case bodies repeat across the four suites on
-purpose, each in its own dialect; sharing a body would be sharing a feature set. `it.fails` stays out
+change has to be written. A `yes` that held only by accident became no guarantee: a write the deconstructor never carries
+back left a frozen key "unchanged" — such cases were dropped rather than promised. Case bodies repeat
+across the suites on purpose, each in its own dialect; sharing a body would be sharing a feature set. `it.fails` stays out
 of an executer's suite. The benchmarks keep a list of
-the four executers (`test/PerformanceTests/Executers.js`), because comparing them is what a benchmark
+the executers (`test/PerformanceTests/Executers.js`), because comparing them is what a benchmark
 is for.
 
 A case is kept where a change to *that* executer could break it — it runs the executer's own code or
-pins a guarantee its README section states. Three executers paste the statement unchanged into the
-function they generate, so one representative case stands for every construct and every position of
-a name there; asked twenty times, the engine gives the same answer twenty times. Only `esprima`,
-whose rewrite walks the statement node by node, is asked construct by construct. That cut the
+pins a guarantee its README section states. Every executer pastes the statement unchanged into the
+function it generates, so one representative case stands for every construct and every position of
+a name there; asked twenty times, the engine gives the same answer twenty times. That cut the
 suites from 343 cases to 81 without moving the coverage.
 
 ## 2026-09-22 — What does an executer do with a name it cannot use?
@@ -488,9 +521,7 @@ better choice if a consumer needs values visible to chains it does not build its
 belongs to the resolver, not the executer, and needs its own rules for writes.
 
 **Consequences:** Consumer-visible for 3.0.0: `executer.defaultContext` answers `undefined`. An own
-executer that passes the option keeps working, the option is ignored. Under `EsprimaExecuter` a
-resolver without a context no longer sees the global object as its context; it reaches globals
-through its `RESERVED_NAMES` list only (B-09).
+executer that passes the option keeps working, the option is ignored.
 
 ---
 
@@ -1191,13 +1222,13 @@ which is a documented side effect rather than a defect.
 ## 2026-08-22 — Is reaching the global object a promise of the package?
 
 **Decision:** No. It is described as a **mechanism** and the details belong to the executer.
-`WithScopedExecuter` and `ContextDeconstructorExecuter` run the statement as ordinary JavaScript,
-so the engine resolves a name the chain does not carry against the global object and neither
-executer can prevent it. `EsprimaExecuter` rewrites identifiers onto one context variable and
-reaches globals only through its `RESERVED_NAMES` list or a global context object.
+Every executer the package ships runs the statement as ordinary JavaScript, so the engine resolves
+a name the chain does not carry — under `ContextObjectExecuter` every bare name — against the
+global object, and no executer can prevent it.
 
 **Reasoning:** The resolver does not execute anything itself. Promising a global fallback would
-be promising something only some executers keep, and the esprima executer already breaks it.
+bind every future executer to it; the removed `EsprimaExecuter` reached globals only through a
+fixed list of names, and a sandboxed executer would reach none.
 
 **Alternatives:** Specifying it as a guarantee every executer must honour would give consumers one
 rule to rely on, at the price of constraining every future execution strategy — including a
@@ -1335,14 +1366,12 @@ record the past.
 `engines` is npm's field for *consumers*: it is checked when someone installs this package, not
 when we build it. This library targets the browser, ships untranspiled ESM, and does not care
 which Node produced the tarball. Putting a build-time requirement there would refuse or warn on
-installs that are perfectly fine. The only runtime floor that could legitimately go in comes
-from `espree` (`^18.18.0 || ^20.9.0 || >=21.1.0`), and it applies solely to consumers who reach
-for `EsprimaExecuter` under Node — a narrow enough case that a documented note beats a hard
-constraint.
+installs that are perfectly fine. The one runtime dependency,
+`@default-js/defaultjs-common-utils`, declares `>=16`; `espree`, which set the only floor that
+could have mattered to a consumer, left with `EsprimaExecuter` on 2026-09-28.
 
 **Alternatives:** Setting `engines` with the toolchain floor would make CI failures louder at
-the cost of every consumer. Setting it to the `espree` range would be defensible if the esprima
-executer were the default; it is not (see the entry of 2026-08-20).
+the cost of every consumer.
 
 **Consequences:** Nothing enforces the floor. A contributor on Node 20 gets a failure from
 `webpack-dev-server` rather than from npm, and on Node 23 one from Vitest. `.nvmrc` and the
@@ -1419,15 +1448,14 @@ all-executers one, and `resolveText("${1 + 1}")` returning `"2"`.
 **Alternatives:** Tree shaking becomes worth revisiting the moment the `module` entry gets an
 `output.library`, or is dropped — bundler consumers reach the package through `main`, which
 points at the raw `index.js`, not at `dist/`. A `sideEffects` field could be introduced as an
-*array* whitelisting the self-registering modules (`./src/executer/*.js`, `./browser.js`,
-`./browser-all-executers.js`); `false` is the value that must never appear. Both are tracked
+*array* whitelisting the self-registering modules (`./src/executer/*.js`, `./browser.js`);
+`false` is the value that must never appear. Both are tracked
 in `BACKLOG.md`.
 
 **Consequences:** The bundles carry unused exports of `@default-js/defaultjs-common-utils`,
 which is what the roughly 10 KB difference in the module bundle is. That is the price of
 correctness here, and it is paid only by consumers of `dist/`, not by those importing `src/`.
-The `usedExports: false` line is load-bearing and carries a comment saying so, in the same
-way as the commented-out esprima import in `src/executer/index.js`.
+The `usedExports: false` line is load-bearing and carries a comment saying so.
 
 
 ## 2026-08-21 — Which test runner replaces Karma?
@@ -1585,25 +1613,3 @@ real effort for versions nobody migrates from any more.
 rule in `AGENTS.md`. A release means moving `## [Unreleased]` to a version heading with a
 date. Which ref a release is pinned to is settled by the branch model above: a tag
 carrying the same version string.
-
-## 2026-08-20 — Should `EsprimaExecuter` be registered by default?
-
-**Decision:** No. `src/executer/index.js` registers `WithScopedExecuter`,
-`ContextObjectExecuter` and `ContextDeconstructorExecuter`; the import of `EsprimaExecuter`
-stays commented out. It is reached either through the separate
-`browser-all-executers.js` bundle or by importing the module explicitly.
-
-**Reasoning:** `espree` dominates the bundle. Measured on the current `dist/` artifacts:
-`browser-…min.js` is 11.5 KB, `browser-all-executers-…min.js` is 355.6 KB — a factor of 31
-for an executer most consumers never use. The split is a bundle-size decision, not a
-functional one; the difference between the two browser bundles is `espree` alone.
-
-**Alternatives:** Registering everything by default would remove one entry point and one
-bundle from the build. It becomes the better choice only if `espree` stops being the
-dominant cost — for instance if the esprima executer were rewritten against a parser that
-is already present, or if it became the default execution strategy.
-
-**Consequences:** Two browser bundles have to be built and kept in step. Consumers wanting
-the esprima executer import it explicitly, which is also how they reach `setupExecuter`.
-The commented-out import in `src/executer/index.js` is load-bearing and must not be
-"cleaned up". An `exports` field must keep `./src/executer/*` importable — see `BACKLOG.md`.

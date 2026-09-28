@@ -102,23 +102,22 @@ The repository root holds permanent records only; anything temporary lives in `p
 - **`src/ExpressionScanner.js`** — finds the expressions of a text (`scan`) and takes the single expression of `resolve` apart (`parseExpression`): delimiters, escaping, the scope prefix. Internal — `index.js` does not export it.
 - **Chain and scopes** — every resolver optionally carries a `name` and a `parent`. `${scopeName::expression}` addresses one specific link of the chain; without a scope the resolver's own context applies.
 - **Context** — always passes through the proxy from `src/ResolverContextHandle.js`. A write, from a data method or from an expression an executer lets through, lands on the resolver it was made on, in the object the caller handed over (`SPECIFICATION.md` 6.5, 6.6).
-- **Executer** — the pluggable execution strategy. `src/Executer.js` defines the interface (`execution`), `src/ExecuterRegistry.js` keeps implementations under a name. Implementations live in `src/executer/`: `ContextDeconstructorExecuter` (the default), `ContextObjectExecuter`, `WithScopedExecuter` (deprecated, a `with` block), and `EsprimaExecuter` (AST-based, via `espree`, not registered by default). Each one exports `EXECUTERNAME` and registers itself on import. Each is a solution of its own; `README.md` documents what each one does.
+- **Executer** — the pluggable execution strategy. `src/Executer.js` defines the interface (`execution`), `src/ExecuterRegistry.js` keeps implementations under a name. Implementations live in `src/executer/`: `ContextDeconstructorExecuter` (the default), `ContextObjectExecuter` and `WithScopedExecuter` (deprecated, a `with` block). Each one exports `EXECUTERNAME` and registers itself on import. Each is a solution of its own; `README.md` documents what each one does.
 - **`src/CodeCache.js`** — LRU-style cache for compiled expressions, one instance per executer.
 - **`src/DefaultValue.js`** — distinguishes "no default passed" from "the default is `undefined`". That is what the `arguments.length` checks in `ExpressionResolver` are for; keep them when changing those signatures.
 
 ## Distribution
 
-Three shapes, all listed in `entries.config.json` and bundled into `dist/` by webpack:
+Two shapes, both listed in `entries.config.json` and bundled into `dist/` by webpack:
 
 | Entry | Bundle | Purpose |
 |---|---|---|
 | `browser.js` | `browser-…[.min].js` | browser script, executers pre-registered, exposes `GLOBAL.defaultjs.el` |
-| `browser-all-executers.js` | `browser-all-executers-…[.min].js` | same, plus the esprima executer |
 | `index.js` | `module-…[.min].js` | the ESM entry point — meant as the standard entry for bundlers, not for direct use in a browser |
 
-Importing any entry registers the executers pulled in by `src/executer/index.js`, which leaves out `EsprimaExecuter` on purpose: `espree` inflates the bundle from 11.5 KB to 355.6 KB. That commented-out import is load-bearing, not leftover — see `DECISIONS.md`.
+Importing any entry registers the executers pulled in by `src/executer/index.js` — all three. `EsprimaExecuter` was removed on 2026-09-28; `DECISIONS.md` says why, before anyone proposes an AST-based executer again.
 
-A consumer who wants a non-default executer imports it explicitly; that same import is what makes `setupExecuter(options)` reachable, to tune that executer's behaviour within whatever it allows. This is intended usage, not a leak — check `BACKLOG.md` before adding an `exports` field.
+A consumer who wants to tune an executer imports its module explicitly; that import is what makes `setupExecuter(options)` reachable, to tune that executer's behaviour within whatever it allows. This is intended usage, not a leak — check `BACKLOG.md` before adding an `exports` field.
 
 ## Conventions
 

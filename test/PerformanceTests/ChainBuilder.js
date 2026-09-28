@@ -27,9 +27,7 @@ export const DEPTHS = [10, 1000, 100000, 1000000];
  * deepest is a million links.
  *
  * The extra link costs one step of the walk, the same for every executer, so a comparison between
- * them is unaffected. Note the empty context is passed explicitly: leaving `context` out takes the
- * default executer's default context, which for `EsprimaExecuter` is the global object - and a
- * global context answers every name itself, so nothing below it would ever be reached.
+ * them is unaffected.
  *
  * @param {ExpressionResolver} aResolver the link to resolve over
  * @param {string} anExecuterName

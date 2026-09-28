@@ -42,9 +42,7 @@
 	},
 	"homepage": "https://github.com/default-js/defaultjs-expression-language#readme",
 	"dependencies": {
-		"@default-js/defaultjs-common-utils": "^1",
-		"escodegen": "^2.1.0",
-		"espree": "^10.4.0"
+		"@default-js/defaultjs-common-utils": "^1"
 	},
 	"directories": {
 		"test": "test"
@@ -52,7 +50,6 @@
 	"files": [
 		"index.js",
 		"browser.js",
-		"browser-all-executers.js",
 		"src/**",
 		"dist/**",
 		"LICENSE",

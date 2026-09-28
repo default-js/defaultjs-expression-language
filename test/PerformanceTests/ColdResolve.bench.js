@@ -14,10 +14,10 @@ import { buildChain, bindExecuter, DEPTHS } from "./ChainBuilder.js";
  *
  * Two chain shapes, as in the original: links carrying a context that does not match, and
  * links carrying no context at all. Since 2026-08-30 every shape runs under every executer,
- * because generating code is exactly what the four of them do differently.
+ * because generating code is exactly what the three of them do differently.
  */
 
-// every executer keeps a code cache of its own, so a cold measurement has to switch off all four
+// every executer keeps a code cache of its own, so a cold measurement has to switch off all three
 for (const { setupExecuter } of EXECUTERS) setupExecuter({ size: 0 });
 
 const SHAPES = [

@@ -25,10 +25,10 @@ import { EXECUTERS } from "./Executers.js";
  *   the scanner's literal states, which is what decided the regex-literal branch.
  *
  * None of the four expressions in `literals` fails - deliberately, because a failing statement
- * writes a warning with a stack trace and that would be measured instead of the parsing. Since the
- * case runs under every executer it also has to hold for the strictest of them, which is what took
- * the context read out of the arrow function on 2026-08-30; the `literals` numbers from before that
- * day are therefore not comparable either.
+ * writes a warning with a stack trace and that would be measured instead of the parsing. The arrow
+ * function has carried no context read since 2026-08-30, when the case had to hold under an executer
+ * the package no longer ships; it stays that way so the numbers taken since remain comparable, and
+ * the `literals` numbers from before that day are not.
  *
  * Since 2026-08-30 all four cases run under every executer. The text handling itself is the
  * resolver's and does not change with the executer, so what the comparison shows is what each
@@ -52,7 +52,7 @@ const buildText = (expression) => {
 
 /**
  * The four texts, spelled for one executer - `ContextObjectExecuter` addresses a context value as
- * `ctx.value` where the other three take `value` (SPECIFICATION.md 9.2).
+ * `ctx.value` where the other two take `value` (SPECIFICATION.md 9.2).
  */
 const buildTexts = (variableName) => {
 	const word = variableName("word");
@@ -67,9 +67,7 @@ const buildTexts = (variableName) => {
 				case 0:
 					return "${ {a: 1}.a }";
 				case 1:
-					// the braces of a function body, not a context read: EsprimaExecuter cannot reach a
-					// context value from inside a nested function (BACKLOG.md), and a statement that
-					// fails would measure the warning it writes instead of the parsing
+					// the braces of a function body, not a context read - see the header for why
 					return "${ (() => { return 1; })() }";
 				case 2:
 					return "${ `x${" + word + "}y` }";

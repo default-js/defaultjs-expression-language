@@ -13,7 +13,7 @@ import { EXECUTERNAME as WithScopedExecuterName } from "../../src/executer/WithS
  * Two of the entry points are deliberately reached differently here. `ExpressionResolver` and
  * `ExecuterRegistry` come from index.js, which is what a bundler consumer imports. `Executer` is
  * imported by path, because index.js does not export it - reaching an executer module directly is
- * the intended usage (DECISIONS.md, 2026-08-20) and the same holds for the interface those modules
+ * the intended usage (DECISIONS.md, 2026-09-28) and the same holds for the interface those modules
  * build on.
  *
  * What each executer module exports is surface as well, and asked in that executer's own
