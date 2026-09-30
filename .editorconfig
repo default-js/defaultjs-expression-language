@@ -25,7 +25,7 @@ indent_size = 2
 
 # Generated artifacts. Never hand-edited, so never normalized either — the
 # tools that write them decide their shape.
-[{dist/**,coverage/**,target/**,package-lock.json,LICENSE-OF-THIRD-PARTY}]
+[{dist/**,coverage/**,target/**,package-lock.json}]
 charset = unset
 end_of_line = unset
 indent_style = unset

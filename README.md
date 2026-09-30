@@ -169,6 +169,11 @@ What holds under all three: a statement stands in **expression position**, so `$
 statements; and the generated code runs in **sloppy mode**, so nothing here is a sandbox — a
 statement that asks for the global object by name, as in `${ globalThis.x = 1 }`, gets it.
 
+A statement **must not begin with a comment that ends a line** — a `//` comment, or a `/* … */`
+spanning a line break. The generated code places the statement right behind `return`, so the line
+ends there and the statement answers `undefined`: `${ // note⏎ value }` does not answer `value`. A
+comment anywhere after the first token, or a block comment on one line, is harmless.
+
 ### context-deconstruction-executer (the default)
 
 Module `src/executer/ContextDeconstructorExecuter.js`, registered by every entry point.

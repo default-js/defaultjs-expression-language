@@ -316,6 +316,11 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   used by `EsprimaExecuter` alone, `esprima` was never imported. The package has one runtime
   dependency left, `@default-js/defaultjs-common-utils`.
 
+- **`LICENSE-OF-THIRD-PARTY` is no longer published.** It carried the licences of the bundled
+  dependencies, which mattered while `espree` and `escodegen` were among them. The one runtime
+  dependency left, `@default-js/defaultjs-common-utils`, comes from the same author under the same
+  MIT licence as this package, see `LICENSE`.
+
 ### Fixed
 
 - **`setupExecuter` without a `size` shrank the cache.** Every executer starts its code cache at
@@ -390,7 +395,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   which corrupted the text instead of leaving it alone. An expression now ends at its **matching**
   closing brace, counted by a scanner that knows string, template and regular expression literals
   and block and line comments; a brace inside one of them does not count. A line comment ends at the
-  end of the line, as in JavaScript, so `${ a // note }` written on one line is not an expression. An
+  end of the line, as in JavaScript, so `${ a // note }` written on one line is not an expression.
+  The executers receive comments unchanged, and a statement that **begins** with a comment ending a
+  line answers `undefined` under all three; `README.md` names the limit. An
   opening delimiter that never finds its matching brace is not an expression, and the text stands
   as written. See `SPECIFICATION.md` 3.1.
 

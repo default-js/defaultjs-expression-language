@@ -19,6 +19,134 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-09-30 — Do the executers contain an assignment to a name nothing declares?
+
+**Decision:** No. `${ x = 1 }` on a name no resolver carries creates a global under all three
+executers — under `context-object-executer` wherever the statement leaves out `ctx.` — and nothing
+contains an explicit `globalThis.x = 1`. No executer switches to strict mode, and there is no
+`allowGlobalWrite` switch. `README.md` documents it per executer. Frank's decision.
+
+**Reasoning:** Strict mode would turn the leak into a `ReferenceError`, but it also rejects binding
+names that sloppy mode accepts — `package`, `interface`, `private`, `public`, `static`, `let`,
+`yield`, `eval`, `arguments` and others. `context-deconstruction-executer` turns every name of the
+context into a binding, so a context carrying one of them would stop every statement over it, where
+it runs today. Those names have to stay allowed for now. `with-scoped-executer` cannot run in strict
+mode at all, and a switch whose *off* state only some executers can keep promises nothing.
+
+**Alternatives:** Strict-mode code in `context-deconstruction-executer` and
+`context-object-executer`, decided on the same day and withdrawn once the name problem was weighed —
+worth reopening together with a way to keep those names usable, for instance skipping them in the
+destructuring. An `allowGlobalWrite` switch in 6.5, the configuration of 4.1 and `buildSecure`.
+
+**Consequences:** 6.5 keeps promising no containment. A consumer who must not leak globals checks
+statements before handing them in.
+
+## 2026-09-30 — Does `context-deconstruction-executer` keep the context as the receiver of a method?
+
+**Decision:** No. `${ greet() }` over a class instance calls `greet` without its object, and `this`
+is `undefined` inside it. It stays a documented limitation of the default (`README.md`). Frank's
+decision.
+
+**Reasoning:** The executer destructures the context into locals; that is what makes it the fastest,
+and a bare local call has no receiver. Binding every function of the context would cost on every
+execution, for every function the context carries, whether the statement calls it or not.
+`context-object-executer` keeps the receiver and runs over class instances.
+
+**Alternatives:** Binding the functions of the context in the generated code — the way in if class
+instances turn out to be the usual context of the default; to be measured with `npm run bench` first.
+
+**Consequences:** A template engine that hands class instances in has to pick
+`context-object-executer`. The loss is silent under the default.
+
+## 2026-09-30 — Is reading every accessor of a context a defect of `context-deconstruction-executer`?
+
+**Decision:** No, it is the price of its strategy. Destructuring reads every name, so every getter
+runs on every execution, and a getter that throws breaks every statement over that context,
+`${ 1 + 1 }` included. Documented in `README.md`. Frank's decision.
+
+**Reasoning:** Handling accessors apart from data would mean inspecting descriptors per context and
+generating different code for them — more work in the generator and in the cache key, for a context
+shape the default is not meant for. The proxy reads no getter itself (6.2); the other two executers
+read a getter only when the statement does.
+
+**Alternatives:** Skipping accessors in the destructuring and reaching them through the context —
+the fix if contexts with getters become common under the default.
+
+**Consequences:** A context with costly or throwing getters belongs on `context-object-executer`.
+
+## 2026-09-30 — Does the package export a `Context`, or `ResolverContextHandle`?
+
+**Decision:** No. The name `Context` is gone; nothing ever exported it. `ResolverContextHandle`
+stays internal and is not listed in section 8. Frank's decision.
+
+**Reasoning:** Nothing needs the handle from outside except `resetCache`, which 6.2 names, and
+whether the name cache and with it `resetCache` survive is what the measurement of the name cache
+decides (`BACKLOG.md`, "What the name cache costs and saves when reading and writing along a
+chain"). Making the class public now would add surface that measurement may take away again.
+
+**Alternatives:** Exporting the handle from `index.js` and covering `get parent` and `updateData`.
+
+**Consequences:** `get parent` and `updateData` of the handle are internal; their coverage is a
+question of reachability, not of surface. The getter `contextHandle` stays public until the
+measurement is done.
+
+## 2026-09-30 — Do the benchmarks get rid of the long pause at depth 10?
+
+**Decision:** No. A run whose `rme` passes 100 % is discarded and repeated; the rule stands in
+`AGENTS.md`, under Benchmarks. Frank's decision.
+
+**Reasoning:** The pause comes from `ChainBuilder.js` keeping a chain of 1 000 000 resolvers live for
+the whole file, and a collection that walks it costs hundreds of milliseconds (verified 2026-08-29:
+with `DEPTHS` cut to `[10, 1000]` it disappears). One chain per depth does not help: a bench file has
+no setup hook, so every chain is built in the module body and all of them are live at once. The
+signature is easy to spot — `rme` past 100 %, `max` at hundreds of milliseconds, `p75` and `p99`
+unchanged — so discarding costs less than restructuring.
+
+**Alternatives:** Moving depth 1 000 000 into a file of its own, so the smaller depths never share a
+page with it — worth it if the pause starts to appear without the signature. Seen on 2026-09-27 also
+at depth 1 000 of `ColdResolve` and in `ResolveText` under `with-scoped-executer`, which builds no
+chain; whether another file's chain stays live in the same browser page is not checked.
+
+**Consequences:** A recorded benchmark number is taken from a run without the signature.
+
+## 2026-09-30 — Does the build move from webpack to Vite?
+
+**Decision:** No, webpack stays. Frank's decision.
+
+**Reasoning:** Nothing about the webpack build is broken. `dist/` is published and committed, so a
+switch changes every published artifact and needs its own verification, for no gain a consumer
+would notice. Vitest puts `vite` into the tree anyway, so the repository carries two bundlers; that
+is a cost of the test runner, not a reason to move the build.
+
+**Alternatives:** Vite's library mode, which covers what is needed in principle; its bundler in Vite 8
+is `rolldown` 1.x. Worth reopening if webpack blocks something — an ESM library output it cannot
+produce, or a maintenance problem.
+
+**Consequences:** Two bundlers stay in the dev tree.
+
+## 2026-09-30 — Do the executers run a statement that begins with a comment ending a line?
+
+**Decision:** No. The limit is documented in `README.md`, under what holds for all three executers,
+and the generated code stays as it is. Frank's decision.
+
+**Reasoning:** All three executers place the statement right behind `return` on the same line. A
+leading `//` comment, or a `/* … */` spanning a line break, ends that line, automatic semicolon
+insertion closes the `return`, and the statement answers `undefined` (node, 2026-09-30). The case is
+rare in a template, and nothing that runs today has to change for it.
+
+**Alternatives:** A line break in front of the statement — does not work, `return` followed by a line
+break is the same ASI case. Wrapping the statement in parentheses on lines of their own — answers
+correctly, but turns a statement with a top-level `;`, `${ a; }`, into a `SyntaxError`, which breaks
+expressions that run today. Skipping leading whitespace and comments before the statement is pasted
+— keeps `;` working at a cost only per compilation, and is the way in if the limit starts to hurt;
+it needs a comment-aware skipper shared by the three executers.
+
+**Consequences:** A consumer who starts a statement with such a comment gets `undefined` without an
+error. A new executer that pastes the statement behind `return` inherits the limit and has to
+document it too.
+
+---
+
 ## 2026-09-28 — Does the package keep `EsprimaExecuter`?
 
 **Decision:** No. `EsprimaExecuter` is removed, together with everything that existed only for it:
@@ -149,7 +277,7 @@ code — a comment would then hide braces but not delimiters, two rules where on
 **Consequences:** `SPECIFICATION.md` 3.1 lost the comment limit and keeps one: a regular expression
 literal after `)` or `]` is read as division. A one-line expression ending in a line comment is text
 now — it was before as well, for another reason. The executers receive comments unchanged, which
-exposes a limit of their generated code: B-51.
+exposes a limit of their generated code — see 2026-09-30.
 
 ---
 
@@ -911,8 +1039,8 @@ not an optimisation.
 **Consequences:** A consumer rendering a text that repeats one expression many times pays for each
 occurrence. Nothing in the family does that today. The measurement also turned up a property of the
 benchmarks themselves: they hold a chain of a million resolvers live, so a collection during a run
-costs hundreds of milliseconds and can inflate the mean at depth 10 two- to fourfold — `BACKLOG.md`,
-"`WarmResolve` and `ColdResolve` can report a mean two to four times too high". And the method is
+costs hundreds of milliseconds and can inflate the mean at depth 10 two- to fourfold — see
+2026-09-30, "Do the benchmarks get rid of the long pause at depth 10?". And the method is
 worth keeping: where the drift indicator has moved, alternate the two versions inside one batch
 instead of comparing against a recorded baseline.
 
@@ -1522,14 +1650,13 @@ tree was normalized once to match them in the same change.
 - `.editorconfig`: utf-8, LF, tabs, final newline, no trailing whitespace. Markdown is the
   one exception — spaces, width 2, because list nesting and fenced blocks are column-based
   syntax there, not style. Generated paths (`dist/**`, `coverage/**`, `target/**`,
-  `package-lock.json`, `LICENSE-OF-THIRD-PARTY`) unset every key.
-- `.gitattributes`: `* text=auto eol=lf`, plus `linguist-generated` on the three generated
-  paths.
+  `package-lock.json`) unset every key.
+- `.gitattributes`: `* text=auto eol=lf`, plus `linguist-generated` on the generated paths.
 - Normalization touched 55 tracked files: four were pure CRLF (`browser.js`,
   `src/ExpressionResolver.js`, `src/index.js`, `test/index.js`), 29 had no final newline,
   ~20 carried trailing whitespace. Space indentation became tabs in `src/Executer.js`,
-  `src/Utils.js`, `test/TestUtils.js`, `webpack.config.js` and
-  `generate-license.config.json`; the JSDoc blocks at `src/CodeCache.js:29` and `:40` sat one
+  `src/Utils.js`, `test/TestUtils.js`, `webpack.config.js` and one configuration file since
+  removed; the JSDoc blocks at `src/CodeCache.js:29` and `:40` sat one
   column off and were straightened.
 
 **Reasoning:** The conventions in `AGENTS.md` were prose only, and the tree had already

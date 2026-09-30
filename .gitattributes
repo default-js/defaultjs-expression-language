@@ -5,7 +5,6 @@
 # Generated artifacts: collapsed in diffs and excluded from language stats.
 dist/**                linguist-generated=true
 package-lock.json      linguist-generated=true
-LICENSE-OF-THIRD-PARTY linguist-generated=true
 
 # The bundles are stored exactly as webpack wrote them. Their CRLF pairs come from bundled
 # dependency sources that ship with CRLF - measured 2026-08-21: this project's own sources

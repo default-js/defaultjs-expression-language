@@ -1,6 +1,6 @@
 # Backlog
 
-Every open task of `@default-js/defaultjs-expression-language`: defects, open decisions, agreed
+Every open task of `@default-js/defaultjs-expression-language`: defects, open agreeds, agreed
 work, ideas, and the status of the v3 goals. If it is to be done, it is here and nowhere else.
 Settled questions and their reasoning are in `DECISIONS.md`, what the resolver is meant to do is in
 `SPECIFICATION.md`.
@@ -11,7 +11,7 @@ Settled questions and their reasoning are in `DECISIONS.md`, what the resolver i
   other gets a plan under `plans/` instead, and its entry here points at it.
 - **Written the moment an item comes up**, not at handover — a session can end at any point.
 - **Only the current state.** An entry says what is wrong or undecided, what is known, and what
-  happens next. How it got there is in git history; why a decision fell is in `DECISIONS.md`.
+  happens next. How it got there is in git history; why a agreed fell is in `DECISIONS.md`.
 - **Deleted once done**, together with its row in the overview. IDs are never reused.
 - **Titles are addresses.** Test comments point at entries by title, so a title is not reworded
   without updating them — `grep` for it first.
@@ -23,7 +23,7 @@ Each entry carries these fields; the ones that do not apply are left out.
 
 | Field | Meaning |
 | --- | --- |
-| **Status** | `decision` — needs a decision, which is Frank's · `agreed` — decided, ready to implement · `investigate` — the facts are not complete yet · `idea` — raised, not agreed |
+| **Status** | `agreed` — needs a agreed, which is Frank's · `agreed` — decided, ready to implement · `investigate` — the facts are not complete yet · `idea` — raised, not agreed |
 | **Kind** | `defect` · `gap` (behaviour nobody has specified) · `executer` (something one executer does not do, and might) · `feature` · `refactor` · `docs` · `bench` · `test` · `tooling` |
 | **Blocks 3.0.0** | `yes` where the release has to wait for it |
 | **Priority** | `low` — taken up after everything without it, with the reason; left out means normal |
@@ -42,13 +42,13 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 
 | # | Goal | Status | Open entries |
 | --- | --- | --- | --- |
-| 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-28) | B-28, B-29 (follow-up decisions) |
+| 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-30) | — |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
 | 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
-| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-27, B-40 |
+| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-40 |
 
-**Markers, counted 2026-09-28** (`npm test`: 320 passed, 320 cases). No `it.fails` is left and no
+**Markers, counted 2026-09-30** (`npm test`: 320 passed, 320 cases). No `it.fails` is left and no
 entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
 the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
 is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
@@ -58,28 +58,19 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | ID | Title | Status | Kind | 3.0.0 | Prio |
 | --- | --- | --- | --- | --- | --- |
 | B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
-| B-10 | A write to an unknown name inside an expression lands on `globalThis` | decision | executer | | |
-| B-11 | `ContextDeconstructorExecuter` loses `this` inside a method of the context | decision | executer | | |
-| B-12 | `ContextDeconstructorExecuter` reads every property of a context | decision | executer | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
-| B-14 | `"type": "module"` plus an `exports` field | decision | tooling | | |
-| B-15 | Was a `Context` export meant to exist on the public API? | decision | gap | | |
-| B-16 | The `module` entry produces a bundle nothing can consume | decision | defect | | |
-| B-19 | `generate-license.config.json` sets a key that does not exist | decision | defect | | |
+| B-14 | `"type": "module"` plus an `exports` field | agreed | tooling | | |
+| B-16 | The `module` entry produces a bundle nothing can consume | agreed | defect | | |
 | B-20 | Every code example in `README.md` uses a default import that does not exist | agreed | docs | | |
 | B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
 | B-22 | The JSDoc of the whole package needs one pass | agreed | docs | | |
 | B-23 | Check every method name against what it does and what it answers | agreed | refactor | | |
-| B-24 | "Link" is out of the specification and still stands in every other file | decision | docs | | |
+| B-24 | "Link" is out of the specification and still stands in every other file | agreed | docs | | |
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
-| B-27 | `WarmResolve` and `ColdResolve` can report a mean two to four times too high at depth 10 | decision | bench | | |
-| B-28 | What happens to Dependabot while the v3 cycle runs | decision | tooling | | |
-| B-29 | Move the build from webpack to Vite? | decision | tooling | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
 | B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | | |
 | B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | | |
-| B-51 | A statement that begins with a line comment answers `undefined` | decision | executer | | |
 
 ---
 
@@ -115,46 +106,6 @@ the `with`-based executer; the default moved away from it on 2026-09-01.
 
 ## Executers
 
-### B-10 · A write to an unknown name inside an expression lands on `globalThis`
-
-- **Status:** decision
-- **Kind:** executer · **Spec:** 6.5
-- **Records:** `SPECIFICATION.md`, `CHANGELOG.md`
-
-Since 2026-09-05 this is not a broken rule: 6.5 no longer promises containment, because only an
-executer can keep it (`DECISIONS.md`). Two questions are open: **should the executers that leak gain
-the containment**, and **is an `allowGlobalWrite` switch worth having** — its *off* state could only
-mean something under an executer able to intercept the assignment. If the switch comes, 6.5 gets it
-back, the configuration form of 4.1 and `buildSecure` (6.7) take it as an option, and this entry gets the release marker.
-What is measured: an unqualified `x = 1` on a name no resolver carries creates a global under
-`with-scoped` and `context-deconstructor`; `context-object`
-contains it, because its dialect writes through the proxy. A compound assignment (`x += 1`) cannot
-leak, it raises on the read. Nothing contains an explicit `globalThis.x = 1`. No executer runs its
-statement in strict mode, which the agreed fix of 2026-08-22 leaned on. A resolver whose context
-*is* the global object is not proxied, so there is no interception point at all.
-
-### B-11 · `ContextDeconstructorExecuter` loses `this` inside a method of the context
-
-- **Status:** decision — stays a limitation of the default, or the generated code binds the receiver
-- **Kind:** executer · **Spec:** none — `README.md`, *context-deconstruction-executer*
-- **Records:** `CHANGELOG.md`
-
-A context that is a class instance — the shape a template engine hands in most often — answers
-`${ greet() }` under the other two executers, which keep the context as the receiver. The
-deconstructor binds the method to a local and calls it bare, so `this` is `undefined` and a method
-reading its own state raises. It is the **default** executer, and the loss is silent.
-
-### B-12 · `ContextDeconstructorExecuter` reads every property of a context, including one that throws on access
-
-- **Status:** decision — defect of the executer, or the price of its strategy
-- **Kind:** executer · **Spec:** none — `README.md`, *context-deconstruction-executer*
-
-It destructures every name of the context, which calls every accessor on every execution. A context
-whose getter throws breaks every expression, including `${ 1 + 1 }`; an `arguments` object in strict
-mode does the same through `callee`. The other two executers answer, and the proxy itself reads no
-getter (6.2), so this is the executer's doing alone. The cost half: every getter runs on every
-execution even when the statement touches no name.
-
 ### B-13 · Should the `ctx` prefix of `ContextObjectExecuter` be configurable?
 
 - **Status:** idea — raised by Frank 2026-08-24
@@ -167,26 +118,21 @@ a property named `ctx` has no way out. Open with it: whether the option belongs 
 `setupExecuter(options)` next to `size`, and what happens to the code cache, which is keyed by the
 statement text alone — entries compiled under the old identifier would answer for the new one.
 
-### B-51 · A statement that begins with a line comment answers `undefined`
-
-- **Status:** decision — a limitation for `README.md`, or the generated code breaks the line
-- **Kind:** executer · **Spec:** none — `README.md`, per executer
-
-`WithScopedExecuter`, `ContextObjectExecuter` and `ContextDeconstructorExecuter` paste the statement
-directly behind `return` on the same line, so `// note\na` becomes `return // note` plus `a` on the next
-line, and automatic semicolon insertion returns nothing (measured 2026-09-27 with `execute`: each of
-the three answers `undefined`). Not new with the scanner learning comments — it handed on the same
-statement before. A line break in front of the statement would close it; whether that is worth its
-cost in every generated function is the question.
-
 ## Public surface and packaging
 
 ### B-14 · Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path
 
-- **Status:** decision
+- **Status:** agreed 2026-09-30 — needs a plan before it starts; planned and verified together with B-16, after B-24
 - **Kind:** tooling · **Spec:** 8
 - **Pinned by:** `test/package/surface.Test.js` (the deep import of `Executer`)
-- **Records:** `DECISIONS.md`, `CHANGELOG.md`
+- **Records:** `DECISIONS.md`, `CHANGELOG.md` (breaking), `AGENTS.md` (Distribution)
+
+**Decided (Frank, 2026-09-30):** `"type": "module"` plus an `exports` field with 3.0.0. It opens
+`.` (`index.js`), `./browser.js`, `./src/executer/*` and `./src/Executer.js`; every other deep
+import breaks. Tuning the default executer keeps going through its module under
+`./src/executer/*`. What the plan has to check: every `.js` file the tooling loads as CommonJS
+(`scripts/generate-version.js` among them), the webpack and vitest configurations, and that
+`package.json` itself stays importable where something reads it.
 
 `defaultjs-common-utils` already went this way, so the two packages diverge. Tuning an executer —
 `setupExecuter(options)` — is done by importing its module directly
@@ -197,42 +143,22 @@ exports only `ExpressionResolver` and `ExecuterRegistry` — whitelist it, or ex
 `index.js`. Also open: tuning the *default* executer needs the same deep import although the
 consumer never imported that module — keep, or give it a documented entry point.
 
-### B-15 · Was a `Context` export meant to exist on the public API?
-
-- **Status:** decision — the name dies unless a reason turns up
-- **Kind:** gap · **Spec:** 8
-- **Records:** `DECISIONS.md` if it becomes public
-
-`browser.js`, `browser-all-executers.js` and `test/setup.js` all imported a `Context` from
-`index.js` that was never exported; the unused imports were removed on 2026-08-21. Section 8 does
-not list `ResolverContextHandle`, the class the name probably meant. Decide together: the handle's
-own public members `get parent` and `updateData` are uncovered (B-30) and only worth covering if
-they are surface. `updateData(data)` replaces the data, but the proxy shape is fixed in the
-constructor, so it cannot move a handle between the global shape and the ordinary one. The handle is
-already surface in one place: 6.2 tells a consumer to call `contextHandle.resetCache()`, while
-section 8 lists the getter `contextHandle` and none of the handle's members.
-
 ### B-16 · The `module` entry produces a bundle nothing can consume
 
-- **Status:** decision — give it a library configuration, or drop the entry
+- **Status:** agreed 2026-09-30 — library configuration; needs a plan before it starts, together with B-14
 - **Kind:** defect · **Spec:** none
 - **Records:** `DECISIONS.md`, `CHANGELOG.md`
+
+**Decided (Frank, 2026-09-30):** the entry stays and gets a library configuration, so
+`dist/module-…[.min].js` exports what `index.js` exports. An ESM output needs
+`output.library.type: "module"` and `experiments.outputModule` in webpack 5 — to be read in the
+installed webpack before planning, together with whether `usedExports: false` can go.
 
 `entries.config.json` builds `index.js` into `dist/module-…[.min].js`, but `webpack.config.mjs`
 sets no `output.library`, so the bundle exposes nothing. Bundlers do not use it either — `main`
 points at the raw `./index.js`. It is also what forces `optimization.usedExports: false`
 (`DECISIONS.md`, 2026-08-21). With a library configuration, tree shaking can come back; without the
 entry, one bundle is published instead of two.
-
-### B-19 · `generate-license.config.json` sets a key that does not exist
-
-- **Status:** decision — should the versions really be dropped?
-- **Kind:** defect · **Spec:** none
-
-The file sets `"omitVersion": true`; `generate-license-file` 4.2.1 knows `omitVersions`, plural
-(its `README.md` and `src/lib/cli/commands/main.d.ts`). The key is silently ignored, so
-`LICENSE-OF-THIRD-PARTY` carries versions and churns on every dependency bump. Fixing it changes a
-published file.
 
 ## Documentation and naming
 
@@ -296,8 +222,13 @@ they do; `registrate` is not an English word and is public; `getExecuterType` is
 
 ### B-24 · "Link" is out of the specification and still stands in every other file
 
-- **Status:** decision — whether the test names are renamed, which changes what the gate prints
+- **Status:** agreed 2026-09-30 — rename everywhere, test names included; next up, a plan goes to Frank first
 - **Kind:** docs
+
+**Decided (Frank, 2026-09-30):** *link* becomes *resolver* in `test/`, the benchmarks, `src/`
+comments, `AGENTS.md`, the `[Unreleased]` entries of `CHANGELOG.md` and `DECISIONS.md`. Left alone
+only where a passage quotes something that said *link* at the time. The gate prints the new test
+names afterwards; the count of cases must stay the same.
 
 Decided 2026-08-30: one member of a chain is a **resolver**, and `SPECIFICATION.md` no longer uses
 *link*. Counted 2026-09-26 (`\blinks?\b`, case-insensitive, occurrences; `test/` recounted 2026-09-27):
@@ -345,7 +276,8 @@ Every handle keeps `#cache`, a `Map` from every name its context carries to the 
 What hangs on the answer: **6.2 itself.** Without the cache, names are as live as values, the
 snapshot rule of 6.2 falls away and `resetCache` loses its purpose — a rule and a public method
 would go, so the measurement decides a specification question and not only an implementation.
-Note the benchmark caveats of B-25 and B-27, and compare alternating runs rather than single ones.
+Note the benchmark caveats of B-25 and of `AGENTS.md` (Benchmarks), and compare alternating runs
+rather than single ones.
 
 ### B-25 · The deep-chain benchmarks are bimodal by a factor of two across runs
 
@@ -369,46 +301,6 @@ from write-time to use-time eviction (2026-08-21) is invisible to `npm run bench
 past `size` and then measures the hit rate on a hot subset would show it and give the eviction order
 a regression guard beyond `test/codecache/caching.Test.js`.
 
-### B-27 · `WarmResolve` and `ColdResolve` can report a mean two to four times too high at depth 10, and the cause is the chain they hold live
-
-- **Status:** decision — accept and discard such runs, or build one chain per depth
-- **Kind:** bench
-
-Signature: `rme` past 100 %, `max` at 340–430 ms, `p75` and `p99` unchanged — one long pause, never
-a slower operation. Cause, verified 2026-08-29: `ChainBuilder.js` keeps a chain of 1 000 000
-resolvers live for the whole file, and a collection that walks that set costs hundreds of
-milliseconds; with `DEPTHS` cut to `[10, 1000]` it disappears. A property of the benchmark, not of
-the library. Reusing the tail of the deepest chain is deliberate — a bench file has nowhere to put
-setup (`AGENTS.md`, Benchmarks).
-
-Seen on 2026-09-27 outside that pattern as well (`npm run bench` at `f33461f`): at depth 1 000 in
-`ColdResolve`, and in `ResolveText` under `with-scoped-executer`, a file that builds no chain at all.
-Whether the chain of another file stays live in the same browser page is not checked.
-
-## Tooling
-
-### B-28 · Decide what happens to Dependabot while the v3 cycle runs
-
-- **Status:** decision — close them and pause Dependabot until after 3.0.0, or leave them
-- **Kind:** tooling
-
-18 `dependabot/*` branches sit on origin (as of the local view, 2026-09-22), all against `master`,
-all for devDependencies of the toolchain the modernization replaced (`karma`, `webpack` 5.76,
-`engine.io`, `ua-parser-js`, …). They no longer reach the documentation app, whose version selector
-runs off tags, so this is only noise.
-
-### B-29 · Decide whether the build moves from webpack to Vite
-
-- **Status:** decision — needs its own plan under `plans/` if taken up
-- **Kind:** tooling
-- **Records:** `DECISIONS.md`
-
-Vitest puts `vite` in the tree as a direct dependency, so the repository carries two bundlers.
-Vite's library mode covers what is needed in principle. Against it: nothing about webpack is broken,
-`dist/` is published *and* committed, so a switch changes every published artifact and needs its own
-verification, and Vite 8's bundler is `rolldown` 1.x. The toolchain modernization this was waiting
-for is done.
-
 ## Tests
 
 ### B-30 · Coverage, and what is still uncovered
@@ -428,7 +320,8 @@ numbers when the picture changes rather than adding another baseline. Uncovered 
 3. `set` and `delete` of `createGlobalCacheWrapper` in `ResolverContextHandle.js`. A global context
    is not proxied since 2026-08-30, so nothing routes a write through the wrapper — check whether
    the two methods still have a caller before covering them.
-4. `get parent` and `updateData` of `ResolverContextHandle` — B-15.
+4. `get parent` and `updateData` of `ResolverContextHandle`. The handle is internal (`DECISIONS.md`,
+   2026-09-30), so check whether anything reaches them before covering them.
 5. **New on 2026-09-22:** the `return null` of `findPropertyDescriptor`, and the `get` of the
    descriptor the `getOwnPropertyDescriptor` trap hands out, which no case ever calls. Look at both
    before deciding whether they are reachable.
