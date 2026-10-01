@@ -19,6 +19,24 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-10-01 — Does a scope name take letters beyond ASCII?
+
+**Decision:** No. A scope name, and so a resolver name, takes the ASCII letters, digits,
+whitespace, `-` and `_` (`SPECIFICATION.md` 3.3, 5.1); a prefix `Äpfel::` is not recognized and the
+constructor rejects the name. Frank's decision.
+
+**Reasoning:** It is what `isNameCharacter` in `src/Utils.js` accepts and what the suite pins, so
+the specification is final as written and nothing moves. A name is a label for a resolver in code,
+not text an author reads.
+
+**Alternatives:** Unicode letters through `\p{L}`. The cost would fall only on characters from
+`0x80` up, on the scanner's path and the constructor's; it becomes the better choice if a consumer
+names resolvers after authored content in a script beyond ASCII.
+
+**Consequences:** Widening the set later keeps every valid name valid, but it is not free: a
+statement that begins with `Äpfel::` today is read without a prefix, and would then address a
+scope.
+
 ## 2026-10-01 — Which public names change for 3.0.0, and how does an old one go?
 
 **Decision:** Per name, with no blanket rule. `ExecuterRegistry.registrate` becomes `register` and

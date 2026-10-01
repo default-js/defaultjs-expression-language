@@ -45,6 +45,17 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   it runs, which shapes of context it runs over, what an assignment inside a statement leaves behind
   and which globals it reaches; and how to pick one for a chain and tune its code cache.
 
+- **`README.md` documents the whole public surface**: installing and importing, the paths that can
+  be imported, the browser script and the module bundle, the expression syntax and its escaping,
+  both call forms of the static entry points, default value and timeout, resolver chains with their
+  lookup, scope prefixes, names and inspecting getters, the four data methods and their filter,
+  error handling, the reach to globals, `buildFiltered`, and writing a custom executer with
+  `Executer` and `ExecuterRegistry`. A reference lists every public member by component, with what
+  it takes, answers and throws. A section *Security* says
+  that an expression runs with the page's rights, that no filter makes an untrusted one safe, and
+  that a Content Security Policy has to allow `'unsafe-eval'`; a section *Upgrading from 2.x* lists
+  the changes most likely to break a 2.x caller.
+
 - **Every public member carries JSDoc** that says what it takes, answers and throws, with the
   section of `SPECIFICATION.md` it follows. One statement was wrong before: the constructor said a
   resolver without the `executer` option takes `ExpressionResolver.defaultExecuter`, while it takes
@@ -351,6 +362,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   MIT licence as this package, see `LICENSE`.
 
 ### Fixed
+
+- **Every code example of `README.md` failed.** They imported a default export the package never
+  had (`import ExpressionResolver from …`), while `index.js` exports only named bindings; they now
+  read `import { ExpressionResolver } from "@default-js/defaultjs-expression-language"`. The promise
+  examples were unbalanced and, once balanced, answered the function they handed over instead of
+  its result. The examples built on global variables are replaced by ones over a context. Every
+  example was run against the package.
 
 - **`dist/module-defaultjs-expression-language[.min].js` exported nothing.** The bundle built from
   `index.js` had no library configuration, so it could be loaded but offered nothing to import. It

@@ -397,10 +397,10 @@ indistinguishable from an empty value — accepted, see section 7. A consumer wh
 locally puts it into the context, so it is found before the lookup walks out.
 
 The global object may also be handed in **as a context object**; it is then an ordinary resolver of
-the chain. Three things follow from what such a resolver is, and all three are intended:
+the chain. Four things follow from what such a resolver is, and all four are intended:
 
-- It carries **every** name, so it answers every lookup that reaches it and no resolver below it is
-  ever consulted. A resolver over the global object therefore belongs at the root of a chain, not in
+- It carries **every** name, so it answers every lookup that reaches it and no resolver nearer the
+  root is ever consulted. A resolver over the global object therefore belongs at the root of a chain, not in
   the middle of one.
 - It contributes **no name to an enumeration** below it. A lookup still finds everything it holds,
   from any resolver of the chain, but `Object.keys` of a context below it does not list the globals:

@@ -45,7 +45,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-30) | — |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
-| 4 | Documentation | `SPECIFICATION.md`, the executers and the JSDoc written; readme open | B-20, B-21 |
+| 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; Frank's review of the specification open | B-21, B-52 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-40 |
 
 **Markers, counted 2026-10-01** (`npm test`: 326 passed, 326 cases). No `it.fails` is left and no
@@ -59,8 +59,9 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | --- | --- | --- | --- | --- | --- |
 | B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
-| B-20 | Every code example in `README.md` uses a default import that does not exist | agreed | docs | | |
+| B-53 | Under a CSP without `'unsafe-eval'` the default executer blames the context's names | agreed | defect | | |
 | B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
+| B-52 | `SPECIFICATION.md` is internal, but the package publishes it and points consumers at it | decision | docs | | |
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
@@ -113,40 +114,53 @@ a property named `ctx` has no way out. Open with it: whether the option belongs 
 `setupExecuter(options)` next to `size`, and what happens to the code cache, which is keyed by the
 statement text alone — entries compiled under the old identifier would answer for the new one.
 
+### B-53 · Under a CSP without `'unsafe-eval'` the default executer blames the context's names
+
+- **Status:** investigate — cause confirmed, how to test it is open; found 2026-10-01 while
+  documenting the CSP requirement in `README.md`
+- **Kind:** defect
+- **Records:** `CHANGELOG.md`
+
+Every executer compiles with `new Function`, which a Content Security Policy without
+`'unsafe-eval'` refuses. `generate` in `src/executer/ContextDeconstructorExecuter.js` takes any
+compile failure for a name problem and asks `unusableNames`, which compiles one pattern per name
+with `new Function` as well — refused too, so every name counts as unusable. Probed in Chromium with
+`script-src 'self'` and the browser bundle: `resolve("${ 1 + 1 }", {})` rejects with a `SyntaxError`
+*Context property names "constructor", … cannot be used as a variable*, naming the twelve names of
+`Object.prototype`. The refusal itself never reaches the caller. The test has to
+reproduce the refusal; a case faking `new Function` is the candidate, since the suite's own page
+allows eval.
+
 ## Documentation
-
-### B-20 · Every code example in `README.md` uses a default import that does not exist
-
-- **Status:** agreed — goal 4
-- **Kind:** docs · **Spec:** all of it — the readme carries its consumer-facing subset
-
-All examples read `import ExpressionResolver from "@default-js/defaultjs-expression-language"`,
-but `index.js` exports only named bindings, so every example fails at the first call (since 1.0.0).
-Two examples are also unbalanced — an object literal and an argument list never closed. And the
-readme documents none of v3: `ExecuterRegistry`, the executers, `setupExecuter`, chains, scopes.
-It is what an AI system reads to learn the package.
 
 ### B-21 · `SPECIFICATION.md` has not been read rule by rule since it was written
 
-- **Status:** agreed — the read-through is done, Frank's review points are open
+- **Status:** agreed — the read-through is done, only Frank's review points are open
 - **Kind:** docs · **Spec:** all of it
 - **Records:** `SPECIFICATION.md`
 
-Read rule by rule against the code, the suite and a node probe on 2026-09-22. What it produced: the
-two release blockers - B-33, and the shadowing of `Object.prototype` names, closed the same day -
-the gaps B-35 to B-37, and six rules without a pin, pinned on 2026-09-27. Fixed in the
-text: *the stacking context* in section 2, *the global-write switch* in 4.2, four references to a
-section 1.3 that does not exist, and 3.3 now says **ASCII** letters, which is what `EXPRESSION_SCOPE` accepts — a prefix
-`Äpfel::` is not recognized, and whether it should be is Frank's to say.
+The read-through against the code, the suite and a node probe is done, and every finding of it is
+fixed or has its own entry. What is left: Frank has further points from reviewing the restructure.
+They are added here when they come, and the entry is closed once they are worked in.
 
-Still open here: Frank has further points from reviewing the restructure; they are added here when
-they come.
+### B-52 · `SPECIFICATION.md` is internal, but the package publishes it and points consumers at it
 
-Found 2026-10-01 during the JSDoc pass: 6.4 uses "below" both ways. The first bullet says a resolver
-over the global object answers every lookup "and no resolver below it is ever consulted", which by
-the code means the resolvers **nearer the root**; the second says `Object.keys` of "a context below
-it" does not list the globals, which means one **further from the root**. Section 1 and 6.6 speak of
-"nearer to / further from the root"; the first bullet should too.
+- **Status:** decision
+- **Kind:** docs
+- **Records:** `CHANGELOG.md`, `DECISIONS.md`, `AGENTS.md`
+
+Frank, 2026-10-01: the specification is internal, the readme public — so `README.md` no longer
+refers to it. Everything else still treats it as published:
+
+- `package.json` lists it under `files`, and `CHANGELOG.md` announces under `Added` that it ships.
+- `DECISIONS.md` 2026-08-22 decided "published with the package", and `AGENTS.md` (Records) says so.
+- A consumer meets it at runtime: the `TypeError` for a bad resolver name in
+  `src/ExpressionResolver.js` ends in `(SPECIFICATION.md 3.3)`.
+- The JSDoc of the published sources cites its sections throughout.
+
+To decide: whether it leaves `files`. If so, the changelog entry, the decision and `AGENTS.md`
+change with it and the error message loses the reference; whether the JSDoc citations stay, as
+pointers for maintainers into a file the consumer does not have, is a question of its own.
 
 ## Benchmarks
 
