@@ -5,10 +5,6 @@ import { playwright } from "@vitest/browser-playwright";
  * Vitest runs the suite in a real browser, because the package targets the browser and the
  * tests reach for document, window and document.location. Node with jsdom would test a
  * simulation.
- *
- * ESM on purpose: this file is .mjs because the package has no "type": "module" yet. See the
- * open entry in BACKLOG.md - once that is settled, this and scripts/generate-version.js and
- * the two config files of the old chain get renamed together.
  */
 export default defineConfig({
 	test: {

@@ -12,8 +12,8 @@ import { buildChain, bindExecuter, DEPTHS } from "./ChainBuilder.js";
  * miss and the executer generates again. Compared to a genuine first call this leaves out the
  * insertion into the cache, which a disabled cache skips.
  *
- * Two chain shapes, as in the original: links carrying a context that does not match, and
- * links carrying no context at all. Since 2026-08-30 every shape runs under every executer,
+ * Two chain shapes, as in the original: resolvers carrying a context that does not match, and
+ * resolvers carrying no context at all. Since 2026-08-30 every shape runs under every executer,
  * because generating code is exactly what the three of them do differently.
  */
 
@@ -21,8 +21,8 @@ import { buildChain, bindExecuter, DEPTHS } from "./ChainBuilder.js";
 for (const { setupExecuter } of EXECUTERS) setupExecuter({ size: 0 });
 
 const SHAPES = [
-	["links carry a non-matching context", buildChain({ test: "test" })],
-	["links carry no context", buildChain(null)]
+	["resolvers carry a non-matching context", buildChain({ test: "test" })],
+	["resolvers carry no context", buildChain(null)]
 ];
 
 for (const [shape, chain] of SHAPES) {

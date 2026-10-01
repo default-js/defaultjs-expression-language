@@ -8,11 +8,11 @@ import { ExpressionResolver } from "../../index.js";
  * contextChain describe a state that changes over a resolver's lifetime, chain is structural.
  */
 
-// 5.5 sets no depth limit. chain and effectiveChain used to recurse once per link and overflowed
-// the stack somewhere between 10,000 and 100,000 links.
+// 5.5 sets no depth limit. chain and effectiveChain used to recurse once per resolver and
+// overflowed the stack somewhere between 10,000 and 100,000 resolvers.
 const DEEP = 100000;
 
-// a chain of the given depth, "/root/r1/…", every link handed a context; answers its leaf
+// a chain of the given depth, "/root/r1/…", every resolver handed a context; answers its leaf
 const deepChain = (aDepth) => {
 	let resolver = new ExpressionResolver({ name: "root", context: {} });
 	for (let i = 1; i < aDepth; i++) resolver = new ExpressionResolver({ name: `r${i}`, context: {}, parent: resolver });
@@ -30,7 +30,7 @@ const deepPath = (aDepth) => {
 
 describe("ExpressionResolver - inspecting the chain", () => {
 
-	it("chain names every link from the root down", async () => {
+	it("chain names every resolver from the root down", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ context: {}, name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
@@ -40,35 +40,35 @@ describe("ExpressionResolver - inspecting the chain", () => {
 	// The expectation coincides with what the code answers today, so this one cannot tell the two
 	// apart. It is here because it is the half of 5.5 that is easiest to get wrong when the rule
 	// is implemented: an empty object is a context - what the context holds does not decide anything.
-	it("effectiveChain names a link built with an empty object", async () => {
+	it("effectiveChain names a resolver built with an empty object", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ context: {}, name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
 		expect(leaf.effectiveChain).toBe("/root/middle/leaf");
 	});
 
-	it("effectiveChain skips a link built with context null", async () => {
+	it("effectiveChain skips a resolver built with context null", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ context: null, name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
 		expect(leaf.effectiveChain).toBe("/root/leaf");
 	});
 
-	it("effectiveChain skips a link built without the context option", async () => {
+	it("effectiveChain skips a resolver built without the context option", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
 		expect(leaf.effectiveChain).toBe("/root/leaf");
 	});
 
-	it("effectiveChain is the empty string when no link provides a context, while chain stays full", async () => {
+	it("effectiveChain is the empty string when no resolver provides a context, while chain stays full", async () => {
 		const root = new ExpressionResolver({ context: null, name: "root" });
 		const leaf = new ExpressionResolver({ context: null, name: "leaf", parent: root });
 		expect(leaf.effectiveChain).toBe("");
 		expect(leaf.chain).toBe("/root/leaf");
 	});
 
-	it("effectiveChain describes a state - a link joins when a value is written to it", async () => {
+	it("effectiveChain describes a state - a resolver joins when a value is written to it", async () => {
 		const root = new ExpressionResolver({ context: null, name: "root" });
 		const leaf = new ExpressionResolver({ context: null, name: "leaf", parent: root });
 		expect(leaf.effectiveChain).toBe("");
@@ -76,7 +76,7 @@ describe("ExpressionResolver - inspecting the chain", () => {
 		expect(leaf.effectiveChain).toBe("/leaf");
 	});
 
-	it("contextChain collects the contexts of exactly the links that provide one", async () => {
+	it("contextChain collects the contexts of exactly the resolvers that provide one", async () => {
 		const root = new ExpressionResolver({ context: { value: 1 }, name: "root" });
 		const middle = new ExpressionResolver({ context: null, name: "middle", parent: root });
 		const leaf = new ExpressionResolver({ context: { value: 1 }, name: "leaf", parent: middle });
@@ -91,17 +91,17 @@ describe("ExpressionResolver - inspecting the chain", () => {
 		expect(contexts[contexts.length - 1] === root.context).toBe(true);
 	});
 
-	it("contextChain is empty when no link provides a context", async () => {
+	it("contextChain is empty when no resolver provides a context", async () => {
 		const root = new ExpressionResolver({ context: null, name: "root" });
 		const leaf = new ExpressionResolver({ context: null, name: "leaf", parent: root });
 		expect(leaf.contextChain.length).toBe(0);
 	});
 
-	it("chain names every link however deep the chain is", async () => {
+	it("chain names every resolver however deep the chain is", async () => {
 		expect(deepChain(DEEP).chain).toBe(deepPath(DEEP));
 	});
 
-	it("effectiveChain names every link providing a context however deep the chain is", async () => {
+	it("effectiveChain names every resolver providing a context however deep the chain is", async () => {
 		expect(deepChain(DEEP).effectiveChain).toBe(deepPath(DEEP));
 	});
 });

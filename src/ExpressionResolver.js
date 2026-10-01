@@ -105,8 +105,9 @@ const withDefault = (aResult, aDefault) => {
 
 const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpression, aFilter, aDefault) {
 	// 5.3: climbs in a loop rather than by recursion - one call per resolver climbed cost a promise
-	// each and overflowed the stack on a deep chain. A scope no link of the chain carries answers
-	// undefined, and the default applies to it like to any other result - see SPECIFICATION.md 5.4
+	// each and overflowed the stack on a deep chain. A scope no resolver of the chain carries
+	// answers undefined, and the default applies to it like to any other result - see
+	// SPECIFICATION.md 5.4
 	if (aFilter)
 		while (aResolver.name != aFilter) {
 			aResolver = aResolver.parent;

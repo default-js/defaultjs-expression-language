@@ -574,6 +574,19 @@ where it exists.
 
 `chain`, `effectiveChain` and `contextChain` are specified in 5.5.
 
+**What a consumer imports.** The package is reached by its name, and only these paths are open:
+
+| Path | What it is |
+| --- | --- |
+| the package itself | `index.js` — `ExpressionResolver` and `ExecuterRegistry`, every executer registered |
+| `/browser.js` | the same, and sets `defaultjs.el` on the global object |
+| `/src/Executer.js` | `Executer`, as its default export |
+| `/src/executer/<module>.js` | an executer module, the way to tune that executer |
+| `/dist/<file>` | the bundles: `browser-…[.min].js` a classic script, `module-…[.min].js` an ES module exporting what `index.js` exports |
+| `/package.json` | the manifest |
+
+Every other path is closed, `index.js` written out included.
+
 # Part B — The executers
 
 ## 9. Executers

@@ -99,7 +99,7 @@ The repository root holds permanent records only; anything temporary lives in `p
 
 - **`src/ExpressionResolver.js`** — the public API. Used statically (`resolve` / `resolveText` with an ad-hoc context) or as an instance within a `parent` chain.
 - **`src/ExpressionScanner.js`** — finds the expressions of a text (`scan`) and takes the single expression of `resolve` apart (`parseExpression`): delimiters, escaping, the scope prefix. Internal — `index.js` does not export it.
-- **Chain and scopes** — every resolver optionally carries a `name` and a `parent`. `${scopeName::expression}` addresses one specific link of the chain; without a scope the resolver's own context applies.
+- **Chain and scopes** — every resolver optionally carries a `name` and a `parent`. `${scopeName::expression}` addresses one specific resolver of the chain; without a scope the resolver's own context applies.
 - **Context** — always passes through the proxy from `src/ResolverContextHandle.js`. A write, from a data method or from an expression an executer lets through, lands on the resolver it was made on, in the object the caller handed over (`SPECIFICATION.md` 6.5, 6.6).
 - **Executer** — the pluggable execution strategy. `src/Executer.js` defines the interface (`execution`), `src/ExecuterRegistry.js` keeps implementations under a name. Implementations live in `src/executer/`: `ContextDeconstructorExecuter` (the default), `ContextObjectExecuter` and `WithScopedExecuter` (deprecated, a `with` block). Each one exports `EXECUTERNAME` and registers itself on import. Each is a solution of its own; `README.md` documents what each one does.
 - **`src/CodeCache.js`** — LRU-style cache for compiled expressions, one instance per executer.
@@ -112,11 +112,13 @@ Two shapes, both listed in `entries.config.json` and bundled into `dist/` by web
 | Entry | Bundle | Purpose |
 |---|---|---|
 | `browser.js` | `browser-…[.min].js` | browser script, executers pre-registered, exposes `GLOBAL.defaultjs.el` |
-| `index.js` | `module-…[.min].js` | the ESM entry point — meant as the standard entry for bundlers, not for direct use in a browser |
+| `index.js` | `module-…[.min].js` | the ESM entry point — meant as the standard entry for bundlers, not for direct use in a browser; the bundle is an ES module exporting what `index.js` exports |
+
+`webpack.config.mjs` builds the two with one configuration each, because an ES module library and a classic script cannot come out of one compiler. `package.json` carries `"type": "module"` and an `exports` field; `SPECIFICATION.md` 8 lists the paths it opens, and every other deep import is closed. A change to the field is checked by hand against a packed install, because the suite can pin open paths but not closed ones (`DECISIONS.md`, 2026-10-01).
 
 Importing any entry registers the executers pulled in by `src/executer/index.js` — all three. `EsprimaExecuter` was removed on 2026-09-28; `DECISIONS.md` says why, before anyone proposes an AST-based executer again.
 
-A consumer who wants to tune an executer imports its module explicitly; that import is what makes `setupExecuter(options)` reachable, to tune that executer's behaviour within whatever it allows. This is intended usage, not a leak — check `BACKLOG.md` before adding an `exports` field.
+A consumer who wants to tune an executer imports its module explicitly; that import is what makes `setupExecuter(options)` reachable, to tune that executer's behaviour within whatever it allows. This is intended usage, not a leak, and the reason `exports` opens `./src/executer/*`.
 
 ## Conventions
 
@@ -154,7 +156,7 @@ Every test file imports what it uses — `import { describe, it, expect, beforeA
 
 ## Benchmarks
 
-`test/PerformanceTests/` holds five `*.bench.js` files run by `npm run bench`, never by `npm test` — `include` matches only `test/**/*Test.js`, so a benchmark can never fail the gate. Three measure resolution over a chain: `ColdResolve` with the code cache switched off so every call recompiles, `WarmResolve` with it on, `RandomScope` with a context on every link and a randomly chosen name. `ResolveText` measures the instance `resolveText` over four texts; no benchmark calls a static entry point. Those four run under every executer, taken from `Executers.js` — comparing them is what a benchmark is for, so the list lives here and nowhere in the test suite. `ResolveTextShare` runs `resolveText` under `TestExecuter` instead, so the resolver's own share is measured without an executer's cost hiding it — the instrument for a change to the resolver's text path.
+`test/PerformanceTests/` holds five `*.bench.js` files run by `npm run bench`, never by `npm test` — `include` matches only `test/**/*Test.js`, so a benchmark can never fail the gate. Three measure resolution over a chain: `ColdResolve` with the code cache switched off so every call recompiles, `WarmResolve` with it on, `RandomScope` with a context on every resolver and a randomly chosen name. `ResolveText` measures the instance `resolveText` over four texts; no benchmark calls a static entry point. Those four run under every executer, taken from `Executers.js` — comparing them is what a benchmark is for, so the list lives here and nowhere in the test suite. `ResolveTextShare` runs `resolveText` under `TestExecuter` instead, so the resolver's own share is measured without an executer's cost hiding it — the instrument for a change to the resolver's text path.
 
 Two things about `vitest bench` cost an hour once, verified against 4.1.11 — do not rediscover them:
 

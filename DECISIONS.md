@@ -19,6 +19,57 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-10-01 — How does a consumer reach the package: `"type": "module"`, `exports`, and the module bundle?
+
+**Decision:** `package.json` carries `"type": "module"` and an `exports` field. The field opens `.`
+(`index.js`), `./browser.js`, `./src/Executer.js`, `./src/executer/*`, `./dist/*` and
+`./package.json`, and nothing else. The `module` entry is built as an ES module library, so
+`dist/module-…[.min].js` exports what `index.js` exports. `webpack.config.mjs` exports two
+configurations, one per entry. `optimization.usedExports: false` is gone from both. The paths
+`./dist/*` and `./package.json`, and keeping the deep import as the way to tune the default
+executer, are Frank's decisions of 2026-10-01; the rest was decided on 2026-09-30.
+
+**Reasoning:** The sources ship untranspiled as ESM, so `"type": "module"` states what every file
+already is. `scripts/generate-version.js` was the last CommonJS file and was rewritten as ESM
+(`import.meta.dirname`) rather than renamed to `.cjs`, which would have kept CommonJS alive for one
+script. The `exports` field makes the surface of section 8 enforceable. Before, every file of the
+package was importable, and a deep import of `src/ExpressionResolver.js` was as much a contract as
+`index.js`. `./src/executer/*` and `./src/Executer.js` stay open because importing an executer
+module is how it is tuned (entry of 2026-09-28). `./dist/*` stays open because otherwise the module
+bundle could be loaded by URL but not imported by package name. `./package.json` stays open for tools
+that read a dependency's manifest.
+
+One webpack compiler cannot emit both bundles: `output.module`, which a library of type `module`
+requires, holds for every bundle of a compiler and turns off the IIFE wrapper of the browser script
+(`node_modules/webpack/lib/config/defaults.js`, read for 5.109.2). Hence two configurations. Each
+cleans only the stale files of its own mode that do not belong to the other entry, since both emit
+into one `dist/`.
+
+`usedExports: false` existed only because the module entry had no library, so tree shaking pruned
+the whole library out of it (measured 2026-08-21: 13 809 → 3 685 bytes). With a library the exports
+count as used. Without the line, the production bundles came out 13 871 → 13 386 bytes (browser) and
+13 554 → 13 299 bytes (module). Comparing identifiers between the old and new minified bundles, only
+webpack-internal names (`exports`, `strict`) are gone. Both bundles were run in dev and min form:
+the module bundle in Node, the browser bundle in Chromium. Each had all three executers registered,
+answered `resolveText("${1 + 1}")` with `"2"` and applied a default value; the browser bundle also
+answered `VERSION` 3.0.0.
+
+**Alternatives:** Leaving `./dist/*` out, which was the list of 2026-09-30. Then the bundle B-16
+fixed would be reachable only by URL. Giving the default executer an entry point of its own was
+rejected: it adds API for something one deep import already does. `experiments.outputModule` for
+the browser bundle as well would have needed `<script type="module">` and broken every consumer of
+the classic script.
+
+**Consequences:** A breaking change for 3.0.0: every deep import outside the list fails with
+`ERR_PACKAGE_PATH_NOT_EXPORTED`, `index.js` written out included. `src/executer/index.js` is open
+through the wildcard; it only registers the executers. `experiments.outputModule` is still marked
+experimental in webpack 5 and may change shape in a minor release. The suite pins the open paths
+through a self-reference (`test/package/surface.Test.js`). It cannot pin a closed one, because Vite
+fails the whole file on a literal import it cannot resolve. Closed paths were checked once against a
+packed install in Node. A future change to the field has to repeat that check by hand.
+
+---
+
 ## 2026-09-30 — Do the executers contain an assignment to a name nothing declares?
 
 **Decision:** No. `${ x = 1 }` on a name no resolver carries creates a global under all three
@@ -155,7 +206,7 @@ runtime dependencies `espree` and `escodegen`. Frank's decision.
 
 What stays in force from the entry of 2026-08-20 that kept it unregistered: an executer module is
 reached by importing it directly, which is how `setupExecuter` is reached and the intended usage,
-so an `exports` field must keep `./src/executer/*` importable (`BACKLOG.md`).
+so the `exports` field keeps `./src/executer/*` importable (2026-10-01).
 
 **Reasoning:** The approach cannot be made clean. The executer rewrote the statement's AST so that
 an identifier became `ctx?.name`, and it had to decide which identifiers to rewrite **without
@@ -939,10 +990,10 @@ deprecation notice and stays reachable by name, so a consumer who needs its beha
 executers exist to get away from, and a default that announces its own deprecation on the first
 expression it resolves is a contradiction: either it is fit to be the default or the notice is
 noise. Second, the cross-executer benchmarks of 2026-08-30 put a price on it. Over a chain of depth
-100 000 with the asked name a few links up (`RandomScope`), `with-scoped` answers **138 hz** where
-`context-object` answers **662 000 hz** and `esprima` **457 000 hz**; `WarmResolve`, where every
-executer walks the whole chain anyway, puts the same three within a factor of three of each other
-(13 / 41 / 41 hz at depth 1 000 000). The gap is therefore not one executer being faster in
+100 000 with the asked name a few resolvers up (`RandomScope`), `with-scoped` answers **138 hz**
+where `context-object` answers **662 000 hz** and `esprima` **457 000 hz**; `WarmResolve`, where
+every executer walks the whole chain anyway, puts the same three within a factor of three of each
+other (13 / 41 / 41 hz at depth 1 000 000). The gap is therefore not one executer being faster in
 general — it is a full-chain walk that only `with` triggers, which matches the `@@unscopables`
 lookup a `with` block performs while resolving a binding. That explanation is consistent with every
 number measured so far but has not been proven with a counter in the trap; the walk itself is
@@ -1066,7 +1117,7 @@ expression blew up" — and a caller could not tell them apart; it now carries o
 gives it.
 
 **Alternatives:** Keeping the catch and letting only errors from statements that do not *compile*
-through, so that a name no link carries stays soft. That was the counter-proposal, and it was
+through, so that a name no resolver carries stays soft. That was the counter-proposal, and it was
 measured on 2026-08-29: `resolve` catching nothing costs **25 tests**, and only 11 of them are the
 error rule itself — the other 14 are the resolver's ordinary business, a name the chain does not
 carry, which is a `ReferenceError` under two of the four executers. `ChainTest`'s "never sees the
@@ -1214,7 +1265,7 @@ repeating before a release: it is what proves no marker has gone stale.
 **Decision:** Three rules, all now in `SPECIFICATION.md`. A brace inside a string literal does not
 count towards the matching brace, so `${ "}" }` is one expression with the statement `"}"`. An
 opening `${` with no matching closing brace is not an expression at all: the text stands
-unchanged, no error, no partial replacement. And where two links of a chain carry the same name,
+unchanged, no error, no partial replacement. And where two resolvers of a chain carry the same name,
 `${name::statement}` answers from the first one found while climbing towards the root.
 
 **Reasoning:** All three were found by probing the edge cases of sections 3 and 5 on 2026-08-24,
@@ -1223,12 +1274,12 @@ moment to decide them. Counting a brace inside a string literal would cut `${ "}
 of a literal, which no reader of the expression would expect. Leaving an unterminated `${` alone
 keeps the failure mode of the syntax uniform: text that is not an expression is text. The scope
 walk taking the first hit makes 5.3 behave like 5.2, so one mental model covers both lookups, and
-it follows how a chain is used: the deeper link is the one introduced most recently.
+it follows how a chain is used: the deeper resolver is the one introduced most recently.
 
 **Alternatives:** For the unterminated delimiter, throwing or replacing up to the end of the text.
 Rejected — both turn a typo in a template into a hard failure or into silent corruption, and a
 template engine feeding this package cannot always guarantee the text it passes. For duplicate
-names, answering from the root-most link. Rejected: it would mean a resolver deeper in the chain
+names, answering from the root-most resolver. Rejected: it would mean a resolver deeper in the chain
 cannot shadow a name, which contradicts the purpose of the chain stated in section 1.
 
 **Consequences:** The parser of the brace fix has to know string literals — `'`, `"` and backtick
@@ -1260,16 +1311,16 @@ than discovered. Open alongside it, and only an idea so far: making the `ctx` pr
 `ContextObjectExecuter` configurable, so a consumer can pick the identifier. It has its own
 `BACKLOG.md` entry.
 
-## 2026-08-24 — When does a link count as providing a context?
+## 2026-08-24 — When does a resolver count as providing a context?
 
 **Decision:** When the caller handed a context to the constructor — anything that is neither
-`null` nor `undefined` — or when a value has been set on the link since. What the context holds
-does not matter: an empty object counts. A link provides no context only if it was built without
+`null` nor `undefined` — or when a value has been set on the resolver since. What the context holds
+does not matter: an empty object counts. A resolver provides no context only if it was built without
 one and nothing has been written to it since.
 
-**Reasoning:** A rule by what the context holds — a link counting only while its context holds at least one
-reachable value — needs a definition of "holds a value", and pinning it showed that definition does
-not exist: `#initPropertyCache` walks the
+**Reasoning:** A rule by what the context holds — a resolver counting only while its context holds
+at least one reachable value — needs a definition of "holds a value", and pinning it showed that
+definition does not exist: `#initPropertyCache` walks the
 prototype chain to its end, so the cache of even `{}` holds `hasOwnProperty`, `toString` and the
 rest of `Object.prototype`. Read literally, every context would be non-empty and `effectiveChain`
 would equal `chain` again; read as intended, the specification would have had to draw a boundary
@@ -1279,12 +1330,12 @@ That is a lot of rule for a getter whose purpose is debug output. Deciding it at
 one comparison, needs no cache, and cannot drift as the context changes shape.
 
 **Alternatives:** That rule, with the prototype boundary written out. It would become
-the better choice if a consumer ever needs `effectiveChain` to answer "which links can actually
-contribute a value to a lookup" rather than "which links were given a context" — the two differ
-for a link handed an empty object.
+the better choice if a consumer ever needs `effectiveChain` to answer "which resolvers can actually
+contribute a value to a lookup" rather than "which resolvers were given a context" — the two differ
+for a resolver handed an empty object.
 
 **Consequences:** `context: null` and `context: {}` are told apart here, and only here; for a
-lookup they stay equivalent (6.3). A link built without a context joins `effectiveChain` and
+lookup they stay equivalent (6.3). A resolver built without a context joins `effectiveChain` and
 `contextChain` the moment a value is written to it, so both still describe a state rather than a
 structure.
 
@@ -1312,17 +1363,17 @@ Publishing it adds a file to the `files` array.
 
 ## 2026-08-22 — Does a key holding `undefined` shadow a value nearer the root?
 
-**Decision:** Yes. A lookup is decided by whether a link **carries the key**, not by what the key
-holds. A key defined as `undefined` answers and stops the walk; a key a link does not carry is
-passed on to its parent.
+**Decision:** Yes. A lookup is decided by whether a resolver **carries the key**, not by what the
+key holds. A key defined as `undefined` answers and stops the walk; a key a resolver does not carry
+is passed on to its parent.
 
 **Reasoning:** It is what JavaScript scoping itself does, and the property cache is keyed by name,
-so it is also the cheapest rule — one map lookup per link, no value inspection.
+so it is also the cheapest rule — one map lookup per resolver, no value inspection.
 
 **Alternatives:** Reading `undefined` as "not there" and walking on was proposed, on the ground
 that the package elsewhere uses `undefined` to mean a thing does not exist. It was rejected:
-that rule is about what a *lookup answers to the caller*, not about how a link's own keys are
-read. It would also have made it impossible for a link to deliberately hide an inherited value.
+that rule is about what a *lookup answers to the caller*, not about how a resolver's own keys are
+read. It would also have made it impossible for a resolver to deliberately hide an inherited value.
 
 **Consequences:** A context built as `{ item: obj.missing }` carries the key `item` and hides
 whatever the parents hold under that name. Combined with the default-value rule the caller still
@@ -1330,12 +1381,12 @@ sees a value where one was passed, so the effect surfaces only when no default i
 
 ## 2026-08-22 — Is a context a snapshot or read live?
 
-**Decision:** **Names are a snapshot, values are live.** The set of keys a link contributes is
-captured when the resolver is built; the values behind them are read at the moment of the lookup.
+**Decision:** **Names are a snapshot, values are live.** The set of keys a resolver contributes is
+captured when it is built; the values behind them are read at the moment of the lookup.
 A key added directly to the handed-in object afterwards is invisible until
 `contextHandle.resetCache()`, `updateData` or `mergeContext` rebuilds the set.
 
-**Reasoning:** That cache is what makes the chain walk cheap — one map lookup per link. It also
+**Reasoning:** That cache is what makes the chain walk cheap — one map lookup per resolver. It also
 matches how the package is used: a resolver of a chain is filled and then used, not
 extended while it is being read.
 
@@ -1415,26 +1466,26 @@ what the documentation recommends as soon as more than a context and a default a
 ## 2026-08-22 — How far along the chain does each data method reach?
 
 **Decision:** Per method, by convention, and written down: `getData` reads along the chain and the
-nearest link carrying the key answers. `updateData` changes the value **where the key lives**,
-creating it on the calling resolver only when no link carries it. `deleteData` removes the key
-from exactly **one** link. `mergeContext` assigns shallowly into **one** link's context and does
-not search. A `filter` selects exactly one link, and **a filter matching no link throws** in all
-four.
+nearest resolver carrying the key answers. `updateData` changes the value **where the key lives**,
+creating it on the calling resolver only when no resolver carries it. `deleteData` removes the key
+from exactly **one** resolver. `mergeContext` assigns shallowly into **one** resolver's context and
+does not search. A `filter` selects exactly one resolver, and **a filter matching no resolver
+throws** in all four.
 
 **Reasoning:** These methods are the path with guaranteed behaviour, identical under every
 executer, so their reach has to be stated rather than inherited from whatever the code does — the
 code answers three different things today and one of them is a defect. The throw follows the same
-line: a filter naming a link that does not exist is a mistake in the calling code, unlike a scope
-name inside an expression, which is data and must never stop a render.
+line: a filter naming a resolver that does not exist is a mistake in the calling code, unlike a
+scope name inside an expression, which is data and must never stop a render.
 
 **Alternatives:** A switch widening `deleteData` to the whole chain was agreed and then withdrawn:
-a filter names one link, a chain-wide switch names all of them, and the two contradict each other
-in one call. Rather than invent a rule for the contradiction, the method stays at one link;
-walking the chain and deleting per link is three lines of consumer code, since `parent` and `name`
-are public.
+a filter names one resolver, a chain-wide switch names all of them, and the two contradict each
+other in one call. Rather than invent a rule for the contradiction, the method stays at one
+resolver; walking the chain and deleting per resolver is three lines of consumer code, since
+`parent` and `name` are public.
 
 **Consequences:** An unmatched filter is silently ignored today, so this is consumer-visible.
-`mergeContext` becomes the only way to define a key on one link when a link nearer the root
+`mergeContext` becomes the only way to define a key on one resolver when a resolver nearer the root
 already carries it — `mergeContext({ key: value })` with a one-key object. A separate `setData`
 was proposed for that and dropped: no method is added, the surface stays at four.
 
@@ -1442,7 +1493,7 @@ was proposed for that and dropped: no method is added, the surface stays at four
 
 **Decision:** `webpack.config.mjs`, native ESM, reading `package.json` and
 `entries.config.json` through `createRequire(import.meta.url)` rather than through JSON import
-attributes. The rename is deliberately independent of the open `"type": "module"` question.
+attributes. It stays `.mjs` under `"type": "module"` (2026-10-01).
 
 **Reasoning:** The config was the last CommonJS file involved in the build, while
 `vitest.config.mjs` was already ESM — two module systems across the two config files of one
@@ -1469,12 +1520,10 @@ same rewrite — Karma was its only caller — so `output.path` is now
 **Alternatives:** Import attributes are the cleaner ESM form and become the better choice the
 moment the floor is verified against Node 22.15; the change is one line per JSON file.
 Renaming to `.cjs` instead — which the version-generation entry below anticipated — keeps
-CommonJS alive in a package that is otherwise pure untranspiled ESM. Leaving the file as `.js`
-works only until `"type": "module"` is set, at which point it breaks.
+CommonJS alive in a package that is otherwise pure untranspiled ESM. Since `"type": "module"`, a
+`.js` name would work as well; `.mjs` says what the file is without depending on that field.
 
-**Consequences:** `scripts/generate-version.js` is now the only CommonJS file left in the
-repository, and it is no longer coupled to the config, so the `"type": "module"` decision has
-to deal with it on its own. Everything naming the config has to say `webpack.config.mjs`; the
+**Consequences:** Everything naming the config has to say `webpack.config.mjs`; the
 entries below were corrected where they describe the present, and left untouched where they
 record the past.
 
@@ -1527,12 +1576,7 @@ That a gitignored file still reaches consumers was verified, not assumed: `npm p
 lists `src/version.js` in the tarball. The `files` array is an allowlist and outranks
 `.gitignore`.
 
-The script is CommonJS because this package has no `"type": "module"`. When that question is
-settled it is renamed to `.cjs` together with `webpack.config.js`.
-
-*Update 2026-08-21: `webpack.config.js` became `webpack.config.mjs` on its own — see the entry
-at the top — so that pairing no longer exists. `scripts/generate-version.js` is the last
-CommonJS file in the repository and the `"type": "module"` decision has to handle it alone.*
+The script is ESM, like every other file of the package (`"type": "module"`, 2026-10-01).
 
 **Alternatives:** `DefinePlugin` is a smaller change but fixes only the bundles, leaving the raw
 published sources broken — which was the worst of the three defects. Checking `src/version.js`
@@ -1544,46 +1588,23 @@ it outside the two browser entries, so tests are unaffected, but any future impo
 aware. The version now has to be right in `package.json` before a build, not before a publish.
 
 
-## 2026-08-21 — Do we enable tree shaking for the `dist/` bundles?
+## 2026-08-21 — Does `package.json` carry a `sideEffects` field?
 
-**Decision:** No. `optimization.usedExports: false` stays in `webpack.config.mjs`, and a
-`sideEffects` field must **not** be added to `package.json` — at least not as `false`. Both
-were reviewed as part of stage F of the toolchain plan, which suggested the opposite; the
-measurements below overruled it.
+**Decision:** Not as `false`, ever. No `sideEffects` field is set. Tree shaking of the `dist/`
+bundles is on since 2026-10-01; that entry has the measurement.
 
-**Reasoning:** Two experiments, each a build followed by a look at what came out.
+**Reasoning:** *Adding `sideEffects: false`* breaks the package. `dist/browser-…min.js` dropped from
+13 403 to 8 126 bytes when tried, and the bundle lost `context-object-executer` and
+`context-deconstruction-executer`. Every executer registers itself through a bare
+`import "./XExecuter.js"` in `src/executer/index.js`. Declaring the package free of side effects
+tells every bundler, ours and the consumers', that those imports may be discarded.
 
-*Dropping `usedExports: false`* guts the module bundle. `dist/module-…min.js` falls from
-13 809 to 3 685 bytes, and `resolveText`, `defaultExecuter`, `ResolverContextHandle` and
-`DefaultValue` are gone from it — only the executer registration survives. The cause is not
-tree shaking misbehaving: the `module` entry has no `output.library`, so webpack correctly
-concludes that nothing consumes the entry's exports and prunes everything reachable only
-through them. The browser entries are unaffected, because their code sets
-`GLOBAL.defaultjs.el` as a side effect rather than through exports.
+**Alternatives:** A `sideEffects` field could be introduced as an *array* whitelisting the
+self-registering modules (`./src/executer/*.js`, `./browser.js`), which would let a consumer's
+bundler drop the rest. Nobody has asked for it; `false` is the value that must never appear.
 
-*Adding `sideEffects: false`* is worse. `dist/browser-…min.js` drops from 13 403 to 8 126
-bytes, and the bundle loses `context-object-executer`, `context-deconstruction-executer` and
-`esprima-executer` — two of the three default executers and the optional one. Every executer
-registers itself through a bare `import "./XExecuter.js"` in `src/executer/index.js`;
-declaring the package free of side effects tells every bundler, ours and the consumers', that
-those imports may be discarded.
-
-Both were confirmed the other way too: with the current settings a Playwright smoke test
-loads each built browser bundle in Chromium and finds `VERSION` 3.0.0, the three default
-executers registered, `esprima-executer` absent from the small bundle and present in the
-all-executers one, and `resolveText("${1 + 1}")` returning `"2"`.
-
-**Alternatives:** Tree shaking becomes worth revisiting the moment the `module` entry gets an
-`output.library`, or is dropped — bundler consumers reach the package through `main`, which
-points at the raw `index.js`, not at `dist/`. A `sideEffects` field could be introduced as an
-*array* whitelisting the self-registering modules (`./src/executer/*.js`, `./browser.js`);
-`false` is the value that must never appear. Both are tracked
-in `BACKLOG.md`.
-
-**Consequences:** The bundles carry unused exports of `@default-js/defaultjs-common-utils`,
-which is what the roughly 10 KB difference in the module bundle is. That is the price of
-correctness here, and it is paid only by consumers of `dist/`, not by those importing `src/`.
-The `usedExports: false` line is load-bearing and carries a comment saying so.
+**Consequences:** Bundlers treat every module of the package as having side effects, so a consumer's
+bundle keeps what it imports, transitively, whether used or not.
 
 
 ## 2026-08-21 — Which test runner replaces Karma?
@@ -1634,8 +1655,8 @@ test path. Tests are transformed by Vite while `dist/` is bundled by webpack; wi
 on either side the difference is small, but it is not nothing, and it is the standing argument
 for eventually moving the build to Vite as well — tracked in `BACKLOG.md`, deliberately not
 part of this decision. No `vite.config` is required; a standalone `vitest.config.mjs` using
-`defineConfig` from `vitest/config` is the documented path. The config file has to be `.mjs`
-until the `"type": "module"` question is settled.
+`defineConfig` from `vitest/config` is the documented path. The config file is `.mjs`,
+which holds with or without `"type": "module"`.
 
 The measurements and the full pro/contra per candidate were recorded in the toolchain
 modernization plan; that plan was retired on 2026-08-21, so the git history up to commit

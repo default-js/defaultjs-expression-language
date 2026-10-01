@@ -1,6 +1,6 @@
 # Backlog
 
-Every open task of `@default-js/defaultjs-expression-language`: defects, open agreeds, agreed
+Every open task of `@default-js/defaultjs-expression-language`: defects, open decisions, agreed
 work, ideas, and the status of the v3 goals. If it is to be done, it is here and nowhere else.
 Settled questions and their reasoning are in `DECISIONS.md`, what the resolver is meant to do is in
 `SPECIFICATION.md`.
@@ -11,7 +11,7 @@ Settled questions and their reasoning are in `DECISIONS.md`, what the resolver i
   other gets a plan under `plans/` instead, and its entry here points at it.
 - **Written the moment an item comes up**, not at handover — a session can end at any point.
 - **Only the current state.** An entry says what is wrong or undecided, what is known, and what
-  happens next. How it got there is in git history; why a agreed fell is in `DECISIONS.md`.
+  happens next. How it got there is in git history; why a decision fell is in `DECISIONS.md`.
 - **Deleted once done**, together with its row in the overview. IDs are never reused.
 - **Titles are addresses.** Test comments point at entries by title, so a title is not reworded
   without updating them — `grep` for it first.
@@ -23,7 +23,7 @@ Each entry carries these fields; the ones that do not apply are left out.
 
 | Field | Meaning |
 | --- | --- |
-| **Status** | `agreed` — needs a agreed, which is Frank's · `agreed` — decided, ready to implement · `investigate` — the facts are not complete yet · `idea` — raised, not agreed |
+| **Status** | `decision` — needs a decision, which is Frank's · `agreed` — decided, ready to implement · `investigate` — the facts are not complete yet · `idea` — raised, not agreed |
 | **Kind** | `defect` · `gap` (behaviour nobody has specified) · `executer` (something one executer does not do, and might) · `feature` · `refactor` · `docs` · `bench` · `test` · `tooling` |
 | **Blocks 3.0.0** | `yes` where the release has to wait for it |
 | **Priority** | `low` — taken up after everything without it, with the reason; left out means normal |
@@ -45,10 +45,10 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-30) | — |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
-| 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23, B-24 |
+| 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-40 |
 
-**Markers, counted 2026-09-30** (`npm test`: 320 passed, 320 cases). No `it.fails` is left and no
+**Markers, counted 2026-10-01** (`npm test`: 326 passed, 326 cases). No `it.fails` is left and no
 entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
 the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
 is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
@@ -59,13 +59,10 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | --- | --- | --- | --- | --- | --- |
 | B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
-| B-14 | `"type": "module"` plus an `exports` field | agreed | tooling | | |
-| B-16 | The `module` entry produces a bundle nothing can consume | agreed | defect | | |
 | B-20 | Every code example in `README.md` uses a default import that does not exist | agreed | docs | | |
 | B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
 | B-22 | The JSDoc of the whole package needs one pass | agreed | docs | | |
 | B-23 | Check every method name against what it does and what it answers | agreed | refactor | | |
-| B-24 | "Link" is out of the specification and still stands in every other file | agreed | docs | | |
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
@@ -117,48 +114,6 @@ and intended (`DECISIONS.md`, 2026-08-24). But the identifier is hard-coded, and
 a property named `ctx` has no way out. Open with it: whether the option belongs on
 `setupExecuter(options)` next to `size`, and what happens to the code cache, which is keyed by the
 statement text alone — entries compiled under the old identifier would answer for the new one.
-
-## Public surface and packaging
-
-### B-14 · Decide on `"type": "module"` plus an `exports` field — and what it does to the executer import path
-
-- **Status:** agreed 2026-09-30 — needs a plan before it starts; planned and verified together with B-16, after B-24
-- **Kind:** tooling · **Spec:** 8
-- **Pinned by:** `test/package/surface.Test.js` (the deep import of `Executer`)
-- **Records:** `DECISIONS.md`, `CHANGELOG.md` (breaking), `AGENTS.md` (Distribution)
-
-**Decided (Frank, 2026-09-30):** `"type": "module"` plus an `exports` field with 3.0.0. It opens
-`.` (`index.js`), `./browser.js`, `./src/executer/*` and `./src/Executer.js`; every other deep
-import breaks. Tuning the default executer keeps going through its module under
-`./src/executer/*`. What the plan has to check: every `.js` file the tooling loads as CommonJS
-(`scripts/generate-version.js` among them), the webpack and vitest configurations, and that
-`package.json` itself stays importable where something reads it.
-
-`defaultjs-common-utils` already went this way, so the two packages diverge. Tuning an executer —
-`setupExecuter(options)` — is done by importing its module directly
-(`…/src/executer/ContextObjectExecuter.js`); that is intended (`DECISIONS.md`, 2026-09-28) and works
-only because there is no `exports` field. So an `exports` field must whitelist `./src/executer/*`.
-`./src/Executer.js` needs the same treatment: section 8 lists `Executer` as public, but `index.js`
-exports only `ExpressionResolver` and `ExecuterRegistry` — whitelist it, or export it from
-`index.js`. Also open: tuning the *default* executer needs the same deep import although the
-consumer never imported that module — keep, or give it a documented entry point.
-
-### B-16 · The `module` entry produces a bundle nothing can consume
-
-- **Status:** agreed 2026-09-30 — library configuration; needs a plan before it starts, together with B-14
-- **Kind:** defect · **Spec:** none
-- **Records:** `DECISIONS.md`, `CHANGELOG.md`
-
-**Decided (Frank, 2026-09-30):** the entry stays and gets a library configuration, so
-`dist/module-…[.min].js` exports what `index.js` exports. An ESM output needs
-`output.library.type: "module"` and `experiments.outputModule` in webpack 5 — to be read in the
-installed webpack before planning, together with whether `usedExports: false` can go.
-
-`entries.config.json` builds `index.js` into `dist/module-…[.min].js`, but `webpack.config.mjs`
-sets no `output.library`, so the bundle exposes nothing. Bundlers do not use it either — `main`
-points at the raw `./index.js`. It is also what forces `optimization.usedExports: false`
-(`DECISIONS.md`, 2026-08-21). With a library configuration, tree shaking can come back; without the
-entry, one bundle is published instead of two.
 
 ## Documentation and naming
 
@@ -219,22 +174,6 @@ size and nothing else; `normalize`, `startsRegex`, `parseScope` and `scanExpress
 they do; `registrate` is not an English word and is public; `getExecuterType` is the import alias of
 `getExecuter` and answers an instance. Public ones —
 `registrate`, the three chain getters, `buildSecure` — need a decision; private ones are a rename.
-
-### B-24 · "Link" is out of the specification and still stands in every other file
-
-- **Status:** agreed 2026-09-30 — rename everywhere, test names included; next up, a plan goes to Frank first
-- **Kind:** docs
-
-**Decided (Frank, 2026-09-30):** *link* becomes *resolver* in `test/`, the benchmarks, `src/`
-comments, `AGENTS.md`, the `[Unreleased]` entries of `CHANGELOG.md` and `DECISIONS.md`. Left alone
-only where a passage quotes something that said *link* at the time. The gate prints the new test
-names afterwards; the count of cases must stay the same.
-
-Decided 2026-08-30: one member of a chain is a **resolver**, and `SPECIFICATION.md` no longer uses
-*link*. Counted 2026-09-26 (`\blinks?\b`, case-insensitive, occurrences; `test/` recounted 2026-09-27):
-`test/` 44, in `test/expressionresolver/` (`chain-inspection`, `data-methods`) and the benchmarks; `DECISIONS.md` 36; `CHANGELOG.md` 9, entries
-under `[Unreleased]` among them, which a reader meets without a definition; `src/` 2 comments;
-`AGENTS.md` 2. The suites written on 2026-09-26 say *resolver* throughout.
 
 ## Benchmarks
 

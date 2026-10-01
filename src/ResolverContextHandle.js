@@ -95,10 +95,10 @@ export default class ResolverContextHandle {
 			this.#proxy = this.#data;
 		else {
 			// The proxy answers for the whole chain, which is more than the object handed to this
-			// link holds. A proxy may not speak that freely for a target that guarantees anything
-			// about its own keys - a frozen or sealed context is where that ends in a TypeError -
-			// so it gets an empty target of its own. No trap reads it; every one of them works on
-			// #data and #cache.
+			// resolver holds. A proxy may not speak that freely for a target that guarantees
+			// anything about its own keys - a frozen or sealed context is where that ends in a
+			// TypeError - so it gets an empty target of its own. No trap reads it; every one of
+			// them works on #data and #cache.
 			this.#proxy = new Proxy({}, {
 				has: (data, property) => {
 					//console.log("has property:", property);

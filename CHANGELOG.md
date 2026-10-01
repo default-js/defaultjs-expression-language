@@ -47,6 +47,15 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Changed
 
+- **The package is an ES module package with an `exports` field, and a deep import outside it
+  breaks.** `package.json` carries `"type": "module"` and an `exports` field. It opens the package
+  itself (`index.js`), `browser.js`, `src/Executer.js`, every module under `src/executer/`, every
+  file under `dist/`, and `package.json`. Every other path is rejected with
+  `ERR_PACKAGE_PATH_NOT_EXPORTED` by Node and by every bundler that honours `exports`, among them
+  `src/ExpressionResolver.js`, `src/CodeCache.js` and `index.js` written out. Import from the
+  package name instead. Tuning an executer still goes through its module under `src/executer/`. See
+  `SPECIFICATION.md` 8.
+
 - **The expression scanner is a module of its own, `src/ExpressionScanner.js`.** It finds the
   expressions of a text and takes the single expression of `resolve` apart; it moved out of
   `src/ExpressionResolver.js` unchanged. It is internal — `index.js` does not export it and nothing
@@ -323,6 +332,12 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 ### Fixed
 
+- **`dist/module-defaultjs-expression-language[.min].js` exported nothing.** The bundle built from
+  `index.js` had no library configuration, so it could be loaded but offered nothing to import. It
+  is an ES module now and exports `ExpressionResolver` and `ExecuterRegistry`, as `index.js` does.
+  Both production bundles are now built with tree shaking and come out 2 to 4 % smaller. The
+  browser bundle stays a classic script that sets `defaultjs.el`.
+
 - **`setupExecuter` without a `size` shrank the cache.** Every executer starts its code cache at
   5000 entries, but `setupExecuter()` or `setupExecuter({})` set it to 1000 and evicted the rest. An
   option left out now changes nothing. See `SPECIFICATION.md` 9.3.
@@ -350,27 +365,28 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   target of its own, so any context object works.
 
   Two things follow for every context, not only a frozen one: **enumeration now describes the
-  chain**, so `Object.keys`, a spread and `JSON.stringify` answer the names of every link instead of
-  only the one the call was made on — each with the enumerability it has where it is defined, so a
-  prototype's members stay out of `Object.keys` as they would on the object itself. And operations
-  that are not intercepted — `Object.getPrototypeOf`, `Object.defineProperty`, `Object.isExtensible`
-  — now see that empty target rather than the context object. See `SPECIFICATION.md` 6.1.
+  chain**, so `Object.keys`, a spread and `JSON.stringify` answer the names of every resolver
+  instead of only the one the call was made on — each with the enumerability it has where it is
+  defined, so a prototype's members stay out of `Object.keys` as they would on the object itself.
+  And operations that are not intercepted — `Object.getPrototypeOf`, `Object.defineProperty`,
+  `Object.isExtensible` — now see that empty target rather than the context object. See
+  `SPECIFICATION.md` 6.1.
 
-- **A page carrying a frame broke every resolver below a global-object link.** The property cache of
-  a global context handed its names out unfiltered, while every other context drops the names that
-  cannot stand for a variable. A window that embeds a frame carries the own name `"0"` — the indexed
-  access to `frames[0]` — which reached `ContextDeconstructorExecuter` through the chain and made
-  every generated function a `SyntaxError: Unexpected number`, including one for an expression that
-  only read its own context. Both caches apply the same rule now.
+- **A page carrying a frame broke every resolver below one built on the global object.** The
+  property cache of a global context handed its names out unfiltered, while every other context
+  drops the names that cannot stand for a variable. A window that embeds a frame carries the own
+  name `"0"` — the indexed access to `frames[0]` — which reached `ContextDeconstructorExecuter`
+  through the chain and made every generated function a `SyntaxError: Unexpected number`, including
+  one for an expression that only read its own context. Both caches apply the same rule now.
 
 - **A resolver built on the global object threw on every lookup.** `new ExpressionResolver({
   context: globalThis })` answered `undefined`
   for every name, `${ Math.round(1.5) }` included. The property cache of a global context is a
   wrapper rather than a `Map`, and its lookup answered the value of the property where the caller
-  expects the link holding it, so reading the property off that answer raised a `TypeError` that
-  the executer swallowed. The wrapper answers the link now, and the global object is an ordinary
-  link of the chain: it carries every name, so it answers every lookup that reaches it and nothing
-  below it is consulted.
+  expects the resolver holding it, so reading the property off that answer raised a `TypeError` that
+  the executer swallowed. The wrapper answers the resolver now, and a resolver on the global object
+  is an ordinary member of the chain: it carries every name, so it answers every lookup that reaches
+  it and nothing below it is consulted.
 
   **A context that is the global object is no longer put behind a proxy.** There is nothing for a
   proxy to add there — the object already carries every name — and putting one in front of it
@@ -385,7 +401,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `resolver.resolve("${scope::statement}")` handed `scope::statement` to the executer, which could
   not compile it: the error was swallowed and the caller got `undefined`. The two entry points
   answered differently for one syntax. Both parse the prefix by the same rule now, and `resolve`
-  reaches a named link of the chain like `resolveText` does. See `SPECIFICATION.md` 4.3.
+  reaches a named resolver of the chain like `resolveText` does. See `SPECIFICATION.md` 4.3.
 
 - **An expression carrying a brace of its own was not recognized.** The delimiters were matched by
   a regular expression that could not see past an inner brace, so an object literal, an arrow
@@ -410,14 +426,14 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 - **`${scope::statement}` never reached an ancestor of the chain.** The internal walk was
   declared as `(aExecuter, aResolver, aExpression, aFilter, aDefault)` but recursed with its five
   arguments rotated by one, so the parent resolver arrived where the executer was expected and the
-  walk died on the first step. Addressing a named link other than the one the call was made on has
-  therefore never worked: `resolveText("${root::value}")` answered the text `null` where the root
-  holds a value. It is a regression, not an original defect — the call site was not adjusted when
-  `aExecuter` was prepended to the parameter list in 2025-07. Where two links carry the same name,
-  the first one found climbing towards the root now answers, the same shadowing rule as an
-  unprefixed lookup. See `SPECIFICATION.md` 5.3.
+  walk died on the first step. Addressing a named resolver other than the one the call was made on
+  has therefore never worked: `resolveText("${root::value}")` answered the text `null` where the
+  root holds a value. It is a regression, not an original defect — the call site was not adjusted
+  when `aExecuter` was prepended to the parameter list in 2025-07. Where two resolvers carry the
+  same name, the first one found climbing towards the root now answers, the same shadowing rule as
+  an unprefixed lookup. See `SPECIFICATION.md` 5.3.
 
-- **A scope prefix that no link carries answered `null` and skipped the default value.** It now
+- **A scope prefix that no resolver carries answered `null` and skipped the default value.** It now
   answers `undefined`, and a default value passed to `resolve` or `resolveText` applies to it as
   it does to every other result. See `SPECIFICATION.md` 5.4.
 

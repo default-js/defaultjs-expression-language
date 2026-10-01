@@ -3,7 +3,16 @@
 	"buildname": "defaultjs-expression-language",
 	"version": "3.0.0",
 	"description": "This provides an expression resolver. You can build an resolver chain to solve hierarchic scopes!",
+	"type": "module",
 	"main": "./index.js",
+	"exports": {
+		".": "./index.js",
+		"./browser.js": "./browser.js",
+		"./src/Executer.js": "./src/Executer.js",
+		"./src/executer/*": "./src/executer/*",
+		"./dist/*": "./dist/*",
+		"./package.json": "./package.json"
+	},
 	"scripts": {
 		"generate:version": "node scripts/generate-version.js",
 		"prebuild:dev": "npm run generate:version",

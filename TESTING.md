@@ -11,7 +11,7 @@ Every part of the suite has one place:
 | one **component** — `ExpressionScanner`, `ResolverContextHandle`, `ExpressionResolver`, `ExecuterRegistry`, `CodeCache` | `test/<component>/`, the full component name in lower case: `test/expressionscanner/`, `test/executerregistry/` | that component alone, called with what it is handed in use |
 | the class **`Executer`**, the interface | `test/executer/interface.Test.js` | the class |
 | what **one executer** guarantees, its interface included | `test/executer/<executer>/` | that executer alone, called as `execute(aStatement, aContext)` |
-| the **public surface** of the package | `test/package/surface.Test.js` | `index.js` and `Executer` |
+| the **public surface** of the package | `test/package/surface.Test.js` | `index.js`, `Executer`, and the paths the `exports` field opens |
 
 ## 1. Where a case belongs
 

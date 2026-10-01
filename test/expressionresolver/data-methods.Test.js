@@ -19,7 +19,7 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		return { root, leaf };
 	};
 
-	it("getData answers the whole context of the addressed link when no key is given", async () => {
+	it("getData answers the whole context of the addressed resolver when no key is given", async () => {
 		const { leaf } = buildChain();
 		expect(leaf.getData() === leaf.context).toBe(true);
 	});
@@ -31,12 +31,12 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(leaf.getData("value")).toBe("from root");
 	});
 
-	it("getData with a filter reads from the addressed link", async () => {
+	it("getData with a filter reads from the addressed resolver", async () => {
 		const { leaf } = buildChain();
 		expect(leaf.getData("value", "root")).toBe("from root");
 	});
 
-	it("getData with a filter naming the calling link reads from it", async () => {
+	it("getData with a filter naming the calling resolver reads from it", async () => {
 		const { leaf } = buildChain();
 		expect(leaf.getData("leafOnly", "leaf")).toBe("l");
 	});
@@ -53,7 +53,7 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(error instanceof TypeError).toBe(true);
 	});
 
-	it("getData throws on a filter that matches no link", async () => {
+	it("getData throws on a filter that matches no resolver", async () => {
 		const { leaf } = buildChain();
 		let error = null;
 		try {
@@ -70,14 +70,14 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(root.getData("value")).toBe("changed");
 	});
 
-	it("updateData without a filter creates the key on the calling resolver when no link carries it", async () => {
+	it("updateData without a filter creates the key on the calling resolver when no resolver carries it", async () => {
 		const { root, leaf } = buildChain();
 		leaf.updateData("fresh", "new");
 		expect(leaf.getData("fresh")).toBe("new");
 		expect(root.getData("fresh")).toBeUndefined();
 	});
 
-	it("updateData with a filter writes to the addressed link outright", async () => {
+	it("updateData with a filter writes to the addressed resolver outright", async () => {
 		const { root, leaf } = buildChain();
 		leaf.updateData("value", "changed", "root");
 		expect(root.getData("value")).toBe("changed");
@@ -91,7 +91,7 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(root.getData("value")).toBe("changed");
 	});
 
-	it("updateData throws on a filter that matches no link", async () => {
+	it("updateData throws on a filter that matches no resolver", async () => {
 		const { leaf } = buildChain();
 		let error = null;
 		try {
@@ -102,19 +102,19 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(error != null).toBe(true);
 	});
 
-	it("deleteData with a filter removes the key from the addressed link", async () => {
+	it("deleteData with a filter removes the key from the addressed resolver", async () => {
 		const { root, leaf } = buildChain();
 		leaf.deleteData("rootOnly", "root");
 		expect(root.getData("rootOnly")).toBeUndefined();
 	});
 
-	it("deleteData without a filter removes the key from the first link carrying it", async () => {
+	it("deleteData without a filter removes the key from the first resolver carrying it", async () => {
 		const { root, leaf } = buildChain();
 		leaf.deleteData("value");
 		expect(root.getData("value")).toBeUndefined();
 	});
 
-	it("deleteData uncovers the value of the next link carrying the same key", async () => {
+	it("deleteData uncovers the value of the next resolver carrying the same key", async () => {
 		const root = new ExpressionResolver({ context: { value: "from root" }, name: "root" });
 		const leaf = new ExpressionResolver({ context: { value: "from leaf" }, name: "leaf", parent: root });
 		leaf.deleteData("value");
@@ -127,7 +127,7 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(root.getData("rootOnly")).toBeUndefined();
 	});
 
-	it("deleteData throws on a filter that matches no link", async () => {
+	it("deleteData throws on a filter that matches no resolver", async () => {
 		const { leaf } = buildChain();
 		let error = null;
 		try {
@@ -138,7 +138,7 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(error != null).toBe(true);
 	});
 
-	it("mergeContext assigns the keys of the passed object into the addressed link", async () => {
+	it("mergeContext assigns the keys of the passed object into the addressed resolver", async () => {
 		const { leaf } = buildChain();
 		leaf.mergeContext({ added: "a", leafOnly: "replaced" });
 		expect(leaf.getData("added")).toBe("a");
@@ -152,13 +152,13 @@ describe("ExpressionResolver - reading and writing from outside", () => {
 		expect(leaf.getData("value")).toBe("from leaf");
 	});
 
-	it("mergeContext with a filter merges into the addressed link", async () => {
+	it("mergeContext with a filter merges into the addressed resolver", async () => {
 		const { root, leaf } = buildChain();
 		leaf.mergeContext({ added: "a" }, "root");
 		expect(root.getData("added")).toBe("a");
 	});
 
-	it("mergeContext throws on a filter that matches no link", async () => {
+	it("mergeContext throws on a filter that matches no resolver", async () => {
 		const { leaf } = buildChain();
 		let error = null;
 		try {

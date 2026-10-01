@@ -9,7 +9,7 @@ import { buildChain, bindExecuter, DEPTHS } from "./ChainBuilder.js";
  * function by construction, which is the same thing.
  *
  * Read together with ColdResolve: the difference between the two is what the cache buys, and
- * it shows only at shallow depths - from a few thousand links on, the walk dominates.
+ * it shows only at shallow depths - from a few thousand resolvers on, the walk dominates.
  *
  * Every executer runs the same chain since 2026-08-30. What the walk costs is the resolver's,
  * but how often it is walked is the executer's: one of the four reads the names of the context

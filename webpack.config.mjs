@@ -5,49 +5,63 @@ const require = createRequire(import.meta.url);
 const project = require("./package.json");
 const entries = require("./entries.config.json");
 
+/**
+ * One configuration per entry of entries.config.json. The module bundle is an ES module and the
+ * browser bundle a classic script, and output.module - which an ES module library needs - holds for
+ * every bundle of a compiler, so the two cannot share one. See DECISIONS.md.
+ */
 export default (env, argv) => {
 	const devMode = argv.mode != "production";
 
-	return {
-		entry: entries,
+	const build = (aName) => ({
+		name: aName,
+		entry: { [aName]: entries[aName] },
 		// no browserslist in this project, so plain "web" makes webpack emit ES5-capable
 		// runtime helpers for sources that ship untranspiled anyway
 		target: ["web", "es2022"],
 		mode: devMode ? "development" : "production",
-		// caches module compilation under node_modules/.cache/webpack between runs
-		cache: { type: "filesystem" },
+		// caches module compilation under node_modules/.cache/webpack between runs, one cache
+		// per configuration and mode
+		cache: { type: "filesystem", name: `${aName}-${devMode ? "development" : "production"}` },
 		optimization: {
 			minimize: !devMode,
-			// LOAD-BEARING, do not "clean up". The module entry has no output.library, so with
-			// tree shaking on webpack sees its exports as unused and prunes the whole library
-			// out of dist/module-...min.js - measured: 13809 -> 3685 bytes, resolveText and
-			// DefaultValue gone. See DECISIONS.md.
-			usedExports: false,
 		},
 		devtool: devMode ? "inline-source-map" : "source-map",
 		output: {
 			filename: devMode ? `[name]-${project.buildname}.js` : `[name]-${project.buildname}.min.js`,
 			path: path.resolve(import.meta.dirname, "dist"),
-			// Both modes emit into the same directory, dev first, prod second. Cleaning
-			// unconditionally would let the prod run delete the dev bundles, which are
-			// published through the files array. Each mode therefore only removes its own
-			// stale artifacts and keeps the ones belonging to the other.
-			clean: { keep: (asset) => (devMode ? asset.includes(".min.") : !asset.includes(".min.")) },
+			// Two configurations in two modes emit into the same directory, and the files array
+			// publishes all of it. Each run therefore only removes its own stale artifacts - the
+			// files of its mode not belonging to the other entry - and keeps everything else.
+			clean: {
+				keep: (asset) => (devMode ? asset.includes(".min.") : !asset.includes(".min.")) || Object.keys(entries).some((name) => name != aName && asset.startsWith(`${name}-`)),
+			},
 		},
-		devServer: {
-			open: true,
-			allowedHosts: "all",
-			client: {
-				overlay: true,
-				progress: true,
-				reconnect: true,
-			},
-			devMiddleware: {
-				index: true,
-				writeToDisk: false,
-			},
-			static: ["./WebContent"],
-			watchFiles: { paths: ["src/**/*", "./WebContent"] }
+	});
+
+	return [
+		{
+			...build("browser"),
+			devServer: {
+				open: true,
+				allowedHosts: "all",
+				client: {
+					overlay: true,
+					progress: true,
+					reconnect: true,
+				},
+				devMiddleware: {
+					index: true,
+					writeToDisk: false,
+				},
+				static: ["./WebContent"],
+				watchFiles: { paths: ["src/**/*", "./WebContent"] }
+			}
+		},
+		{
+			...build("module"),
+			experiments: { outputModule: true },
+			output: { ...build("module").output, module: true, library: { type: "module" } },
 		}
-	};
+	];
 };
