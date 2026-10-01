@@ -29,12 +29,12 @@ export const isNameCharacter = (aCode) => {
 };
 
 /**
- * Trims a string, and answers null for one that is empty.
+ * Trims a string, and answers null for one that is empty after trimming, and for none.
  *
  * @param {?string} value
  * @returns {?string}
  */
-export const normalize = (value) => {
+export const trimToNull = (value) => {
 	if (value) {
 		value = value.trim();
 		return value.length == 0 ? null : value;
@@ -42,6 +42,12 @@ export const normalize = (value) => {
 	return null;
 };
 
+/**
+ * A 32 bit hash of a string, in the manner of Java's `String.hashCode`.
+ *
+ * @param {string} aString
+ * @returns {number}
+ */
 export const stringToHashcode = (aString) => {
 	let hash = 0;
 	if (aString.length == 0) return hash;

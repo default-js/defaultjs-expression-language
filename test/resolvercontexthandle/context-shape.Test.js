@@ -13,7 +13,7 @@ describe("ResolverContextHandle - every access goes through the proxy", () => {
 
 	it("answers a proxy rather than the object it was handed", () => {
 		const handed = { value: "handed in" };
-		expect(new ResolverContextHandle(handed).proxy === handed).toBe(false);
+		expect(new ResolverContextHandle(handed).context === handed).toBe(false);
 	});
 
 	// The proxy answers the names of the whole chain, which is more than the object it was built
@@ -23,7 +23,7 @@ describe("ResolverContextHandle - every access goes through the proxy", () => {
 	it("enumerates the chain over a context the caller froze", () => {
 		const root = new ResolverContextHandle({ rootOnly: "from root" });
 		const leaf = new ResolverContextHandle(Object.freeze({ leafOnly: "from leaf" }), root);
-		const names = Object.keys(leaf.proxy);
+		const names = Object.keys(leaf.context);
 		expect(names.includes("leafOnly")).toBe(true);
 		expect(names.includes("rootOnly")).toBe(true);
 	});
@@ -31,18 +31,18 @@ describe("ResolverContextHandle - every access goes through the proxy", () => {
 	// A context carries every key JavaScript says it carries, whether or not it could stand for a
 	// variable - DECISIONS.md, 2026-09-22.
 	it("enumerates a key that is not a variable name", () => {
-		expect(Object.keys(new ResolverContextHandle({ "test-test": "dashed" }).proxy).includes("test-test")).toBe(true);
+		expect(Object.keys(new ResolverContextHandle({ "test-test": "dashed" }).context).includes("test-test")).toBe(true);
 	});
 
 	it("answers a symbol key the context carries", () => {
 		const marker = Symbol("marker");
-		expect(new ResolverContextHandle({ [marker]: "from symbol" }).proxy[marker]).toBe("from symbol");
+		expect(new ResolverContextHandle({ [marker]: "from symbol" }).context[marker]).toBe("from symbol");
 	});
 
 	// A context carries what `in` says it carries, inherited members included (5.2) - an object
 	// handed over as a context answers the members of Object.prototype itself.
 	it("answers a member of Object.prototype for a plain object as context", () => {
-		expect(new ResolverContextHandle({}).proxy.valueOf === Object.prototype.valueOf).toBe(true);
+		expect(new ResolverContextHandle({}).context.valueOf === Object.prototype.valueOf).toBe(true);
 	});
 
 });

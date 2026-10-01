@@ -45,6 +45,12 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   it runs, which shapes of context it runs over, what an assignment inside a statement leaves behind
   and which globals it reaches; and how to pick one for a chain and tune its code cache.
 
+- **Every public member carries JSDoc** that says what it takes, answers and throws, with the
+  section of `SPECIFICATION.md` it follows. One statement was wrong before: the constructor said a
+  resolver without the `executer` option takes `ExpressionResolver.defaultExecuter`, while it takes
+  the executer of its parent and only a resolver without a parent takes the default. The code
+  always did the latter.
+
 ### Changed
 
 - **The package is an ES module package with an `exports` field, and a deep import outside it
@@ -130,7 +136,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   to a name no resolver of the chain carries creates a global; only `context-object-executer`
   contains it. An
   explicit `globalThis.x = 1` reaches the global object under every one of them. **This package does
-  not sandbox the global object**, and `buildSecure` (6.7) never claimed to. The `allowGlobalWrite`
+  not sandbox the global object**, and `buildFiltered` (6.7) never claimed to. The `allowGlobalWrite`
   switch that was to make the containment configurable is **not part of the specification**: its
   *off* state could only ever mean *under the executers able to intercept an assignment*, so whether
   it is worth having is undecided, and the document does not describe undecided features. With it go
@@ -289,6 +295,20 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   fraction is rounded down. See
   `SPECIFICATION.md` 9.3.
 
+- **`ExecuterRegistry.registrate` is now `register`, and the old name is gone.** An own executer is
+  registered with `ExecuterRegistry.register(aName, anExecuter)`; a call to `registrate` fails, since
+  the registry no longer exports it. The error for a name that was never registered now reads
+  `is not registered`. See `SPECIFICATION.md` 9.1.
+
+- **`ExpressionResolver.buildSecure` is now `buildFiltered`.** It takes the same arguments and
+  builds the same resolver; the new name says what it does, filter the context, where the old one
+  promised a security the method does not give. See `SPECIFICATION.md` 6.7.
+
+### Deprecated
+
+- **`ExpressionResolver.buildSecure`**, the former name of `buildFiltered`. It still works and
+  writes no warning, and it is removed in 4.0.
+
 ### Removed
 
 - **No warning for a statement that runs longer than a second.** Every statement used to start a
@@ -437,15 +457,15 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   answers `undefined`, and a default value passed to `resolve` or `resolveText` applies to it as
   it does to every other result. See `SPECIFICATION.md` 5.4.
 
-- **`ExpressionResolver.buildSecure` threw a `TypeError` on every call.** It passed
+- **`ExpressionResolver.buildSecure`, now `buildFiltered`, threw a `TypeError` on every call.** It passed
   `ObjectUtils.filter` a single object where that helper takes three positional arguments, so
   the wrapper object arrived as the data to be filtered and `propFilter` arrived as
   `undefined` — every call died inside the filter before a resolver was built, whatever was
   handed in. The method therefore had no working consumer. The three arguments are now passed
   in the places `filter` expects, which also makes the documented default `deep: true` take
   effect. The constructor options travel inside `option` together with `deep` —
-  `buildSecure({ context, propFilter, option : { deep, name, parent, executer } })` — and
-  `executer` is among them, which was missing by oversight, so a secure resolver could not be
+  `buildFiltered({ context, propFilter, option : { deep, name, parent, executer } })` — and
+  `executer` is among them, which was missing by oversight, so a filtered resolver could not be
   pinned to an execution strategy. See `SPECIFICATION.md` 6.7.
 
 - **The expression cache evicted the entries it should have kept.** `CodeCache` refreshed a

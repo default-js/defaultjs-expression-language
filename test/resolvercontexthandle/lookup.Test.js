@@ -15,25 +15,25 @@ describe("ResolverContextHandle - lookup without a prefix", () => {
 	it("answers from the nearest handle and shadows the ones above", () => {
 		const root = new ResolverContextHandle({ value: "from root" });
 		const leaf = new ResolverContextHandle({ value: "from leaf" }, root);
-		expect(leaf.proxy.value).toBe("from leaf");
+		expect(leaf.context.value).toBe("from leaf");
 	});
 
 	it("reaches a value carried by an ancestor", () => {
 		const root = new ResolverContextHandle({ rootOnly: "from root" });
 		const leaf = new ResolverContextHandle({ leafOnly: "from leaf" }, root);
-		expect(leaf.proxy.rootOnly).toBe("from root");
+		expect(leaf.context.rootOnly).toBe("from root");
 	});
 
 	it("never sees the context of a handle below", () => {
 		const root = new ResolverContextHandle({ rootOnly: "from root" });
 		new ResolverContextHandle({ leafOnly: "from leaf" }, root);
-		expect(root.proxy.leafOnly).toBeUndefined();
+		expect(root.context.leafOnly).toBeUndefined();
 	});
 
 	it("stops the walk at a key that holds undefined", () => {
 		const root = new ResolverContextHandle({ value: "from root" });
 		const leaf = new ResolverContextHandle({ value: undefined }, root);
-		expect(leaf.proxy.value).toBeUndefined();
+		expect(leaf.context.value).toBeUndefined();
 	});
 
 	// A method is found by the same walk; the getter is the case that also shows it is called.
@@ -43,7 +43,7 @@ describe("ResolverContextHandle - lookup without a prefix", () => {
 				return "from getter";
 			}
 		}
-		expect(new ResolverContextHandle(new Data()).proxy.value).toBe("from getter");
+		expect(new ResolverContextHandle(new Data()).context.value).toBe("from getter");
 	});
 });
 
@@ -54,28 +54,28 @@ describe("ResolverContextHandle - which names the proxy says it carries", () => 
 	it("says it carries a name only an ancestor carries", () => {
 		const root = new ResolverContextHandle({ rootOnly: "from root" });
 		const leaf = new ResolverContextHandle({ leafOnly: "from leaf" }, root);
-		expect("rootOnly" in leaf.proxy).toBe(true);
+		expect("rootOnly" in leaf.context).toBe(true);
 	});
 
 	it("says it does not carry a name no handle of the chain carries", () => {
 		const root = new ResolverContextHandle({ rootOnly: "from root" });
 		const leaf = new ResolverContextHandle({ leafOnly: "from leaf" }, root);
-		expect("nowhere" in leaf.proxy).toBe(false);
+		expect("nowhere" in leaf.context).toBe(false);
 	});
 
 	it("says it carries a key that holds undefined", () => {
-		expect("value" in new ResolverContextHandle({ value: undefined }).proxy).toBe(true);
+		expect("value" in new ResolverContextHandle({ value: undefined }).context).toBe(true);
 	});
 
 	it("lists the names of every handle up to the root, each once", () => {
 		const root = new ResolverContextHandle({ rootOnly: 1, value: 1 });
 		const leaf = new ResolverContextHandle({ leafOnly: 1, value: 2 }, root);
-		expect(Object.keys(leaf.proxy).sort().join()).toBe("leafOnly,rootOnly,value");
+		expect(Object.keys(leaf.context).sort().join()).toBe("leafOnly,rootOnly,value");
 	});
 
 	it("lists no name of a handle below", () => {
 		const root = new ResolverContextHandle({ rootOnly: 1 });
 		new ResolverContextHandle({ leafOnly: 1 }, root);
-		expect(Object.keys(root.proxy).sort().join()).toBe("rootOnly");
+		expect(Object.keys(root.context).sort().join()).toBe("rootOnly");
 	});
 });

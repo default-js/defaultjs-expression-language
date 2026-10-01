@@ -6,7 +6,7 @@
  * Internal to the package: index.js does not export it.
  */
 
-import { WHITESPACE, isNameCharacter, normalize } from "./Utils.js";
+import { WHITESPACE, isNameCharacter, trimToNull } from "./Utils.js";
 
 const EXPRESSION_START = "${";
 
@@ -56,7 +56,7 @@ const SCOPE_SEPARATOR = "::";
  * the order they stand; null where the expression has none
  * @returns {boolean}
  */
-const startsRegex = (aText, aIndex, theComments) => {
+const slashOpensRegex = (aText, aIndex, theComments) => {
 	let index = aIndex - 1;
 	let comment = theComments ? theComments.length - 1 : -1;
 	while (index >= 0) {
@@ -71,7 +71,13 @@ const startsRegex = (aText, aIndex, theComments) => {
 	return index < 0 || !BEFORE_DIVISION.test(aText[index]);
 };
 
-const endsLine = (aCode) => aCode === LINE_FEED || aCode === CARRIAGE_RETURN || aCode === LINE_SEPARATOR || aCode === PARAGRAPH_SEPARATOR;
+/**
+ * Whether a char code ends a line comment - a line terminator in the sense of ECMAScript.
+ *
+ * @param {number} aCode
+ * @returns {boolean}
+ */
+const isLineTerminator = (aCode) => aCode === LINE_FEED || aCode === CARRIAGE_RETURN || aCode === LINE_SEPARATOR || aCode === PARAGRAPH_SEPARATOR;
 
 /*
  * Two splits take the text between the delimiters apart into the scope prefix of 3.3 and the
@@ -85,19 +91,29 @@ const endsLine = (aCode) => aCode === LINE_FEED || aCode === CARRIAGE_RETURN || 
 /**
  * The split of a text: reads forwards only as far as the first character a name cannot carry, which
  * for most statements is a few characters.
+ *
+ * @param {string} aContent the text between the delimiters
+ * @returns {{ scope: ?string, statement: ?string }} both trimmed, null where empty
  */
-const splitScopeAndStatement = (aContent) => {
+const splitScopeAndStatementForward = (aContent) => {
 	const length = aContent.length;
 	let index = 0;
 	while (index < length && isNameCharacter(aContent.charCodeAt(index))) index++;
 
 	if (index === 0 || aContent.charCodeAt(index) !== COLON || aContent.charCodeAt(index + 1) !== COLON)
-		return { scope: null, statement: normalize(aContent) };
+		return { scope: null, statement: trimToNull(aContent) };
 
-	return { scope: normalize(aContent.substring(0, index)), statement: normalize(aContent.substring(index + 2)) };
+	return { scope: trimToNull(aContent.substring(0, index)), statement: trimToNull(aContent.substring(index + 2)) };
 };
 
-const countBackslashes = (aText, aIndex) => {
+/**
+ * The number of backslashes standing directly in front of the index.
+ *
+ * @param {string} aText
+ * @param {number} aIndex
+ * @returns {number}
+ */
+const countBackslashesBefore = (aText, aIndex) => {
 	let count = 0;
 	while (aIndex - count > 0 && aText.charCodeAt(aIndex - count - 1) === BACKSLASH) count++;
 
@@ -132,7 +148,7 @@ const readExpression = (aText, aStart) => {
 				else if (char === CLOSE_BRACE) {
 					stack.pop();
 					if (stack.length === 0) {
-						const { scope, statement } = splitScopeAndStatement(aText.substring(aStart + 2, index));
+						const { scope, statement } = splitScopeAndStatementForward(aText.substring(aStart + 2, index));
 						return { start: aStart, end: index + 1, escaped: false, scope: scope, statement: statement };
 					}
 				} else if (char === SINGLE_QUOTE) stack.push(SINGLE_QUOTED);
@@ -145,7 +161,7 @@ const readExpression = (aText, aStart) => {
 						stack.push(next === STAR ? BLOCK_COMMENT : LINE_COMMENT);
 						commentStart = index;
 						index++;
-					} else if (startsRegex(aText, index, comments)) stack.push(REGEX);
+					} else if (slashOpensRegex(aText, index, comments)) stack.push(REGEX);
 				}
 				break;
 			case BLOCK_COMMENT:
@@ -156,7 +172,7 @@ const readExpression = (aText, aStart) => {
 				}
 				break;
 			case LINE_COMMENT:
-				if (endsLine(char)) {
+				if (isLineTerminator(char)) {
 					stack.pop();
 					(comments ??= []).push(commentStart, index - 1);
 				}
@@ -210,7 +226,7 @@ export const scan = (aText) => {
 		// 3.2: an odd run of backslashes escapes the delimiter itself. It opens nothing, so only
 		// those two characters are taken out of the text and the scan carries on behind them -
 		// what would have been the statement is ordinary text and may hold expressions of its own.
-		if (countBackslashes(aText, start) % 2 === 1) {
+		if (countBackslashesBefore(aText, start) % 2 === 1) {
 			if (!occurrences) occurrences = [];
 			occurrences.push({ start: start, end: start + 2, escaped: true, scope: null, statement: null });
 			start = aText.indexOf(EXPRESSION_START, start + 2);
@@ -256,7 +272,7 @@ export const parseExpression = (aExpression) => {
 	}
 
 	// anything else is a statement in full, and carries no scope prefix
-	return { scope: null, statement: normalize(aExpression) };
+	return { scope: null, statement: trimToNull(aExpression) };
 };
 
 /**
@@ -264,13 +280,16 @@ export const parseExpression = (aExpression) => {
  * native search. Where one stands, everything before the first of them has to be a name, checked
  * backwards from it: a "::" inside a statement - a quoted one - usually has a character no name
  * carries right in front of it.
+ *
+ * @param {string} aContent the text between the delimiters
+ * @returns {{ scope: ?string, statement: ?string }} both trimmed, null where empty
  */
 const splitScopeAndStatementBySeparator = (aContent) => {
 	const end = aContent.indexOf(SCOPE_SEPARATOR);
-	if (end < 1) return { scope: null, statement: normalize(aContent) };
+	if (end < 1) return { scope: null, statement: trimToNull(aContent) };
 
 	for (let index = end - 1; index >= 0; index--)
-		if (!isNameCharacter(aContent.charCodeAt(index))) return { scope: null, statement: normalize(aContent) };
+		if (!isNameCharacter(aContent.charCodeAt(index))) return { scope: null, statement: trimToNull(aContent) };
 
-	return { scope: normalize(aContent.substring(0, end)), statement: normalize(aContent.substring(end + 2)) };
+	return { scope: trimToNull(aContent.substring(0, end)), statement: trimToNull(aContent.substring(end + 2)) };
 };

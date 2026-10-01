@@ -15,7 +15,7 @@ describe("ResolverContextHandle - names are a snapshot, values are live", () => 
 		const handed = { known: 1 };
 		const handle = new ResolverContextHandle(handed);
 		handed.added = 2;
-		expect("added" in handle.proxy).toBe(false);
+		expect("added" in handle.context).toBe(false);
 	});
 
 	it("sees that key after resetCache", () => {
@@ -23,18 +23,18 @@ describe("ResolverContextHandle - names are a snapshot, values are live", () => 
 		const handle = new ResolverContextHandle(handed);
 		handed.added = 2;
 		handle.resetCache();
-		expect(handle.proxy.added).toBe(2);
+		expect(handle.context.added).toBe(2);
 	});
 
 	it("reads a value at the moment of the lookup, so a mutation is visible immediately", () => {
 		const handed = { holder: { name: "before" } };
 		const handle = new ResolverContextHandle(handed);
 		handed.holder.name = "after";
-		expect(handle.proxy.holder.name).toBe("after");
+		expect(handle.context.holder.name).toBe("after");
 	});
 
 	it("keeps the set of names in step when a value is written through the proxy", () => {
-		const proxy = new ResolverContextHandle({ known: 1 }).proxy;
+		const proxy = new ResolverContextHandle({ known: 1 }).context;
 		proxy.fresh = "written";
 		expect("fresh" in proxy).toBe(true);
 	});

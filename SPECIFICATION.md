@@ -436,7 +436,7 @@ resolver carries stays off the global object.
 
 **Reaching the global object is not sandboxed.** A statement that names `globalThis` gets it, and an
 unqualified assignment to a name no resolver carries creates a global under an executer that cannot
-intercept it. `buildSecure` (6.7) filters the context, not the globals.
+intercept it. `buildFiltered` (6.7) filters the context, not the globals.
 
 ### 6.6 Reading and writing from outside
 
@@ -509,11 +509,11 @@ from outside: `updateData` changes a value **where it lives**, `mergeContext` de
 **here**. Defining a single key on one resolver is `mergeContext({ key: value })` with a one-key
 object; there is no separate method for it and none is planned.
 
-### 6.7 `buildSecure`
+### 6.7 `buildFiltered`
 
 ```javascript
-ExpressionResolver.buildSecure({ context, propFilter,
-                                 option : { deep, name, parent, executer } })
+ExpressionResolver.buildFiltered({ context, propFilter,
+                                   option : { deep, name, parent, executer } })
 ```
 
 Builds a resolver over a **filtered copy** of the context, so that properties a consumer does
@@ -522,11 +522,14 @@ and this resolver run inside CMS systems where users author expressions.
 
 It filters the **context, not the globals**. `fetch`, `console` and `document` stay reachable from an
 expression through the mechanism of 6.4, as far as the executer in use reaches them (9.2).
-`buildSecure` is a way to hand over a cleaned context; it is not a sandbox and must not be
+`buildFiltered` is a way to hand over a cleaned context; it is not a sandbox and must not be
 documented as one.
 
 `option` carries the filter's own `deep` together with the **full constructor option set**, which
-`buildSecure` hands on unchanged.
+`buildFiltered` hands on unchanged.
+
+`buildSecure` is its former name, kept until 4.0 and deprecated: it takes the same arguments and
+answers the same resolver.
 
 ## 7. Errors
 
@@ -560,12 +563,13 @@ is text and no error arises at all (3.1).
 Everything listed here is public and may be used, the purely informative parts included: they
 exist so a consumer can build their own debug output.
 
-**`ExpressionResolver`** — static `resolve`, `resolveText`, `buildSecure`, `defaultExecuter`;
+**`ExpressionResolver`** — static `resolve`, `resolveText`, `buildFiltered`, `defaultExecuter`, and
+`buildSecure`, deprecated (6.7);
 constructor `{ context, parent, name, executer }`;
 instance `resolve`, `resolveText`, `getData`, `updateData`, `deleteData`, `mergeContext`; getters `name`, `parent`, `context`, `contextHandle`,
 `executer`, `chain`, `effectiveChain`, `contextChain`.
 
-**`ExecuterRegistry`** — `registrate`, `getExecuter`.
+**`ExecuterRegistry`** — `register`, `getExecuter`.
 
 **`Executer`** — the interface an own implementation builds on.
 
@@ -602,7 +606,7 @@ An executer runs statements and holds no context of its own: the context always 
 resolver, and a context shared by many resolvers is the context of a resolver at the root of their
 chain (5.1).
 
-`ExecuterRegistry` keeps implementations under a name: `registrate(aName, anExecuter)` and
+`ExecuterRegistry` keeps implementations under a name: `register(aName, anExecuter)` and
 `getExecuter(aName)`, the latter also the module's default export. Importing an executer module
 registers it.
 

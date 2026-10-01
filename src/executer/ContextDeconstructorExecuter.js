@@ -1,9 +1,10 @@
-import { registrate } from "../ExecuterRegistry.js";
+import { register } from "../ExecuterRegistry.js";
 import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 
 let DEBUG = false;
+/** The name this executer is registered under, and the default executer - SPECIFICATION.md 9.2. */
 export const EXECUTERNAME = "context-deconstruction-executer";
 const EXPRESSION_CACHE = new CodeCache();
 
@@ -38,6 +39,7 @@ const unusableNames = (theNames) =>
 		.map(String);
 
 /**
+ * Switches the logging of every function this executer generates to the console.
  *
  * @param {boolean} value
  */
@@ -46,7 +48,11 @@ export const setDebug = (value) => {
 };
 
 /**
+ * Configures the code cache of this executer - SPECIFICATION.md 9.3. `size` is the only option
+ * today; an option left out changes nothing.
+ *
  * @param {import('../CodeCache.js').CodeCacheOptions} options
+ * @throws {TypeError} where the size is not a finite number
  */
 export const setupExecuter = (options) => {
 	EXPRESSION_CACHE.setup(options);
@@ -77,7 +83,7 @@ const getOrCreateFunction = (aStatement, contextProperties) => {
  *
  * **Nothing is carried back.** A statement that assigns to a context name writes into a local
  * binding, and that binding is gone when the function returns - so a write is not readable
- * afterwards (`context-write`, SPECIFICATION.md 9.7). That is a decision rather than a gap: the
+ * afterwards (SPECIFICATION.md 6.5 leaves that to the executer). That is a decision rather than a gap: the
  * write-back this executer carried between 2026-09-07 and 2026-09-20 cost a factor of eleven on a
  * cache miss, because it needs every context name declared in the body instead of listed in the
  * parameter list. Speed is what this executer is for, and a consumer who needs a write to persist
@@ -140,6 +146,13 @@ return (async ({${thePropertyNameString}}) => {
 	}
 };
 
+/**
+ * The executer: destructures the context into the parameters of a generated function, so a
+ * statement addresses a context value by its bare name - SPECIFICATION.md 9.2, `README.md`.
+ * Registered under `EXECUTERNAME` on import.
+ *
+ * @type {Executer}
+ */
 const EXECUTER = new Executer({
 	execution: (aStatement, aContext) => {
 		const propertyNames = getPropertyNames(aContext);
@@ -148,6 +161,6 @@ const EXECUTER = new Executer({
 	},
 });
 
-registrate(EXECUTERNAME, EXECUTER);
+register(EXECUTERNAME, EXECUTER);
 
 export default EXECUTER;

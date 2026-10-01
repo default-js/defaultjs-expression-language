@@ -78,11 +78,25 @@ export default class CodeCache {
 		}
 	}
 
+	/**
+	 * Whether an entry is held under the key. A disabled cache holds none. Asking does not count as a
+	 * hit, so it leaves the eviction order alone.
+	 *
+	 * @param {string} key
+	 * @returns {boolean}
+	 */
 	has(key) {
 		if(this.#disabled) return false;
 		return this.#entryMap.has(key);
 	}
 
+	/**
+	 * The code held under the key, or null where none is held or the cache is disabled. A hit
+	 * refreshes the entry, so it is evicted last.
+	 *
+	 * @param {string} key
+	 * @returns {?Function}
+	 */
 	get(key) {
 		if(this.#disabled) return null;
 		const entry = this.#entryMap.get(key);
@@ -93,6 +107,15 @@ export default class CodeCache {
 		return null;
 	}
 
+	/**
+	 * Holds the code under the key, replacing what was held there, and refreshes the entry. Once the
+	 * cache reaches a tenth past its size, the least recently used entries are evicted down to the
+	 * size.
+	 * A disabled cache keeps nothing.
+	 *
+	 * @param {string} key
+	 * @param {Function} code
+	 */
 	set(key, code) {
 		if(this.#disabled) return;
 		let entry = this.#entryMap.get(key);
@@ -112,6 +135,9 @@ export default class CodeCache {
 		if (this.#entryMap.size >= this.#maxSize) this.#trim();
 	}
 
+	/**
+	 * Drops every entry. The size stays as it is.
+	 */
 	clear() {
 		this.#entries = [];
 		this.#entryMap = new Map();

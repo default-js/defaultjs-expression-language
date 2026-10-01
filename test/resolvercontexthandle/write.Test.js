@@ -16,13 +16,13 @@ describe("ResolverContextHandle - writing into the object the caller handed over
 	// way of writing, because a caller who shares a context has to be able to rely on all of them.
 	it("a write through the proxy lands in the object the caller handed over", () => {
 		const handed = { value: "before" };
-		new ResolverContextHandle(handed).proxy.value = "after";
+		new ResolverContextHandle(handed).context.value = "after";
 		expect(handed.value).toBe("after");
 	});
 
 	it("a delete through the proxy removes the key from the object the caller handed over", () => {
 		const handed = { value: "before" };
-		delete new ResolverContextHandle(handed).proxy.value;
+		delete new ResolverContextHandle(handed).context.value;
 		expect("value" in handed).toBe(false);
 	});
 
@@ -35,8 +35,8 @@ describe("ResolverContextHandle - writing into the object the caller handed over
 	it("mergeData is shallow - a merged object replaces rather than merges", () => {
 		const handle = new ResolverContextHandle({ holder: { keep: 1 } });
 		handle.mergeData({ holder: { fresh: 2 } });
-		expect(handle.proxy.holder.keep).toBeUndefined();
-		expect(handle.proxy.holder.fresh).toBe(2);
+		expect(handle.context.holder.keep).toBeUndefined();
+		expect(handle.context.holder.fresh).toBe(2);
 	});
 });
 
@@ -50,23 +50,23 @@ describe("ResolverContextHandle - writing into a frozen object", () => {
 	it("a write through the proxy is refused by a frozen object", async () => {
 		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
 		await catchError(() => {
-			handle.proxy.value = "after";
+			handle.context.value = "after";
 		});
-		expect(handle.proxy.value).toBe("before");
+		expect(handle.context.value).toBe("before");
 	});
 
 	it("a delete through the proxy is refused by a frozen object", async () => {
 		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
 		await catchError(() => {
-			delete handle.proxy.value;
+			delete handle.context.value;
 		});
-		expect(handle.proxy.value).toBe("before");
+		expect(handle.context.value).toBe("before");
 	});
 
 	it("mergeData is refused by a frozen object", async () => {
 		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
 		await catchError(() => handle.mergeData({ value: "after" }));
-		expect(handle.proxy.value).toBe("before");
+		expect(handle.context.value).toBe("before");
 	});
 });
 
@@ -78,7 +78,7 @@ describe("ResolverContextHandle - a refused change raises what the object raises
 	it("a write through the proxy raises over a frozen object", async () => {
 		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
 		const error = await catchError(() => {
-			handle.proxy.value = "after";
+			handle.context.value = "after";
 		});
 		expect(error instanceof TypeError).toBe(true);
 	});
@@ -86,7 +86,7 @@ describe("ResolverContextHandle - a refused change raises what the object raises
 	it("a delete through the proxy raises over a frozen object", async () => {
 		const handle = new ResolverContextHandle(Object.freeze({ value: "before" }));
 		const error = await catchError(() => {
-			delete handle.proxy.value;
+			delete handle.context.value;
 		});
 		expect(error instanceof TypeError).toBe(true);
 	});
@@ -100,7 +100,7 @@ describe("ResolverContextHandle - a refused change raises what the object raises
 	it("a write of a new key through the proxy raises over a sealed object", async () => {
 		const handle = new ResolverContextHandle(Object.seal({ value: "before" }));
 		const error = await catchError(() => {
-			handle.proxy.fresh = "new";
+			handle.context.fresh = "new";
 		});
 		expect(error instanceof TypeError).toBe(true);
 	});
@@ -108,7 +108,7 @@ describe("ResolverContextHandle - a refused change raises what the object raises
 	it("a delete through the proxy raises over a sealed object", async () => {
 		const handle = new ResolverContextHandle(Object.seal({ value: "before" }));
 		const error = await catchError(() => {
-			delete handle.proxy.value;
+			delete handle.context.value;
 		});
 		expect(error instanceof TypeError).toBe(true);
 	});

@@ -15,14 +15,14 @@ describe("ResolverContextHandle - a handle without a context", () => {
 	it("passes a name of Object.prototype through to the handle above", () => {
 		const root = new ResolverContextHandle({ valueOf: "from root" });
 		const leaf = new ResolverContextHandle(undefined, root);
-		expect(leaf.proxy.valueOf).toBe("from root");
+		expect(leaf.context.valueOf).toBe("from root");
 	});
 
 	it("contributes nothing to a lookup and is passed through", () => {
 		const root = new ResolverContextHandle({ value: "from root" });
 		const middle = new ResolverContextHandle(null, root);
 		const leaf = new ResolverContextHandle({ leafOnly: 1 }, middle);
-		expect(leaf.proxy.value).toBe("from root");
+		expect(leaf.context.value).toBe("from root");
 	});
 
 	it("gains content like any other handle", () => {
@@ -30,6 +30,6 @@ describe("ResolverContextHandle - a handle without a context", () => {
 		const middle = new ResolverContextHandle(null, root);
 		const leaf = new ResolverContextHandle({ leafOnly: 1 }, middle);
 		middle.mergeData({ value: "from middle" });
-		expect(leaf.proxy.value).toBe("from middle");
+		expect(leaf.context.value).toBe("from middle");
 	});
 });

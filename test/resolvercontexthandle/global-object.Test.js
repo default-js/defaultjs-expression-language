@@ -14,7 +14,7 @@ describe("ResolverContextHandle - the global object as a context", () => {
 	it("answers a global name from a handle below a global one", () => {
 		const root = new ResolverContextHandle(globalThis);
 		const leaf = new ResolverContextHandle({ own: "from leaf" }, root);
-		expect(leaf.proxy.Math === Math).toBe(true);
+		expect(leaf.context.Math === Math).toBe(true);
 	});
 
 	// Everything the global object holds is reachable through the ordinary scope chain of a statement
@@ -23,13 +23,13 @@ describe("ResolverContextHandle - the global object as a context", () => {
 	it("contributes no name to the enumeration of a handle below it", () => {
 		const root = new ResolverContextHandle(globalThis);
 		const leaf = new ResolverContextHandle({ own: "from leaf" }, root);
-		expect(Object.keys(leaf.proxy).join()).toBe("own");
+		expect(Object.keys(leaf.context).join()).toBe("own");
 	});
 
-	// Not wrapped: what a resolver answers for `getData()` is this proxy, so it answers the global
+	// Not wrapped: what a resolver answers for `getData()` is this context, so it answers the global
 	// object itself. Reading a global name from it and writing through it are ordinary global
 	// accesses, which follow from the identity and need no case of their own.
-	it("answers the global object itself as its proxy", () => {
-		expect(new ResolverContextHandle(globalThis).proxy === globalThis).toBe(true);
+	it("answers the global object itself as its context", () => {
+		expect(new ResolverContextHandle(globalThis).context === globalThis).toBe(true);
 	});
 });

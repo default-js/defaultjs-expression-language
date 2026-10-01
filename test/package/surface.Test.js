@@ -31,7 +31,7 @@ import { EXECUTERNAME as WithScopedExecuterName } from "../../src/executer/WithS
 
 describe("Specification 8 - ExpressionResolver, the static surface", () => {
 
-	for (const name of ["resolve", "resolveText", "buildSecure"]) {
+	for (const name of ["resolve", "resolveText", "buildFiltered", "buildSecure"]) {
 		it(`carries the static method ${name}`, async () => {
 			expect(typeof ExpressionResolver[name]).toBe("function");
 		});
@@ -76,7 +76,7 @@ describe("Specification 8 - ExpressionResolver, the instance surface", () => {
 
 describe("Specification 8 - ExecuterRegistry", () => {
 
-	for (const name of ["registrate", "getExecuter"]) {
+	for (const name of ["register", "getExecuter"]) {
 		it(`carries ${name}`, async () => {
 			expect(typeof ExecuterRegistry[name]).toBe("function");
 		});

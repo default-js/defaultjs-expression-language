@@ -45,7 +45,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-30) | — |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
-| 4 | Documentation | `SPECIFICATION.md` and the executers written; readme and JSDoc open | B-20, B-21, B-22, B-23 |
+| 4 | Documentation | `SPECIFICATION.md`, the executers and the JSDoc written; readme open | B-20, B-21 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-40 |
 
 **Markers, counted 2026-10-01** (`npm test`: 326 passed, 326 cases). No `it.fails` is left and no
@@ -61,8 +61,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
 | B-20 | Every code example in `README.md` uses a default import that does not exist | agreed | docs | | |
 | B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
-| B-22 | The JSDoc of the whole package needs one pass | agreed | docs | | |
-| B-23 | Check every method name against what it does and what it answers | agreed | refactor | | |
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
@@ -94,7 +92,7 @@ while `ownKeys` of the same proxy got faster, 3.1 ms against 9.4. Before, each e
 
 Under `WithScopedExecuter` a lookup scales with the full chain depth even when the name sits a few
 resolvers up: `RandomScope` at depth 100 000 answers 138 hz under `with-scoped` against 662 000 hz
-under `context-object` (2026-08-30). `#getPropertyDef` does stop at
+under `context-object` (2026-08-30). `#findHandle` does stop at
 the first match; what walks the whole chain is a lookup that can never match —
 `proxy[Symbol.unscopables]`, which `with` asks on every binding, walks every resolver because the
 cache is keyed by string. Cheap fix if confirmed: answer non-string properties in `get`/`has`
@@ -115,7 +113,7 @@ a property named `ctx` has no way out. Open with it: whether the option belongs 
 `setupExecuter(options)` next to `size`, and what happens to the code cache, which is keyed by the
 statement text alone — entries compiled under the old identifier would answer for the new one.
 
-## Documentation and naming
+## Documentation
 
 ### B-20 · Every code example in `README.md` uses a default import that does not exist
 
@@ -144,36 +142,11 @@ section 1.3 that does not exist, and 3.3 now says **ASCII** letters, which is wh
 Still open here: Frank has further points from reviewing the restructure; they are added here when
 they come.
 
-### B-22 · The JSDoc of the whole package needs one pass
-
-- **Status:** agreed 2026-08-30
-- **Kind:** docs
-
-Known without having looked at every file: the constructor of `ResolverContextHandle` is documented
-as "Creates an instance of Context"; `#initPropertyCache` promises
-`@returns {Map<string,PropertyDefinition>}`, a type that exists nowhere, and over a global context
-answers the cache wrapper instead; the doc block of the instance `resolveText` runs its description
-and the next line together ("replace all expressions at a string *"); `CodeCache.has`, `get`, `set`
-and `clear` carry no JSDoc although `AGENTS.md` asks for it on everything public. Two comments cite
-sections of `SPECIFICATION.md` that no longer exist since 2026-09-26 (part B is 9.1 to 9.3 now):
-`ContextDeconstructorExecuter.js` ("`context-write`, SPECIFICATION.md 9.7") and the global cache
-wrapper in `ResolverContextHandle.js` ("6.4, 9.8"). Go file by file, not through this list, and
-together with B-23.
-
-### B-23 · Check every method name against what it does and what it answers
-
-- **Status:** agreed 2026-08-30
-- **Kind:** refactor
-- **Records:** `DECISIONS.md` and `CHANGELOG.md` for the public names
-
-Known so far: `#getPropertyDef` answers the handle carrying a name, and the variable it lands in is
-called `proxy`; `chain` and `effectiveChain` answer a string path, `contextChain` an array, and none
-of them a chain in the sense of section 2; `getData` without a key answers the whole context;
-`toText` replaces `undefined` and `null` by their word and converts nothing; `buildSecure` promises a security its own JSDoc denies; `setupExecuter` sets the cache
-size and nothing else; `normalize`, `startsRegex`, `parseScope` and `scanExpression` say less than
-they do; `registrate` is not an English word and is public; `getExecuterType` is the import alias of
-`getExecuter` and answers an instance. Public ones —
-`registrate`, the three chain getters, `buildSecure` — need a decision; private ones are a rename.
+Found 2026-10-01 during the JSDoc pass: 6.4 uses "below" both ways. The first bullet says a resolver
+over the global object answers every lookup "and no resolver below it is ever consulted", which by
+the code means the resolvers **nearer the root**; the second says `Object.keys` of "a context below
+it" does not list the globals, which means one **further from the root**. Section 1 and 6.6 speak of
+"nearer to / further from the root"; the first bullet should too.
 
 ## Benchmarks
 
@@ -196,8 +169,8 @@ so the gain is bounded by it.
 - **Records:** `DECISIONS.md`, and `SPECIFICATION.md` 6.2 if the cache goes
 
 Every handle keeps `#cache`, a `Map` from every name its context carries to the handle carrying it
-(`src/ResolverContextHandle.js`: built in `#initPropertyCache`, read by `#getPropertyDef`, the
-`ownKeys` trap and `hasData`, kept in step by the `set` and `deleteProperty` traps, `updateData`,
+(`src/ResolverContextHandle.js`: built in `#buildNameCache`, read by `#findHandle`, the
+`ownKeys` trap and `hasName`, kept in step by the `set` and `deleteProperty` traps, `replaceData`,
 `mergeData` and `resetCache`). **Since 2026-09-22 it filters nothing**, so it holds exactly what
 `key in object` would answer, one `Map` per resolver, built on construction.
 
@@ -209,7 +182,7 @@ Every handle keeps `#cache`, a `Map` from every name its context carries to the 
 - **Writing** — `updateData`, `mergeContext`, `deleteData` and an assignment from inside an
   expression. Each of those rebuilds or amends the cache today, which is work a live lookup would
   not do at all.
-- **Building** — one `#initPropertyCache` per resolver, which a chain pays once per resolver and a
+- **Building** — one `#buildNameCache` per resolver, which a chain pays once per resolver and a
   template engine pays on every nesting level it enters.
 
 What hangs on the answer: **6.2 itself.** Without the cache, names are as live as values, the
@@ -256,10 +229,10 @@ numbers when the picture changes rather than adding another baseline. Uncovered 
    (Frank, 2026-09-27).
 2. The `setDebug` body of `ContextDeconstructorExecuter.js`. The surface
    test asserts it exists and deliberately never flips them: a debug switch has nothing observable.
-3. `set` and `delete` of `createGlobalCacheWrapper` in `ResolverContextHandle.js`. A global context
+3. `set` and `delete` of `createGlobalNameCache` in `ResolverContextHandle.js`. A global context
    is not proxied since 2026-08-30, so nothing routes a write through the wrapper — check whether
    the two methods still have a caller before covering them.
-4. `get parent` and `updateData` of `ResolverContextHandle`. The handle is internal (`DECISIONS.md`,
+4. `get parent` and `replaceData` of `ResolverContextHandle`. The handle is internal (`DECISIONS.md`,
    2026-09-30), so check whether anything reaches them before covering them.
 5. **New on 2026-09-22:** the `return null` of `findPropertyDescriptor`, and the `get` of the
    descriptor the `getOwnPropertyDescriptor` trap hands out, which no case ever calls. Look at both

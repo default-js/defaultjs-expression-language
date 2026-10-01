@@ -21,18 +21,27 @@ const findPropertyDescriptor = (data, property) => {
 };
 
 /**
- * Property cache for a context that is the global object itself.
+ * The names a handle provides, each mapped to the handle providing it: a Map, or the stand-in of
+ * `createGlobalNameCache` over the global object, which answers the same calls.
+ *
+ * @typedef {Map<string|symbol,ResolverContextHandle>} NameCache
+ */
+
+/**
+ * Name cache for a context that is the global object itself.
  *
  * It answers like the Map it replaces: every name is present, and the value is the handle
- * holding it - never the value of the property. That is the contract of #getPropertyDef,
+ * holding it - never the value of the property. That is the contract of #findHandle,
  * whose caller reads the property off the handle it gets back.
  *
- * Because every name is present, such a resolver answers every lookup and nothing below it is
- * reached, and ownKeys reports every own key of the global object.
+ * Because every name is present, such a resolver answers every lookup that reaches it, and no
+ * handle nearer the root is reached. It lists no name of its own, so the ownKeys trap of a handle
+ * further from the root reports none of the global object's - SPECIFICATION.md 6.4.
  *
  * @param {ResolverContextHandle} handle
+ * @returns {NameCache}
  */
-const createGlobalCacheWrapper = (handle) => {
+const createGlobalNameCache = (handle) => {
 	return {
 		has: (property) => {
 			return true;
@@ -51,92 +60,94 @@ const createGlobalCacheWrapper = (handle) => {
 			// is found from anywhere below; listing it as well would only hand it to an executer that
 			// turns a name into code, which then fails over names it never needed - the index "0" of
 			// a frame, a symbol another library planted. A statement reaches a global through the
-			// ordinary scope chain anyway (SPECIFICATION.md 6.4, 9.8).
+			// ordinary scope chain anyway (SPECIFICATION.md 6.4).
 			return [];
 		},
 	};
 };
 
 /**
- * Context object to handle data access
+ * What stands behind the context of one resolver: the object handed to it, the handle of its parent,
+ * and the name cache that tells which names this resolver provides. It hands out the context an
+ * expression sees, a proxy that answers for the whole chain - SPECIFICATION.md 5.2, 6.1 to 6.5.
+ *
+ * Internal to the package: index.js does not export it (DECISIONS.md, 2026-09-30).
  *
  * @export
  * @class ResolverContextHandle
  */
 export default class ResolverContextHandle {
-	/** @type {Proxy|null} */
-	#proxy = null;
+	/** @type {object|null} */
+	#context = null;
 	/** @type {ResolverContextHandle|null} */
 	#parent = null;
 	/** @type {object|null} */
 	#data = null;
-	/** @type {Map<string|symbol,ResolverContextHandle>|null} */
+	/** @type {NameCache|null} */
 	#cache = null;
 	/** @type {boolean} */
-	#providesData = false;
+	#providesContext = false;
 
 	/**
-	 * Creates an instance of Context.
-	 *
 	 * @constructor
-	 * @param {object} context where none is passed, the handle holds no object at all and carries no
-	 * name, not even one of Object.prototype - SPECIFICATION.md 6.3. It gets an object on the first
-	 * write.
-	 * @param {ResolverContextHandle} parent
+	 * @param {?object} context the object the caller handed over, kept rather than copied. Where none
+	 * is passed, the handle holds no object at all and carries no name, not even one of
+	 * Object.prototype - SPECIFICATION.md 6.3. It gets an object on the first write.
+	 * @param {?ResolverContextHandle} parent the handle of the parent resolver
 	 */
 	constructor(context, parent) {
 		this.#data = isNullOrUndefined(context) ? null : context;
 		this.#parent = parent ? parent : null;
-		this.#providesData = !isNullOrUndefined(context);
+		this.#providesContext = !isNullOrUndefined(context);
 
-		this.#cache = this.#initPropertyCache();
+		this.#cache = this.#buildNameCache();
 
 		if (GLOBAL === this.#data)
-			this.#proxy = this.#data;
+			this.#context = this.#data;
 		else {
 			// The proxy answers for the whole chain, which is more than the object handed to this
 			// resolver holds. A proxy may not speak that freely for a target that guarantees
 			// anything about its own keys - a frozen or sealed context is where that ends in a
 			// TypeError - so it gets an empty target of its own. No trap reads it; every one of
 			// them works on #data and #cache.
-			this.#proxy = new Proxy({}, {
+			this.#context = new Proxy({}, {
 				has: (data, property) => {
 					//console.log("has property:", property);
-					return this.#getPropertyDef(property) != null;
+					return this.#findHandle(property) != null;
 				},
 				get: (data, property) => {
 					//console.log("get property:", property);
-					const proxy = this.#getPropertyDef(property);
-					return proxy ? proxy.#data[property] : undefined;
+					const handle = this.#findHandle(property);
+					return handle ? handle.#data[property] : undefined;
 				},
 				set: (data, property, value) => {
 					//console.log("set property:", property, "=", value);
 					this.#data ??= {};
 					this.#data[property] = value;
 					this.#cache.set(property, this);
-					this.#providesData = true;
+					this.#providesContext = true;
 					return true;
 				},
 				deleteProperty: (data, property) => {
-					const propertyDef = this.#cache.get(property);
-					if (propertyDef) {
+					const handle = this.#cache.get(property);
+					if (handle) {
 						delete this.#data[property];
 						this.#cache.delete(property);
 					}
 					return true;
 				},
 				getOwnPropertyDescriptor: (data, property) => {
-					const proxy = this.#getPropertyDef(property);
-					if (!proxy) return undefined;
+					const handle = this.#findHandle(property);
+					if (!handle) return undefined;
 
 					// Read through a getter rather than up front, so enumerating a context does not
 					// evaluate what nobody asked for, and so a value stays live (6.2). Enumerability
 					// is taken from where the property is defined - that is what keeps the members
 					// of Object.prototype out of Object.keys - while configurable has to be true:
 					// a proxy may not claim a fixed property its target does not have.
-					const descriptor = findPropertyDescriptor(proxy.#data, property);
+					const descriptor = findPropertyDescriptor(handle.#data, property);
 					return {
-						get: () => proxy.#data[property],
+						get: () => handle.#data[property],
 						enumerable: descriptor ? descriptor.enumerable : true,
 						configurable: true
 					};
@@ -160,11 +171,14 @@ export default class ResolverContextHandle {
 	}
 
 	/**
+	 * The context an expression sees: a proxy that answers for the whole chain, or over the global
+	 * object the global object itself - SPECIFICATION.md 6.1, 6.4.
+	 *
 	 * @readonly
-	 * @type {Proxy}
+	 * @type {object}
 	 */
-	get proxy() {
-		return this.#proxy;
+	get context() {
+		return this.#context;
 	}
 
 	/**
@@ -180,10 +194,10 @@ export default class ResolverContextHandle {
 	 * inherited through the prototype chain included (5.2); a handle over the global object
 	 * provides every name.
 	 *
-	 * @param {string} key
+	 * @param {string|symbol} key
 	 * @returns {boolean}
 	 */
-	hasData(key) {
+	hasName(key) {
 		return this.#cache.has(key);
 	}
 
@@ -194,35 +208,54 @@ export default class ResolverContextHandle {
 	 * @readonly
 	 * @type {boolean}
 	 */
-	get providesData() {
-		return this.#providesData;
-	}
-
-	updateData(data) {
-		this.#data = isNullOrUndefined(data) ? null : data;
-		this.#providesData = !isNullOrUndefined(data);
-		this.#cache = this.#initPropertyCache();
-	}
-
-	mergeData(data) {
-		this.#data ??= {};
-		Object.assign(this.#data, data);
-		this.#providesData = true;
-		this.#cache = this.#initPropertyCache();
-	}
-
-	resetCache() {
-		this.#cache = this.#initPropertyCache();
+	get providesContext() {
+		return this.#providesContext;
 	}
 
 	/**
+	 * Replaces the object this handle holds, and with it the names it provides.
 	 *
-	 * @returns {Map<string,PropertyDefinition>}
+	 * @param {?object} data the new object; null or undefined leaves the handle without one
 	 */
-	#initPropertyCache() {
+	replaceData(data) {
+		this.#data = isNullOrUndefined(data) ? null : data;
+		this.#providesContext = !isNullOrUndefined(data);
+		this.#cache = this.#buildNameCache();
+	}
+
+	/**
+	 * Assigns the keys of an object into the one this handle holds, key by key, creating that object
+	 * where there is none - SPECIFICATION.md 6.6.
+	 *
+	 * @param {object} data
+	 * @throws {TypeError} where the object held refuses a key - the keys before it are written by then
+	 */
+	mergeData(data) {
+		this.#data ??= {};
+		Object.assign(this.#data, data);
+		this.#providesContext = true;
+		this.#cache = this.#buildNameCache();
+	}
+
+	/**
+	 * Takes up the keys added to the handed-in object since the handle was built, which are not
+	 * provided until then - SPECIFICATION.md 6.2.
+	 */
+	resetCache() {
+		this.#cache = this.#buildNameCache();
+	}
+
+	/**
+	 * A new name cache for the object this handle holds: every key it carries, its prototype chain
+	 * included, each mapped to this handle (5.2). Over the global object the stand-in of
+	 * `createGlobalNameCache`, which provides every name.
+	 *
+	 * @returns {NameCache}
+	 */
+	#buildNameCache() {
 		const data = this.#data;
 		if (GLOBAL === data) 
-			return createGlobalCacheWrapper(this);
+			return createGlobalNameCache(this);
 
 		// every key JavaScript says the object carries, nothing filtered - which of them an executer
 		// can put into its code is the executer's business (DECISIONS.md 2026-08-30, 2026-09-22)
@@ -237,10 +270,13 @@ export default class ResolverContextHandle {
 	}
 
 	/**
-	 * @param {string} property
+	 * The nearest handle from this one to the root that provides the name, or null where none does -
+	 * SPECIFICATION.md 5.2.
+	 *
+	 * @param {string|symbol} property
 	 * @returns {ResolverContextHandle|null}
 	 */
-	#getPropertyDef(property) {
+	#findHandle(property) {
 		if (this.#cache.has(property)) return this.#cache.get(property);
 		let parent = this.#parent;
 		while (parent) {

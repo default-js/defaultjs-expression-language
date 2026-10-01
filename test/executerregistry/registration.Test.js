@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import Executer from "../../src/Executer.js";
-import getExecuter, { registrate, getExecuter as namedGetExecuter } from "../../src/ExecuterRegistry.js";
+import getExecuter, { register, getExecuter as namedGetExecuter } from "../../src/ExecuterRegistry.js";
 
 /**
  * ExecuterRegistry - keeping an implementation under a name. SPECIFICATION.md 9.1.
@@ -12,7 +12,7 @@ describe("ExecuterRegistry - registration", () => {
 
 	it("keeps an implementation under a name and answers it again", async () => {
 		const own = new Executer({ execution: () => "from own executer" });
-		registrate("conformance-probe-executer", own);
+		register("conformance-probe-executer", own);
 		expect(getExecuter("conformance-probe-executer") === own).toBe(true);
 	});
 

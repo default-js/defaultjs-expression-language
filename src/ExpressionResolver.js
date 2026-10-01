@@ -1,11 +1,11 @@
 import ObjectUtils from "@default-js/defaultjs-common-utils/src/ObjectUtils.js";
 import DefaultValue from "./DefaultValue.js";
-import getExecuterType from "./ExecuterRegistry.js";
+import { getExecuter } from "./ExecuterRegistry.js";
 import DefaultExecuter from "./executer/ContextDeconstructorExecuter.js";
 import ResolverContextHandle from "./ResolverContextHandle.js";
 import Executer from "./Executer.js";
 import { scan, parseExpression } from "./ExpressionScanner.js";
-import { isNameCharacter, normalize } from "./Utils.js";
+import { isNameCharacter, trimToNull } from "./Utils.js";
 
 /** @type {Executer} */
 let DEFAULT_EXECUTER = DefaultExecuter;
@@ -38,7 +38,7 @@ const toName = (aName) => {
 	if (aName == null) return generateName();
 	if (typeof aName !== "string") throw new TypeError(`The option name takes a string, not a ${typeof aName}!`);
 
-	const name = normalize(aName);
+	const name = trimToNull(aName);
 	if (name == null) throw new TypeError("The option name takes a name, not an empty string!");
 	for (let index = 0; index < name.length; index++)
 		if (!isNameCharacter(name.charCodeAt(index))) throw new TypeError(`The name "${name}" carries a character a scope name cannot carry (SPECIFICATION.md 3.3)!`);
@@ -58,7 +58,7 @@ const toScope = (aFilter) => {
 	if (aFilter == null) return null;
 	if (typeof aFilter !== "string") throw new TypeError(`A filter is a scope name, not a ${typeof aFilter}!`);
 
-	return normalize(aFilter);
+	return trimToNull(aFilter);
 };
 
 /**
@@ -103,18 +103,18 @@ const withDefault = (aResult, aDefault) => {
 	return aResult;
 };
 
-const resolve = async function (aExecuter = DEFAULT_EXECUTER, aResolver, aExpression, aFilter, aDefault) {
+const resolveInScope = async function (anExecuter = DEFAULT_EXECUTER, aResolver, aStatement, aScope, aDefault) {
 	// 5.3: climbs in a loop rather than by recursion - one call per resolver climbed cost a promise
 	// each and overflowed the stack on a deep chain. A scope no resolver of the chain carries
 	// answers undefined, and the default applies to it like to any other result - see
 	// SPECIFICATION.md 5.4
-	if (aFilter)
-		while (aResolver.name != aFilter) {
+	if (aScope)
+		while (aResolver.name != aScope) {
 			aResolver = aResolver.parent;
 			if (!aResolver) return withDefault(undefined, aDefault);
 		}
 
-	return withDefault(await execute(aExecuter, aExpression, aResolver.context), aDefault);
+	return withDefault(await execute(anExecuter, aStatement, aResolver.context), aDefault);
 };
 
 // 4.1: the first argument of a static entry point is a string, or a configuration object
@@ -124,7 +124,12 @@ const isConfiguration = (aValue) => aValue !== null && typeof aValue === "object
 const defaultOf = (aConfiguration) => ("defaultValue" in aConfiguration ? aConfiguration.defaultValue : DEFAULT_NOT_DEFINED);
 
 /**
- * ExpressionResolver
+ * Resolves `${...}` expressions against a context. A resolver may have a parent, and the resolvers
+ * from it up to the root form a chain: a name is looked up from this resolver towards the root, and
+ * a scope prefix `${name::statement}` addresses one resolver of the chain - SPECIFICATION.md 2, 5.
+ *
+ * Used statically with an ad-hoc context (`resolve`, `resolveText`), or as an instance within a
+ * chain.
  *
  * @export
  * @class ExpressionResolver
@@ -132,14 +137,24 @@ const defaultOf = (aConfiguration) => ("defaultValue" in aConfiguration ? aConfi
  */
 export default class ExpressionResolver {
 	/**
-	 * @param {string} anExecuterName
+	 * Sets the executer a resolver without a parent takes where the `executer` option is left out,
+	 * and so the executer of the static entry points - SPECIFICATION.md 9.1.
+	 *
+	 * @param {string|Executer} anExecuter a registered name or an `Executer` instance
+	 * @throws {Error} where a name is not registered
 	 */
 	static set defaultExecuter(anExecuter) {
 		if ( anExecuter instanceof Executer) DEFAULT_EXECUTER = anExecuter;
-		else DEFAULT_EXECUTER = getExecuterType(anExecuter);
+		else DEFAULT_EXECUTER = getExecuter(anExecuter);
 		console.info(`Changed default executer for ExpressionResolver!`);
 	}
 
+	/**
+	 * The executer a resolver without a parent takes where the `executer` option is left out;
+	 * `context-deconstruction-executer` until it is set - SPECIFICATION.md 9.2.
+	 *
+	 * @type {Executer}
+	 */
 	static get defaultExecuter() {
 		return DEFAULT_EXECUTER;
 	}
@@ -148,28 +163,28 @@ export default class ExpressionResolver {
 	#name = null;
 	/** @type {ExpressionResolver|null} */
 	#parent = null;
-	/** @type {function|null} */
+	/** @type {Executer|null} */
 	#executer = null;
-	/** @type {Proxy|null} */
+	/** @type {object|null} */
 	#context = null;
 	/** @type {ResolverContextHandle|null} */
 	#contextHandle = null;
 
 	/**
-	 * Creates an instance of ExpressionResolver.
-	 * @date 3/10/2024 - 7:27:57 PM
-	 *
 	 * @constructor
-	 * @param {{ context?: any; parent?: any; name?: any; executer?: (string|Executer); }} options
-	 * @param {object} [options.context] where none is passed, the resolver has no context of its own - 4.2
+	 * @param {object} [options]
+	 * @param {object} [options.context] any object; where none is passed - left out, null or
+	 * undefined - the resolver has no context of its own - 4.2, 6.3
 	 * @param {ExpressionResolver} [options.parent=null]
 	 * @param {?string} [options.name=null] kept trimmed; where none is passed, one is generated - 5.1
 	 * @param {(string|Executer)} [options.executer] the registered name of an executer, or an
 	 * `Executer` instance. A name that is not registered throws; an instance needs no registration,
-	 * because it addresses the executer directly. Without the option the resolver uses
+	 * because it addresses the executer directly. Anything else counts as left out. Without the
+	 * option the resolver takes the executer of its parent, and one without a parent
 	 * `ExpressionResolver.defaultExecuter` - 4.2.
 	 * @throws {TypeError} where the parent is no resolver, the context a primitive, or the name breaks
 	 * the rule of 5.1 - 4.2
+	 * @throws {Error} where the executer is named and the name is not registered
 	 */
 	constructor({ context, parent = null, name = null, executer } = {}) {
 		if (parent != null && !(parent instanceof ExpressionResolver)) throw new TypeError("The option parent takes an ExpressionResolver!");
@@ -177,40 +192,72 @@ export default class ExpressionResolver {
 		this.#name = toName(name);
 
 		if(executer instanceof Executer) this.#executer =  executer;
-		else if (typeof executer === "string") this.#executer = getExecuterType(executer);
+		else if (typeof executer === "string") this.#executer = getExecuter(executer);
 		else if(parent != null) this.#executer = parent.executer;
 		else this.#executer = ExpressionResolver.defaultExecuter;
 
 		this.#parent = parent;
 		this.#contextHandle = new ResolverContextHandle(context , this.#parent ? this.#parent.contextHandle : null);
-		this.#context = this.#contextHandle.proxy;
+		this.#context = this.#contextHandle.context;
 	}
 
+	/**
+	 * The name this resolver is addressed by in a scope prefix and a filter - 5.1.
+	 *
+	 * @readonly
+	 * @type {string}
+	 */
 	get name() {
 		return this.#name;
 	}
 
+	/**
+	 * @readonly
+	 * @type {ExpressionResolver|null}
+	 */
 	get parent() {
 		return this.#parent;
 	}
 
+	/**
+	 * The context of this resolver as an expression sees it. It is not the object passed to the
+	 * constructor and it answers for the whole chain - 6.1. Over the global object it is the global
+	 * object itself - 6.4.
+	 *
+	 * @readonly
+	 * @type {object}
+	 */
 	get context() {
 		return this.#context;
 	}
 
+	/**
+	 * The executer in use, chosen once in the constructor - 4.2.
+	 *
+	 * @readonly
+	 * @type {Executer}
+	 */
 	get executer() {
 		return this.#executer;
 	}
 
+	/**
+	 * The internal handle behind the context. Public only for `resetCache` (6.2), and only until the
+	 * name cache is measured - DECISIONS.md, 2026-09-30.
+	 *
+	 * @readonly
+	 * @type {ResolverContextHandle}
+	 */
 	get contextHandle() {
 		return this.#contextHandle;
 	}
 
 	/**
-	 * get chain path
+	 * The names of every resolver from the root down to this one, as a path - `/root/…/this`. It
+	 * describes the structure and does not change - SPECIFICATION.md 5.5.
 	 *
 	 * @readonly
-	 * @returns {string}
+	 * @type {string}
 	 */
 	get chain() {
 		// a loop, not a recursion into the parent: a deep chain overflowed the stack
@@ -225,20 +272,20 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * get effective chain path
-	 *
-	 * Only the resolvers that provide a context appear, so this describes a state and not the
-	 * structure - SPECIFICATION.md 5.5. Where none provides one, the answer is the empty string.
+	 * The names of the resolvers from the root down to this one that provide a context, as a path
+	 * like `chain`. A resolver built without a context joins it the moment a value is set on it, so
+	 * this describes a state and not the structure - SPECIFICATION.md 5.5. Where none provides one,
+	 * the answer is the empty string.
 	 *
 	 * @readonly
-	 * @returns {string}
+	 * @type {string}
 	 */
 	get effectiveChain() {
 		// a loop, not a recursion into the parent: a deep chain overflowed the stack
 		let path = "";
 		let resolver = this;
 		while (resolver) {
-			if (resolver.contextHandle.providesData) path = `/${resolver.name}${path}`;
+			if (resolver.contextHandle.providesContext) path = `/${resolver.name}${path}`;
 			resolver = resolver.parent;
 		}
 
@@ -246,19 +293,17 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * get context chain
-	 *
-	 * The contexts of exactly the resolvers that provide one, this resolver's first and the root's
-	 * last - SPECIFICATION.md 5.5.
+	 * The contexts of exactly the resolvers `effectiveChain` names, as an array, this resolver's
+	 * first and the root's last. A state like `effectiveChain` - SPECIFICATION.md 5.5.
 	 *
 	 * @readonly
-	 * @returns {Context[]}
+	 * @type {Array<object>}
 	 */
 	get contextChain() {
 		const result = [];
 		let resolver = this;
 		while (resolver) {
-			if (resolver.contextHandle.providesData) result.push(resolver.context);
+			if (resolver.contextHandle.providesContext) result.push(resolver.context);
 
 			resolver = resolver.parent;
 		}
@@ -300,7 +345,7 @@ export default class ExpressionResolver {
 	#resolverForKey(key) {
 		let resolver = this;
 		while (resolver) {
-			if (resolver.contextHandle.hasData(key)) return resolver;
+			if (resolver.contextHandle.hasName(key)) return resolver;
 			resolver = resolver.parent;
 		}
 
@@ -308,14 +353,16 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * get data from context
+	 * Reads a value along the chain from the addressed resolver by the rule of 5.2. Without a key -
+	 * null or undefined - it answers the whole context of that resolver, which still sees the chain on
+	 * every access - SPECIFICATION.md 6.1, 6.6.
 	 *
-	 * Reads along the chain from the addressed resolver by the rule of 5.2. Without a key it answers the
-	 * whole context of that resolver - the proxy, so every access on it still sees the chain.
-	 *
-	 * @param {string} key
-	 * @param {?string} filter
-	 * @returns {*}
+	 * @param {?(string|number|symbol)} [key] a property key; a number is looked up as its string
+	 * @param {?string} [filter] the scope name of the resolver the call addresses; without one, this
+	 * resolver
+	 * @returns {*} the value, or the whole context without a key
+	 * @throws {TypeError} where the key is of a type no property key has, or the filter no string
+	 * @throws {Error} where the filter matches no resolver of the chain
 	 */
 	getData(key, filter) {
 		const resolver = this.#findResolver(toScope(filter));
@@ -325,15 +372,16 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * update data at context
+	 * Sets a value, in the object the caller handed over. Without a filter the value is changed where
+	 * the key lives, counting from here towards the root, and created here where no resolver carries
+	 * it. With a filter the addressed resolver is the target outright - SPECIFICATION.md 6.6.
 	 *
-	 * Without a filter the value is changed where the key lives, counting from here towards the root,
-	 * and created here where no resolver carries it. With a filter the addressed resolver is the
-	 * target outright - SPECIFICATION.md 6.6.
-	 *
-	 * @param {string} key
+	 * @param {string|number|symbol} key a property key; a number is looked up as its string
 	 * @param {*} value
-	 * @param {?string} filter
+	 * @param {?string} [filter] the scope name of the resolver the call addresses
+	 * @throws {TypeError} where the key is missing or of a type no property key has, the filter no
+	 * string, or the object refuses the write
+	 * @throws {Error} where the filter matches no resolver of the chain
 	 */
 	updateData(key, value, filter) {
 		const property = toKey(key);
@@ -345,14 +393,15 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * delete data from context
-	 *
 	 * Removes the key from one resolver - the addressed one with a filter, and without one the first
 	 * resolver carrying it, counting from here towards the root. Removing it uncovers the value of
 	 * the next resolver that carries the same key - SPECIFICATION.md 6.6.
 	 *
-	 * @param {string} key
-	 * @param {?string} filter
+	 * @param {string|number|symbol} key a property key; a number is looked up as its string
+	 * @param {?string} [filter] the scope name of the resolver the call addresses
+	 * @throws {TypeError} where the key is missing or of a type no property key has, the filter no
+	 * string, or the object refuses the deletion
+	 * @throws {Error} where the filter matches no resolver of the chain
 	 */
 	deleteData(key, filter) {
 		const property = toKey(key);
@@ -364,14 +413,15 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * merge context object
+	 * A shallow assignment, key by key, into the context of the addressed resolver, replacing what is
+	 * there and adding what is not. No search along the chain: a merged key shadows the resolvers
+	 * above from here on - SPECIFICATION.md 6.6.
 	 *
-	 * A shallow assignment into the context of the addressed resolver, replacing what is there and adding
-	 * what is not. No search along the chain: a merged key shadows the resolvers above from here on -
-	 * SPECIFICATION.md 6.6.
-	 *
-	 * @param {object} context
-	 * @param {?string} filter
+	 * @param {?object} context the keys to assign; null or undefined changes nothing
+	 * @param {?string} [filter] the scope name of the resolver the call addresses
+	 * @throws {TypeError} where the context is a primitive, the filter no string, or the object
+	 * refuses a key - the keys before it are written by then
+	 * @throws {Error} where the filter matches no resolver of the chain
 	 */
 	mergeContext(context, filter) {
 		const resolver = this.#findResolver(toScope(filter));
@@ -382,12 +432,17 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * resolved an expression string to data
+	 * Resolves one expression to its value, of whatever type the statement answers. Takes the
+	 * delimited form `${...}`, a scope prefix included, or a bare statement - SPECIFICATION.md 4.2,
+	 * 4.3. An error of the statement is logged and handed on, and the default never covers it - 7.
 	 *
 	 * @async
 	 * @param {string} aExpression
-	 * @param {?*} aDefault
+	 * @param {*} [aDefault] replaces a result of null or undefined where it is passed, undefined
+	 * included - 4.4
 	 * @returns {Promise<*>}
+	 * @throws {TypeError} where the expression is no string
+	 * @throws {SyntaxError} where the input opens with "${" and does not end with "}"
 	 */
 	async resolve(aExpression, aDefault) {
 		// 4.2: a mistake in the calling code, not a failed statement - so no warning and no default
@@ -396,7 +451,7 @@ export default class ExpressionResolver {
 		try {
 			// 4.3: the delimited form or a bare statement, told apart by the scanner
 			const { scope, statement } = parseExpression(aExpression);
-			return await resolve(this.#executer, this, statement, scope, defaultValue);
+			return await resolveInScope(this.#executer, this, statement, scope, defaultValue);
 		} catch (e) {
 			// 7: the error is logged and handed on. resolve answers a value or says why it cannot,
 			// and a default value covers a missing result, never an error.
@@ -406,11 +461,16 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * replace all expressions at a string	 *
+	 * Replaces every expression of a text by its value and answers the text - SPECIFICATION.md 4.2,
+	 * 4.3. An expression whose statement fails stands as written, a warning names it, and the rest of
+	 * the text keeps rendering - 7.
+	 *
 	 * @async
 	 * @param {string} aText
-	 * @param {?*} aDefault
-	 * @returns {Promise<*>}
+	 * @param {*} [aDefault] replaces a result of null or undefined, per expression, where it is
+	 * passed - 4.4
+	 * @returns {Promise<string>}
+	 * @throws {TypeError} where the text is no string
 	 */
 	async resolveText(aText, aDefault) {
 		if (typeof aText !== "string") throw new TypeError(`resolveText takes a text as a string, not a ${typeof aText}!`);
@@ -431,7 +491,7 @@ export default class ExpressionResolver {
 				text += aText.substring(occurrence.start, occurrence.end);
 			} else {
 				try {
-					text += await resolve(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue);
+					text += await resolveInScope(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue);
 				} catch (e) {
 					// 7: an expression whose statement failed stands as written, and the default value
 					// does not cover it. The rest of the text keeps rendering.
@@ -445,7 +505,8 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * resolve an expression string to data
+	 * Resolves one expression against an ad-hoc context, through a resolver of its own, as the instance
+	 * `resolve` does - SPECIFICATION.md 4.1, 4.2.
 	 *
 	 * Takes the arguments positionally, or one configuration object
 	 * `{ expression, context, defaultValue, timeout }`, behind which every argument is ignored -
@@ -455,10 +516,11 @@ export default class ExpressionResolver {
 	 * @static
 	 * @async
 	 * @param {string|{ expression: string, context?: object, defaultValue?: *, timeout?: number }} aExpression
-	 * @param {?object} aContext
-	 * @param {?*} aDefault
-	 * @param {?number} aTimeout
+	 * @param {?object} [aContext]
+	 * @param {*} [aDefault] replaces a result of null or undefined where it is passed - 4.4
+	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline - 4.5
 	 * @returns {Promise<*>}
+	 * @throws {TypeError} where the arguments take neither form, or the context is a primitive
 	 */
 	static async resolve(aExpression, aContext, aDefault, aTimeout) {
 		if (isConfiguration(arguments[0])) {
@@ -481,7 +543,8 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * replace expression at text
+	 * Replaces every expression of a text against an ad-hoc context, through a resolver of its own, as
+	 * the instance `resolveText` does - SPECIFICATION.md 4.1, 4.2.
 	 *
 	 * Takes the arguments positionally, or one configuration object
 	 * `{ text, context, defaultValue, timeout }`, behind which every argument is ignored -
@@ -491,10 +554,12 @@ export default class ExpressionResolver {
 	 * @static
 	 * @async
 	 * @param {string|{ text: string, context?: object, defaultValue?: *, timeout?: number }} aText
-	 * @param {?object} aContext
-	 * @param {?*} aDefault
-	 * @param {?number} aTimeout
-	 * @returns {Promise<*>}
+	 * @param {?object} [aContext]
+	 * @param {*} [aDefault] replaces a result of null or undefined, per expression, where it is
+	 * passed - 4.4
+	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline - 4.5
+	 * @returns {Promise<string>}
+	 * @throws {TypeError} where the arguments take neither form, or the context is a primitive
 	 */
 	static async resolveText(aText, aContext, aDefault, aTimeout) {		
 		if (isConfiguration(arguments[0])) {
@@ -517,7 +582,7 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * build a resolver over a filtered copy of the context
+	 * Builds a resolver over a filtered copy of the context - SPECIFICATION.md 6.7.
 	 *
 	 * The filter is applied to the context only, never to the globals, so this is a way to hand
 	 * over a cleaned context and not a sandbox.
@@ -527,19 +592,35 @@ export default class ExpressionResolver {
 	 *
 	 * @static
 	 * @param {object} arg the filter arguments, plus the whole constructor option set
-	 * @param {object} arg.context
-	 * @param {function} arg.propFilter
+	 * @param {object} arg.context the object to copy; it is left untouched
+	 * @param {function(string, *, object): boolean} arg.propFilter called with name, value and the
+	 * object holding it for every enumerable property, inherited ones included; a property it
+	 * answers false for is left out of the copy
 	 * @param {object} [arg.option={ deep: true, name: null, parent: null, executer: null }]
-	 * @param {boolean} [arg.option.deep=true]
+	 * @param {boolean} [arg.option.deep=true] filters sub objects as well
 	 * @param {string} [arg.option.name=null]
 	 * @param {ExpressionResolver} [arg.option.parent=null]
-	 * @param {string} [arg.option.executer=null]
+	 * @param {(string|Executer)} [arg.option.executer=null]
 	 * @returns {ExpressionResolver}
+	 * @throws {TypeError} where a constructor option is of the wrong kind, as the constructor throws
 	 */
-	static buildSecure({ context, propFilter, option = { deep: true, name: null, parent: null, executer: null } }) {
+	static buildFiltered({ context, propFilter, option = { deep: true, name: null, parent: null, executer: null } }) {
 		const { deep = true, name, parent, executer } = option;
 		context = ObjectUtils.filter(context, propFilter, {deep});
 		return new ExpressionResolver({ context, name, parent, executer });
+	}
+
+	/**
+	 * The former name of `buildFiltered`, kept until 4.0. It promised a security the method does not
+	 * give - SPECIFICATION.md 6.7.
+	 *
+	 * @deprecated use `buildFiltered`
+	 * @static
+	 * @param {object} arg the arguments of `buildFiltered`
+	 * @returns {ExpressionResolver}
+	 */
+	static buildSecure(arg) {
+		return ExpressionResolver.buildFiltered(arg);
 	}
 }
 

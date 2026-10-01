@@ -19,6 +19,34 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-10-01 — Which public names change for 3.0.0, and how does an old one go?
+
+**Decision:** Per name, with no blanket rule. `ExecuterRegistry.registrate` becomes `register` and
+the old name goes without an alias. `ExpressionResolver.buildSecure` becomes `buildFiltered`.
+`buildSecure` stays as a silent alias, marked `@deprecated` in JSDoc and announced in the changelog,
+writes no console warning and is removed in 4.0. `chain`, `effectiveChain`, `contextChain`,
+`getData` and `setupExecuter` keep their names, and their JSDoc says what they answer. Frank's
+decisions.
+
+**Reasoning:** `registrate` is not an English word, and an own executer is rare enough that one
+renamed call is a cheap migration in a major release. `buildSecure` promised the one thing 6.7 says
+it does not give, a sandbox, and the name sits in CMS integrations, so it gets a way out rather
+than a break. The three chain getters are defined precisely in 5.5, and `getData` without a key
+answering the whole context is specified as intended in 6.6, so a rename would cost consumers and
+add no precision. `setupExecuter` sets only the cache size today, but it is the place for further
+executer options, among them the `ctx` prefix of `BACKLOG.md` "Should the `ctx` prefix of
+`ContextObjectExecuter` be configurable?", and a name like `setupCache` would close that path.
+
+**Alternatives:** One rule for every public rename, either a hard break or an alias each. A hard
+break is the better choice for `buildSecure` once its consumers are known to have moved. Renaming
+the chain getters to `path`, `contextPath` and `contexts`, which say the type they answer, is the
+better choice if 5.5 is ever rewritten anyway.
+
+**Consequences:** 3.0.0 breaks every call of `registrate`. Removing `buildSecure` in 4.0 is a
+promise in the changelog, so the alias is not dropped earlier. The private and internal names were
+renamed in the same pass from a list Frank approved. They are no surface, so no record carries them
+beyond git history.
+
 ## 2026-10-01 — How does a consumer reach the package: `"type": "module"`, `exports`, and the module bundle?
 
 **Decision:** `package.json` carries `"type": "module"` and an `exports` field. The field opens `.`
