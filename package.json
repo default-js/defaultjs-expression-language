@@ -61,7 +61,6 @@
 		"dist/**",
 		"LICENSE",
 		"README.md",
-		"SPECIFICATION.md",
 		"CHANGELOG.md"
 	]
 }

@@ -22,7 +22,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   an object — so a context carrying a key named `context` is never mistaken for a configuration.
   Any argument behind a configuration is ignored. A configuration without a string under
   `expression` or `text` is rejected with a `TypeError` naming the key. A default counts as passed
-  where the key `defaultValue` is present. See `SPECIFICATION.md` 4.1.
+  where the key `defaultValue` is present.
 
 - **The constructor takes an `Executer` instance, not only a registered name.**
   `new ExpressionResolver({ executer })` accepted a registered name and silently fell back to the
@@ -31,13 +31,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   now follow the same rule. Nothing that worked before changes: a name is still looked up in the
   registry and an unregistered one still throws. What is new is that an executer can be used
   **without registering it**, which is what a caller wants for one that is built for a single
-  resolver. See `SPECIFICATION.md` 4.2.
-
-- **`SPECIFICATION.md` ships with the package.** Part A states what the resolver does, rule by
-  rule — expression syntax, the resolver chain and its scopes, the context and what it guarantees,
-  error handling, and the whole public surface. Part B states the interface an executer implements,
-  the three the package ships and how to tune them. It describes the released package: every rule in
-  it holds by 3.0.0, and it carries no index of pending work.
+  resolver.
 
 - **`README.md` documents every executer.** How each one runs a statement; how a statement
   addresses a context value under it — `${ctx.value}` under `context-object-executer`, the bare
@@ -56,8 +50,8 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   that a Content Security Policy has to allow `'unsafe-eval'`; a section *Upgrading from 2.x* lists
   the changes most likely to break a 2.x caller.
 
-- **Every public member carries JSDoc** that says what it takes, answers and throws, with the
-  section of `SPECIFICATION.md` it follows. One statement was wrong before: the constructor said a
+- **Every public member carries JSDoc** that says what it takes, answers and throws. One statement
+  was wrong before: the constructor said a
   resolver without the `executer` option takes `ExpressionResolver.defaultExecuter`, while it takes
   the executer of its parent and only a resolver without a parent takes the default. The code
   always did the latter.
@@ -70,13 +64,12 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   file under `dist/`, and `package.json`. Every other path is rejected with
   `ERR_PACKAGE_PATH_NOT_EXPORTED` by Node and by every bundler that honours `exports`, among them
   `src/ExpressionResolver.js`, `src/CodeCache.js` and `index.js` written out. Import from the
-  package name instead. Tuning an executer still goes through its module under `src/executer/`. See
-  `SPECIFICATION.md` 8.
+  package name instead. Tuning an executer still goes through its module under `src/executer/`.
 
 - **The expression scanner is a module of its own, `src/ExpressionScanner.js`.** It finds the
   expressions of a text and takes the single expression of `resolve` apart; it moved out of
   `src/ExpressionResolver.js` unchanged. It is internal — `index.js` does not export it and nothing
-  in `SPECIFICATION.md` promises its shape — but it is published under `src/` like every other file.
+  promises its shape — but it is published under `src/` like every other file.
 
 - **A context carries every key JavaScript says it carries.** Names that are not variable names
   (`test-test`, `0`), reserved words (`class`, `undefined`, `constructor`) and symbol keys used to be
@@ -85,7 +78,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   them, from an expression — `ctx["test-test"]` under `context-object-executer`. `Object.keys`, a
   spread and `JSON.stringify` of a context include them. The warning is gone. Under
   `with-scoped-executer` a context key named like `undefined` now shadows it inside an expression.
-  See `SPECIFICATION.md` 6.1 and `DECISIONS.md`, 2026-09-22.
+  See `DECISIONS.md`, 2026-09-22.
 
 - **`context-deconstruction-executer`, the default, no longer runs over a context whose names it
   cannot bind — and says so.** It binds every name a context carries as a variable and filters
@@ -96,7 +89,8 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   defined. The error names the key and
   the statement: *Context property name "test-test" cannot be used as a variable by
   context-deconstruction-executer, so this statement cannot run over this context! statement: 1 + 1*.
-  A consumer who hands over such a context picks `context-object-executer`, which addresses a name
+  A compilation that a Content Security Policy without `'unsafe-eval'` refuses is not blamed on a
+  name: the browser's `EvalError` reaches the caller as it is. A consumer who hands over such a context picks `context-object-executer`, which addresses a name
   through an object and needs no name to be a variable. `README.md` describes the executer, and
   `DECISIONS.md` (2026-09-22) the reasoning.
 
@@ -113,20 +107,19 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   is found from anywhere in the chain, and a statement reaches it through the ordinary scope chain.
   What this fixes: those names were handed to every executer that turns a name into code, so one
   frame on the page — `window[0]` — was enough to stop every statement below a global resolver.
-  See `SPECIFICATION.md` 6.4.
 
 - **A resolver without a context no longer answers the names of `Object.prototype`.** It held an
   empty object, so `toString`, `valueOf`, `hasOwnProperty` and the rest of `Object.prototype` were
   answered by it rather than by a resolver further up that carried them. It now holds no object at
   all until a value is written to it. A resolver built over a plain object still answers those
-  names itself — that is what `in` says. See `SPECIFICATION.md` 5.2 and 6.3.
+  names itself — that is what `in` says.
 
 - **The static entry points reject a first argument that is neither a string nor an object.**
   `ExpressionResolver.resolve` and `resolveText` now reject a number, a boolean, a function,
   `undefined` or `null` in first place with a `TypeError` that names the call.
   Before, `resolve(123)` failed by accident inside a string method, and `resolveText(123)`
   answered `123` unchanged. The instance method `resolveText` still hands a non-string back as it
-  is. See `SPECIFICATION.md` 4.1.
+  is.
 
 - **A resolver without an executer of its own takes the one of its parent.** Until now a
   resolver built without the `executer` option used `ExpressionResolver.defaultExecuter`, whatever
@@ -134,24 +127,6 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   The order is now: the `executer` option, then the executer of the `parent`, then the default.
   A resolver whose parent runs a non-default executer changes behaviour with this, since it now
   evaluates in that executer's dialect. The new getter `executer` answers the executer in use.
-  See `SPECIFICATION.md` 4.2.
-
-- **The specification no longer promises that a write from inside an expression stays off the global
-  object.** `SPECIFICATION.md` 6.5 carried that as a guarantee, conditional on a switch that was
-  never implemented. It is **withdrawn** — whether a write stays off the global object is up to the
-  executer in use (`SPECIFICATION.md` 6.5) — because the package cannot keep it: only an executer can
-  intercept an assignment, and two of the three shipped today let an unqualified one reach the
-  global object. Nothing about the code changed here — what changed is that
-  the document now says what the code does. Concretely, and worth knowing for anyone who read the
-  guarantee: under `with-scoped-executer` and `context-deconstruction-executer` (the default) a write
-  to a name no resolver of the chain carries creates a global; only `context-object-executer`
-  contains it. An
-  explicit `globalThis.x = 1` reaches the global object under every one of them. **This package does
-  not sandbox the global object**, and `buildFiltered` (6.7) never claimed to. The `allowGlobalWrite`
-  switch that was to make the containment configurable is **not part of the specification**: its
-  *off* state could only ever mean *under the executers able to intercept an assignment*, so whether
-  it is worth having is undecided, and the document does not describe undecided features. With it go
-  the fifth argument of the static calls and the constructor option of the same name.
 
 - **`resolve` no longer catches an error — it logs it and hands it on.** A statement that fails
   used to answer `undefined`, or the default value where one was passed, and the caller had no way
@@ -164,8 +139,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   text exactly as it was written**, a warning names it, and the rest of the text renders. Where it
   used to leave `undefined` or the default value, the reader now sees the expression that could not
   be evaluated — which is what an author needs in order to find it. The two entry points differ on
-  purpose: a document has to render, a value has a caller standing right there. See
-  `SPECIFICATION.md` 7.
+  purpose: a document has to render, a value has a caller standing right there.
 
   This is the loudest change of the release for anyone calling `resolve` directly. What used to be
   a silent `undefined` is now a rejected promise, so every call site that relied on the default
@@ -193,7 +167,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   not.
 
   **Two ways out.** `updateData` and `mergeContext` are the supported way to change a context and
-  behave identically under every executer (`SPECIFICATION.md` 6.6) — that is the path to move a write
+  behave identically under every executer — that is the path to move a write
   onto. Where an expression really has to do the writing,
   `ExpressionResolver.defaultExecuter = "context-object-executer"` restores it in every shape, at the
   price of its dialect: that executer addresses a context property `value` as `${ctx.value}`, so the
@@ -209,24 +183,24 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `${value}`; it now hands `\${value}` to the executer as a statement, which cannot compile it, so
   the error reaches the caller. The escape exists so that an expression can stand in surrounding
   text without being evaluated, and `resolve` has no surrounding text — its input is one
-  expression. See `SPECIFICATION.md` 3.2.
+  expression.
 
 - **An empty statement answers `undefined`.** `${}` used to answer `null`, and before the parser
   landed it was not recognized as an expression at all. It is one now, and it answers what
   `return;` answers in JavaScript. A default value applies to it like to any other result, and in
-  a text it renders as `undefined`. See `SPECIFICATION.md` 3.4.
+  a text it renders as `undefined`.
 
 - **`resolve` rejects a delimited expression that does not end with `}`.** It throws a
   `SyntaxError` instead of answering the default value: nothing has been executed at that point,
-  so it is a rejection of the form rather than an execution error, and section 7 does not cover
-  it. Whether the statement between the delimiters is valid JavaScript is still the executer's
-  business and an error there is caught as before. See `SPECIFICATION.md` 4.3 and 7.
+  so it is a rejection of the form rather than an execution error, and the rules for a failing
+  statement do not cover it. Whether the statement between the delimiters is valid JavaScript is
+  still the executer's business and an error there is caught as before.
 
 - **Every occurrence of an expression in a text is evaluated on its own.** `resolveText` used to
   scan a text once per *distinct* expression and replace all identical occurrences with that one
   result, so a statement with a side effect ran once however often it stood in the text. Each
   occurrence is now parsed, evaluated and replaced by position. Visible where a statement is not
-  pure: a text carrying `${counter++}` twice now increments twice. See `SPECIFICATION.md` 4.3.
+  pure: a text carrying `${counter++}` twice now increments twice.
 
 - **What escapes is the delimiter, and the parity of the backslash run decides.** An odd number of
   backslashes before the `$` escapes the `${` and exactly one backslash is consumed; an even number
@@ -234,8 +208,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   nothing else was defined. No backslash is removed except the one that does the escaping.
 
   An escaped `${` **opens nothing**, so the text behind it is scanned like any other: a delimiter
-  that would have stood inside its statement is an expression of its own and resolves. See
-  `SPECIFICATION.md` 3.2.
+  that would have stood inside its statement is an expression of its own and resolves.
 
 - **The four data methods follow the rules of the chain now.** `getData`, `updateData`,
   `deleteData` and `mergeContext` each take a `filter`, and what it meant was never quite the same
@@ -245,8 +218,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   lives**, walking towards the root and creating the key on the calling resolver only where no
   resolver carries it, and `deleteData` removes it from the first one carrying it; both used to act
   on the calling resolver alone. A caller who wants to define a value on one resolver without
-  reaching into the rest of the chain uses `mergeContext({ key: value })`, which is unchanged. See
-  `SPECIFICATION.md` 6.6.
+  reaching into the rest of the chain uses `mergeContext({ key: value })`, which is unchanged.
 
 - **Every resolver carries a name, and the two state getters mean what they say.** A resolver built
   without a `name` used to keep `null` and put the literal `/null` into every chain path; it now
@@ -261,8 +233,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   to it since through `updateData`, `mergeContext` or an assignment inside an expression. What the
   context holds decides nothing: an empty object counts. Both therefore describe a **state** that
   changes over a resolver's lifetime, while `chain` stays structural — a consumer must not cache
-  either. Where no resolver provides a context, `effectiveChain` is the empty string. See
-  `SPECIFICATION.md` 5.1 and 5.5.
+  either. Where no resolver provides a context, `effectiveChain` is the empty string.
 
 - **The constructor rejects a `parent`, a `context` or a `name` it cannot use.** Each raises a
   `TypeError` naming the option, where the mistake used to surface somewhere else or not at all:
@@ -278,18 +249,15 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
     whitespace-only name and one that is no string are rejected. `""` and `0` used to get a generated
     name. A passed name is kept **trimmed**: `" root "` is the resolver `root`.
 
-  See `SPECIFICATION.md` 4.2 and 5.1.
-
 - **The `filter` of the data methods is read like a scope prefix.** `getData`, `updateData`,
   `deleteData` and `mergeContext` trim it, and a filter that is empty or whitespace only means no
   filter, where `"  "` used to throw as a name no resolver carries. A filter that is no string raises
-  a `TypeError`. See `SPECIFICATION.md` 6.6.
+  a `TypeError`.
 
 - **The instance `resolve` and `resolveText` reject an argument that is not a string.** Both reject
   with a `TypeError`, as the static entry points do, and no default value applies. `resolveText(42)`
   used to answer `42`, and `resolve(42)` raised a `TypeError` from inside the scanner and logged it
-  as a failed statement; no warning is written now, since no statement ran. See `SPECIFICATION.md`
-  4.2.
+  as a failed statement; no warning is written now, since no statement ran.
 
 - **The data methods take every property key, and reject what is none.** `getData`, `updateData`
   and `deleteData` take a string, `""` included, a symbol or a number, and `0` addresses the first
@@ -297,23 +265,21 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   answered the whole context, `updateData` and `deleteData` did nothing. Without a key — `null` or
   `undefined` — `getData` still answers the whole context, while `updateData` and `deleteData` raise
   a `TypeError`, as all three do for a key of another type. `mergeContext` still ignores `null` and
-  `undefined` and raises a `TypeError` for a primitive, which it used to ignore. See
-  `SPECIFICATION.md` 6.6.
+  `undefined` and raises a `TypeError` for a primitive, which it used to ignore.
 
 - **`setupExecuter` rejects a `size` that is not a finite number.** A string, `null`, `NaN` or
   `Infinity` raises a `TypeError`. Before, such a size was taken as it was: `null` switched the cache
   off, and `"abc"` or `NaN` left it without an upper bound, so it never evicted anything again. A
-  fraction is rounded down. See
-  `SPECIFICATION.md` 9.3.
+  fraction is rounded down.
 
 - **`ExecuterRegistry.registrate` is now `register`, and the old name is gone.** An own executer is
   registered with `ExecuterRegistry.register(aName, anExecuter)`; a call to `registrate` fails, since
   the registry no longer exports it. The error for a name that was never registered now reads
-  `is not registered`. See `SPECIFICATION.md` 9.1.
+  `is not registered`.
 
 - **`ExpressionResolver.buildSecure` is now `buildFiltered`.** It takes the same arguments and
   builds the same resolver; the new name says what it does, filter the context, where the old one
-  promised a security the method does not give. See `SPECIFICATION.md` 6.7.
+  promised a security the method does not give.
 
 ### Deprecated
 
@@ -336,8 +302,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `EsprimaExecuter` the global object, under the other three a single object shared by every
   resolver built that way, so a write to one of them showed up in all the others. An own executer
   that still passes `defaultContext` keeps working; the option is ignored. A context shared by many
-  resolvers is the context of a resolver at the root of their chain. See `SPECIFICATION.md` 4.2,
-  6.3 and 9.1.
+  resolvers is the context of a resolver at the root of their chain.
 
 - **`EsprimaExecuter` is gone.** `src/executer/EsprimaExecuter.js` and the executer name
   `esprima-executer` no longer exist. It rewrote a statement's syntax tree onto the context without
@@ -378,7 +343,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
 - **`setupExecuter` without a `size` shrank the cache.** Every executer starts its code cache at
   5000 entries, but `setupExecuter()` or `setupExecuter({})` set it to 1000 and evicted the rest. An
-  option left out now changes nothing. See `SPECIFICATION.md` 9.3.
+  option left out now changes nothing.
 
 - **A scope prefix failed on a deep chain, and slowed down with every resolver it climbed.** The
   walk to the resolver a prefix names recursed once per resolver passed, so somewhere between 1,000
@@ -407,8 +372,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   instead of only the one the call was made on — each with the enumerability it has where it is
   defined, so a prototype's members stay out of `Object.keys` as they would on the object itself.
   And operations that are not intercepted — `Object.getPrototypeOf`, `Object.defineProperty`,
-  `Object.isExtensible` — now see that empty target rather than the context object. See
-  `SPECIFICATION.md` 6.1.
+  `Object.isExtensible` — now see that empty target rather than the context object.
 
 - **A page carrying a frame broke every resolver below one built on the global object.** The
   property cache of a global context handed its names out unfiltered, while every other context
@@ -431,15 +395,14 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   broke every operation that enumerates a context, because a proxy may not hide what its target
   guarantees. `getData()` on such a resolver therefore answers the global object itself.
   `ContextDeconstructorExecuter` skips reading the property names when the context is the global
-  object, so it no longer generates a destructuring pattern over every global name. See
-  `SPECIFICATION.md` 6.1 and 6.4.
+  object, so it no longer generates a destructuring pattern over every global name.
 
 - **The instance `resolve` did not understand the scope syntax.** It stripped the delimiters and
   passed everything between them to the executer with the scope filter hardcoded to `null`, so
   `resolver.resolve("${scope::statement}")` handed `scope::statement` to the executer, which could
   not compile it: the error was swallowed and the caller got `undefined`. The two entry points
   answered differently for one syntax. Both parse the prefix by the same rule now, and `resolve`
-  reaches a named resolver of the chain like `resolveText` does. See `SPECIFICATION.md` 4.3.
+  reaches a named resolver of the chain like `resolveText` does.
 
 - **An expression carrying a brace of its own was not recognized.** The delimiters were matched by
   a regular expression that could not see past an inner brace, so an object literal, an arrow
@@ -453,13 +416,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   The executers receive comments unchanged, and a statement that **begins** with a comment ending a
   line answers `undefined` under all three; `README.md` names the limit. An
   opening delimiter that never finds its matching brace is not an expression, and the text stands
-  as written. See `SPECIFICATION.md` 3.1.
+  as written.
 
 - **An escaped expression was resolved anyway where the same expression also stood unescaped.**
   Replacement went through `split`/`join` over the whole text, which cannot tell one occurrence
   from another: an escaped occurrence was replaced by the plain expression and evaluated on the
   next round, and an unescaped one left its backslash standing in front of the result. Escaping is
-  decided per occurrence now. See `SPECIFICATION.md` 3.2.
+  decided per occurrence now.
 
 - **`${scope::statement}` never reached an ancestor of the chain.** The internal walk was
   declared as `(aExecuter, aResolver, aExpression, aFilter, aDefault)` but recursed with its five
@@ -469,11 +432,11 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   root holds a value. It is a regression, not an original defect — the call site was not adjusted
   when `aExecuter` was prepended to the parameter list in 2025-07. Where two resolvers carry the
   same name, the first one found climbing towards the root now answers, the same shadowing rule as
-  an unprefixed lookup. See `SPECIFICATION.md` 5.3.
+  an unprefixed lookup.
 
 - **A scope prefix that no resolver carries answered `null` and skipped the default value.** It now
   answers `undefined`, and a default value passed to `resolve` or `resolveText` applies to it as
-  it does to every other result. See `SPECIFICATION.md` 5.4.
+  it does to every other result.
 
 - **`ExpressionResolver.buildSecure`, now `buildFiltered`, threw a `TypeError` on every call.** It passed
   `ObjectUtils.filter` a single object where that helper takes three positional arguments, so
@@ -484,7 +447,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   effect. The constructor options travel inside `option` together with `deep` —
   `buildFiltered({ context, propFilter, option : { deep, name, parent, executer } })` — and
   `executer` is among them, which was missing by oversight, so a filtered resolver could not be
-  pinned to an execution strategy. See `SPECIFICATION.md` 6.7.
+  pinned to an execution strategy.
 
 - **The expression cache evicted the entries it should have kept.** `CodeCache` refreshed a
   marker on every read but ordered the eviction by write time, so it dropped the least

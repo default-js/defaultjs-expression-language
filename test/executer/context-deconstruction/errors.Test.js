@@ -8,9 +8,10 @@ import { catchError } from "../../TestUtils.js";
  * It binds every name the context carries and filters nothing (DECISIONS.md, 2026-09-22), so a name
  * that is no identifier makes the generated function fail to compile - and the message has to say
  * which statement it was and which name did it, because the statement itself may not mention that
- * name at all.
+ * name at all. A compilation the page refuses is no such failure, and no name is blamed for it.
  *
- * Every case hands the executer a statement and a plain data context, and nothing else.
+ * Every case hands the executer a statement and a plain data context, and nothing else - the case of
+ * the refusal also lends it the Function constructor of a frame that refuses.
  */
 
 describe("ContextDeconstructorExecuter - a name it cannot bind", () => {
@@ -31,6 +32,35 @@ describe("ContextDeconstructorExecuter - a name it cannot bind", () => {
 		const error = await catchError(() => executer.execute("1 + 1", { [Symbol("marker")]: 1 }));
 		expect(error.message.includes("Symbol(marker)")).toBe(true);
 		expect(error.message.includes("1 + 1")).toBe(true);
+	});
+});
+
+describe("ContextDeconstructorExecuter - a compilation the page refuses", () => {
+
+	// The suite's own page allows eval, so the refusal comes from a frame whose policy does not: a
+	// Function constructor refuses by the policy of the realm it belongs to, whoever calls it. The
+	// executer compiles with the global Function, so the case swaps in the frame's for one call. The
+	// context carries a name, because without one there is nothing the executer could blame.
+	it("hands the refusal on as it is", async () => {
+		const frame = document.createElement("iframe");
+		frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`;
+		await new Promise((resolve) => {
+			frame.onload = resolve;
+			document.body.append(frame);
+		});
+
+		const original = globalThis.Function;
+		globalThis.Function = frame.contentWindow.Function;
+		let error;
+		try {
+			// never compiled before, so the call is a cache miss and compiles
+			error = await catchError(() => executer.execute(`${Date.now()} + value`, { value: 1 }));
+		} finally {
+			globalThis.Function = original;
+			frame.remove();
+		}
+
+		expect(error.name).toBe("EvalError");
 	});
 });
 

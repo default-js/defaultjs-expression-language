@@ -45,7 +45,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-30) | — |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
-| 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; Frank's review of the specification open | B-21, B-52 |
+| 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; Frank's review of the specification open | B-21, B-54, B-55 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-40 |
 
 **Markers, counted 2026-10-01** (`npm test`: 326 passed, 326 cases). No `it.fails` is left and no
@@ -59,9 +59,9 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | --- | --- | --- | --- | --- | --- |
 | B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
-| B-53 | Under a CSP without `'unsafe-eval'` the default executer blames the context's names | agreed | defect | | |
 | B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
-| B-52 | `SPECIFICATION.md` is internal, but the package publishes it and points consumers at it | decision | docs | | |
+| B-54 | Published files point at `DECISIONS.md` and `AGENTS.md`, which the package does not ship | decision | docs | | |
+| B-55 | `CHANGELOG.md` says two things the code does not do | agreed | docs | | |
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
@@ -114,23 +114,6 @@ a property named `ctx` has no way out. Open with it: whether the option belongs 
 `setupExecuter(options)` next to `size`, and what happens to the code cache, which is keyed by the
 statement text alone — entries compiled under the old identifier would answer for the new one.
 
-### B-53 · Under a CSP without `'unsafe-eval'` the default executer blames the context's names
-
-- **Status:** investigate — cause confirmed, how to test it is open; found 2026-10-01 while
-  documenting the CSP requirement in `README.md`
-- **Kind:** defect
-- **Records:** `CHANGELOG.md`
-
-Every executer compiles with `new Function`, which a Content Security Policy without
-`'unsafe-eval'` refuses. `generate` in `src/executer/ContextDeconstructorExecuter.js` takes any
-compile failure for a name problem and asks `unusableNames`, which compiles one pattern per name
-with `new Function` as well — refused too, so every name counts as unusable. Probed in Chromium with
-`script-src 'self'` and the browser bundle: `resolve("${ 1 + 1 }", {})` rejects with a `SyntaxError`
-*Context property names "constructor", … cannot be used as a variable*, naming the twelve names of
-`Object.prototype`. The refusal itself never reaches the caller. The test has to
-reproduce the refusal; a case faking `new Function` is the candidate, since the suite's own page
-allows eval.
-
 ## Documentation
 
 ### B-21 · `SPECIFICATION.md` has not been read rule by rule since it was written
@@ -143,24 +126,38 @@ The read-through against the code, the suite and a node probe is done, and every
 fixed or has its own entry. What is left: Frank has further points from reviewing the restructure.
 They are added here when they come, and the entry is closed once they are worked in.
 
-### B-52 · `SPECIFICATION.md` is internal, but the package publishes it and points consumers at it
+### B-54 · Published files point at `DECISIONS.md` and `AGENTS.md`, which the package does not ship
 
-- **Status:** decision
+- **Status:** decision — found 2026-10-03 while taking the specification out of the published files
 - **Kind:** docs
-- **Records:** `CHANGELOG.md`, `DECISIONS.md`, `AGENTS.md`
+- **Records:** `CHANGELOG.md`, `DECISIONS.md`
 
-Frank, 2026-10-01: the specification is internal, the readme public — so `README.md` no longer
-refers to it. Everything else still treats it as published:
+The case of the specification (`DECISIONS.md`, 2026-10-03), for two other internal records.
+`package.json` ships neither of them, but:
 
-- `package.json` lists it under `files`, and `CHANGELOG.md` announces under `Added` that it ships.
-- `DECISIONS.md` 2026-08-22 decided "published with the package", and `AGENTS.md` (Records) says so.
-- A consumer meets it at runtime: the `TypeError` for a bad resolver name in
-  `src/ExpressionResolver.js` ends in `(SPECIFICATION.md 3.3)`.
-- The JSDoc of the published sources cites its sections throughout.
+- `CHANGELOG.md` names `DECISIONS.md` in its header — "`DECISIONS.md` carries the reasoning" — and
+  points at it from six entries.
+- Six comments under `src/` cite `DECISIONS.md` with a date: `ExpressionResolver.js`,
+  `ExpressionScanner.js`, `ResolverContextHandle.js` twice, `ContextDeconstructorExecuter.js` twice.
+  The header of `src/Utils.js` cites `AGENTS.md`, Conventions.
 
-To decide: whether it leaves `files`. If so, the changelog entry, the decision and `AGENTS.md`
-change with it and the error message loses the reference; whether the JSDoc citations stay, as
-pointers for maintainers into a file the consumer does not have, is a question of its own.
+To decide: whether the rule of 2026-10-03 covers every internal record. Unlike the rules of the
+specification, the reasoning of a decision is not restated in any published file, so dropping the
+pointers drops the only path from the changelog to the *why*, which a reader on GitHub can follow.
+
+### B-55 · `CHANGELOG.md` says two things the code does not do
+
+- **Status:** agreed — the code and the specification (4.2, 7) decide the wording; found 2026-10-03
+- **Kind:** docs
+- **Records:** `CHANGELOG.md`
+
+- The entry *The static entry points reject a first argument that is neither a string nor an
+  object* ends: "The instance method `resolveText` still hands a non-string back as it is." It
+  rejects one with a `TypeError`, as the entry *The instance `resolve` and `resolveText` reject an
+  argument that is not a string* says.
+- The entry *`resolve` rejects a delimited expression that does not end with `}`* says that an
+  invalid statement between the delimiters "is caught as before". Under `resolve` it is logged and
+  handed on, as the entry *`resolve` no longer catches an error* says; only `resolveText` catches it.
 
 ## Benchmarks
 

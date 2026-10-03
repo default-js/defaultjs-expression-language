@@ -1,7 +1,7 @@
 /**
- * Finds the expressions of a text and takes a single expression apart - SPECIFICATION.md 3.1 to
- * 3.3 and 4.3. It reads where an expression begins and ends, whether it is escaped, and which scope
- * prefix it carries; evaluating a statement and addressing a scope is ExpressionResolver's.
+ * Finds the expressions of a text and takes a single expression apart. It reads where an expression
+ * begins and ends, whether it is escaped, and which scope prefix it carries; evaluating a statement
+ * and addressing a scope is ExpressionResolver's.
  *
  * Internal to the package: index.js does not export it.
  */
@@ -10,8 +10,7 @@ import { WHITESPACE, isNameCharacter, trimToNull } from "./Utils.js";
 
 const EXPRESSION_START = "${";
 
-// the scanner states - everything that is not code hides the braces inside it, see
-// SPECIFICATION.md 3.1
+// the scanner states - everything that is not code hides the braces inside it
 const CODE = 0;
 const SINGLE_QUOTED = 1;
 const DOUBLE_QUOTED = 2;
@@ -80,7 +79,7 @@ const slashOpensRegex = (aText, aIndex, theComments) => {
 const isLineTerminator = (aCode) => aCode === LINE_FEED || aCode === CARRIAGE_RETURN || aCode === LINE_SEPARATOR || aCode === PARAGRAPH_SEPARATOR;
 
 /*
- * Two splits take the text between the delimiters apart into the scope prefix of 3.3 and the
+ * Two splits take the text between the delimiters apart into the scope prefix and the
  * statement - this one for a text, `splitScopeAndStatementBySeparator` behind `parseExpression` for
  * the single expression of `resolve`. They are two implementations of the one rule, each measured
  * faster for other statements (DECISIONS.md, 2026-09-27): a text reads forwards, the single
@@ -125,7 +124,7 @@ const countBackslashesBefore = (aText, aIndex) => {
  * inside a literal or a comment, and takes it apart into scope prefix and statement.
  *
  * Answers the occurrence `scan` hands on, `end` the index directly after the matching closing brace;
- * null where the text ends before that brace, which per SPECIFICATION.md 3.1 means there is no
+ * null where the text ends before that brace, which means there is no
  * expression here at all; and, with `end` negated, the index of another "${" met outside a literal
  * or a comment, which starts an expression of its own and abandons this one.
  *
@@ -223,7 +222,7 @@ export const scan = (aText) => {
 	let start = aText.indexOf(EXPRESSION_START);
 
 	while (start >= 0) {
-		// 3.2: an odd run of backslashes escapes the delimiter itself. It opens nothing, so only
+		// an odd run of backslashes escapes the delimiter itself. It opens nothing, so only
 		// those two characters are taken out of the text and the scan carries on behind them -
 		// what would have been the statement is ordinary text and may hold expressions of its own.
 		if (countBackslashesBefore(aText, start) % 2 === 1) {
@@ -251,10 +250,10 @@ export const scan = (aText) => {
 };
 
 /**
- * Takes the one expression `resolve` is handed apart - SPECIFICATION.md 4.3.
+ * Takes the one expression `resolve` is handed apart.
  *
  * Which form is in hand is decided by the first characters of the trimmed input. The whole input
- * is one expression, so its end is the end of the input. The escaping of 3.2 does not apply here -
+ * is one expression, so its end is the end of the input. Escaping a delimiter does not apply here -
  * it is a rule of the text form, and there is no surrounding text, so a backslash belongs to the
  * statement.
  *

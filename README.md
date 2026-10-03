@@ -110,7 +110,7 @@ statement with `new Function`, so:
   [`buildFiltered`](#filtered-contexts) limits that: they decide which data an expression finds,
   not what it may do. Nothing in this package is a sandbox.
 - **A Content Security Policy has to allow `'unsafe-eval'`** in `script-src`. Without it no
-  statement compiles.
+  statement compiles, and the refusal reaches the caller as the browser's `EvalError`.
 
 ## API at a glance
 

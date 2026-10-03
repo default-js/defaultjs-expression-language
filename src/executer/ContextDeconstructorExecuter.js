@@ -4,7 +4,7 @@ import CodeCache from "../CodeCache.js";
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 
 let DEBUG = false;
-/** The name this executer is registered under, and the default executer - SPECIFICATION.md 9.2. */
+/** The name this executer is registered under, and the default executer. */
 export const EXECUTERNAME = "context-deconstruction-executer";
 const EXPRESSION_CACHE = new CodeCache();
 
@@ -48,7 +48,7 @@ export const setDebug = (value) => {
 };
 
 /**
- * Configures the code cache of this executer - SPECIFICATION.md 9.3. `size` is the only option
+ * Configures the code cache of this executer. `size` is the only option
  * today; an option left out changes nothing.
  *
  * @param {import('../CodeCache.js').CodeCacheOptions} options
@@ -83,7 +83,7 @@ const getOrCreateFunction = (aStatement, contextProperties) => {
  *
  * **Nothing is carried back.** A statement that assigns to a context name writes into a local
  * binding, and that binding is gone when the function returns - so a write is not readable
- * afterwards (SPECIFICATION.md 6.5 leaves that to the executer). That is a decision rather than a gap: the
+ * afterwards, which the resolver leaves to each executer. That is a decision rather than a gap: the
  * write-back this executer carried between 2026-09-07 and 2026-09-20 cost a factor of eleven on a
  * cache miss, because it needs every context name declared in the body instead of listed in the
  * parameter list. Speed is what this executer is for, and a consumer who needs a write to persist
@@ -134,6 +134,11 @@ return (async ({${thePropertyNameString}}) => {
 	try {
 		return new Function("context", code);
 	} catch (e) {
+		// only a syntax error can come from a name. Anything else - the EvalError of a Content Security
+		// Policy without 'unsafe-eval' among them - is handed on: asking about the names would be
+		// refused as well, and every name would be blamed
+		if (!(e instanceof SyntaxError)) throw e;
+
 		const unusable = unusableNames(theNames);
 		// nothing wrong with the names: the statement itself does not compile, and that error says
 		// more than anything this executer could add
@@ -148,7 +153,7 @@ return (async ({${thePropertyNameString}}) => {
 
 /**
  * The executer: destructures the context into the parameters of a generated function, so a
- * statement addresses a context value by its bare name - SPECIFICATION.md 9.2, `README.md`.
+ * statement addresses a context value by its bare name - see `README.md`.
  * Registered under `EXECUTERNAME` on import.
  *
  * @type {Executer}

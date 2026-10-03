@@ -36,7 +36,7 @@ const findPropertyDescriptor = (data, property) => {
  *
  * Because every name is present, such a resolver answers every lookup that reaches it, and no
  * handle nearer the root is reached. It lists no name of its own, so the ownKeys trap of a handle
- * further from the root reports none of the global object's - SPECIFICATION.md 6.4.
+ * further from the root reports none of the global object's.
  *
  * @param {ResolverContextHandle} handle
  * @returns {NameCache}
@@ -60,7 +60,7 @@ const createGlobalNameCache = (handle) => {
 			// is found from anywhere below; listing it as well would only hand it to an executer that
 			// turns a name into code, which then fails over names it never needed - the index "0" of
 			// a frame, a symbol another library planted. A statement reaches a global through the
-			// ordinary scope chain anyway (SPECIFICATION.md 6.4).
+			// ordinary scope chain anyway.
 			return [];
 		},
 	};
@@ -69,7 +69,7 @@ const createGlobalNameCache = (handle) => {
 /**
  * What stands behind the context of one resolver: the object handed to it, the handle of its parent,
  * and the name cache that tells which names this resolver provides. It hands out the context an
- * expression sees, a proxy that answers for the whole chain - SPECIFICATION.md 5.2, 6.1 to 6.5.
+ * expression sees, a proxy that answers for the whole chain.
  *
  * Internal to the package: index.js does not export it (DECISIONS.md, 2026-09-30).
  *
@@ -92,7 +92,7 @@ export default class ResolverContextHandle {
 	 * @constructor
 	 * @param {?object} context the object the caller handed over, kept rather than copied. Where none
 	 * is passed, the handle holds no object at all and carries no name, not even one of
-	 * Object.prototype - SPECIFICATION.md 6.3. It gets an object on the first write.
+	 * Object.prototype. It gets an object on the first write.
 	 * @param {?ResolverContextHandle} parent the handle of the parent resolver
 	 */
 	constructor(context, parent) {
@@ -141,7 +141,7 @@ export default class ResolverContextHandle {
 					if (!handle) return undefined;
 
 					// Read through a getter rather than up front, so enumerating a context does not
-					// evaluate what nobody asked for, and so a value stays live (6.2). Enumerability
+					// evaluate what nobody asked for, and so a value stays live. Enumerability
 					// is taken from where the property is defined - that is what keeps the members
 					// of Object.prototype out of Object.keys - while configurable has to be true:
 					// a proxy may not claim a fixed property its target does not have.
@@ -172,7 +172,7 @@ export default class ResolverContextHandle {
 
 	/**
 	 * The context an expression sees: a proxy that answers for the whole chain, or over the global
-	 * object the global object itself - SPECIFICATION.md 6.1, 6.4.
+	 * object the global object itself.
 	 *
 	 * @readonly
 	 * @type {object}
@@ -191,7 +191,7 @@ export default class ResolverContextHandle {
 
 	/**
 	 * Whether this handle provides the name itself. Every name of its own context counts, the ones
-	 * inherited through the prototype chain included (5.2); a handle over the global object
+	 * inherited through the prototype chain included; a handle over the global object
 	 * provides every name.
 	 *
 	 * @param {string|symbol} key
@@ -203,7 +203,7 @@ export default class ResolverContextHandle {
 
 	/**
 	 * Whether this handle provides a context: one was handed to the constructor, or a value has been
-	 * written since. What the data holds decides nothing - SPECIFICATION.md 5.5.
+	 * written since. What the data holds decides nothing.
 	 *
 	 * @readonly
 	 * @type {boolean}
@@ -225,7 +225,7 @@ export default class ResolverContextHandle {
 
 	/**
 	 * Assigns the keys of an object into the one this handle holds, key by key, creating that object
-	 * where there is none - SPECIFICATION.md 6.6.
+	 * where there is none.
 	 *
 	 * @param {object} data
 	 * @throws {TypeError} where the object held refuses a key - the keys before it are written by then
@@ -239,7 +239,7 @@ export default class ResolverContextHandle {
 
 	/**
 	 * Takes up the keys added to the handed-in object since the handle was built, which are not
-	 * provided until then - SPECIFICATION.md 6.2.
+	 * provided until then.
 	 */
 	resetCache() {
 		this.#cache = this.#buildNameCache();
@@ -247,7 +247,7 @@ export default class ResolverContextHandle {
 
 	/**
 	 * A new name cache for the object this handle holds: every key it carries, its prototype chain
-	 * included, each mapped to this handle (5.2). Over the global object the stand-in of
+	 * included, each mapped to this handle. Over the global object the stand-in of
 	 * `createGlobalNameCache`, which provides every name.
 	 *
 	 * @returns {NameCache}
@@ -270,8 +270,7 @@ export default class ResolverContextHandle {
 	}
 
 	/**
-	 * The nearest handle from this one to the root that provides the name, or null where none does -
-	 * SPECIFICATION.md 5.2.
+	 * The nearest handle from this one to the root that provides the name, or null where none does.
 	 *
 	 * @param {string|symbol} property
 	 * @returns {ResolverContextHandle|null}

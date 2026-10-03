@@ -2,12 +2,12 @@ import { register } from "../ExecuterRegistry.js";
 import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 
-/** The name this executer is registered under - SPECIFICATION.md 9.2. */
+/** The name this executer is registered under. */
 export const EXECUTERNAME = "context-object-executer";
 const EXPRESSION_CACHE = new CodeCache();
 
 /**
- * Configures the code cache of this executer - SPECIFICATION.md 9.3. `size` is the only option
+ * Configures the code cache of this executer. `size` is the only option
  * today; an option left out changes nothing.
  *
  * @param {import('../CodeCache.js').CodeCacheOptions} options
@@ -58,7 +58,7 @@ const getOrCreateFunction = (aStatement) => {
 
 /**
  * The executer: hands the context over as one object named `ctx`, so a statement addresses a
- * context value as `ctx.value` - SPECIFICATION.md 9.2, `README.md`. Registered under
+ * context value as `ctx.value` - see `README.md`. Registered under
  * `EXECUTERNAME` on import.
  *
  * @type {Executer}

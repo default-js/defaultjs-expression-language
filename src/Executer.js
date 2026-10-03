@@ -1,5 +1,5 @@
 /**
- * The interface every executer implements - SPECIFICATION.md 9.1. An executer runs statements and
+ * The interface every executer implements. An executer runs statements and
  * holds no context of its own: the context always comes from the resolver.
  *
  * An own implementation is built from it by handing over the function that does the work.

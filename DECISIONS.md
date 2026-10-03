@@ -19,6 +19,30 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-10-03 — Does `SPECIFICATION.md` ship with the package, and may a published file cite it?
+
+**Decision:** No to both. `SPECIFICATION.md` is internal: `package.json` does not list it under
+`files`, and no published file refers to it — not `README.md`, not `CHANGELOG.md`, no comment under
+`src/` and no error message, by name or by section number. Where a published file needs a rule, it
+states the rule in its own words. Frank's decisions, the first on 2026-10-01 for `README.md`, the
+rest on 2026-10-03.
+
+**Reasoning:** The specification is written for the people who maintain the package: it is the
+release gate for 3.0.0 (2026-09-05) and the reference a fix is derived from. `README.md` is the
+document a consumer reads. A published file that cites the specification points the consumer at a
+file the package does not carry. That holds for the comments under `src/` too, because the sources
+ship untranspiled and a consumer reads their JSDoc in the editor.
+
+**Alternatives:** Shipping the specification, decided on 2026-08-22 and withdrawn here, because it
+would make the internal reference a second consumer document beside `README.md`. Keeping the
+citations in the JSDoc as pointers for maintainers was rejected for the reason above. It becomes the
+better choice if the sources stop being published as they are.
+
+**Consequences:** The only link from a rule to the code left is the header of each test file,
+which names the sections it pins (`TESTING.md`). A comment under `src/` that has to explain a
+rule explains it. A change to the specification is no longer visible to consumers and needs no
+changelog entry of its own.
+
 ## 2026-10-01 — Does a scope name take letters beyond ASCII?
 
 **Decision:** No. A scope name, and so a resolver name, takes the ASCII letters, digits,
@@ -1388,8 +1412,8 @@ structure.
 ## 2026-08-22 — Where does the specification of the resolver live, and what is it for?
 
 **Decision:** A permanent `SPECIFICATION.md` in the repository root, written from an interview
-with the author rather than from the code, and published with the package. `README.md` carries
-the consumer-facing subset, this file carries the reasoning behind individual answers.
+with the author rather than from the code. `README.md` carries the consumer-facing subset, this
+file carries the reasoning behind individual answers. The package does not ship it (2026-10-03).
 
 **Reasoning:** There was no statement of what the `ExpressionResolver` is meant to do. The code
 could not supply one: at least one of its behaviours turned out to be a year-old regression
@@ -1405,7 +1429,6 @@ somewhere.
 **Consequences:** A fourth permanent record to keep in step. The specification states intended
 behaviour; where the code does not keep it yet, `BACKLOG.md` carries the entry (2026-09-05), and the
 specification is the reference for what the fix has to achieve.
-Publishing it adds a file to the `files` array.
 
 ## 2026-08-22 — Does a key holding `undefined` shadow a value nearer the root?
 

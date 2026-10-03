@@ -20,19 +20,20 @@ const toDefaultValue = (value) => {
 let NAME_COUNTER = 0;
 /**
  * The name a resolver carries where the caller passed none. Only uniqueness is promised, the shape
- * is not - SPECIFICATION.md 5.1.
+ * is not.
  *
  * @returns {string}
  */
 const generateName = () => `ER${++NAME_COUNTER}`;
 
 /**
- * The name a resolver keeps: the one passed, trimmed and held to the rule of 3.3, or a generated one
- * where none was passed - SPECIFICATION.md 5.1.
+ * The name a resolver keeps: the one passed, trimmed and held to the characters a scope name may
+ * carry, or a generated one where none was passed.
  *
  * @param {?string} aName
  * @returns {string}
- * @throws {TypeError} where the name is no string, empty, or carries a character 3.3 does not allow
+ * @throws {TypeError} where the name is no string, empty, or carries a character a scope name cannot
+ * carry
  */
 const toName = (aName) => {
 	if (aName == null) return generateName();
@@ -41,14 +42,14 @@ const toName = (aName) => {
 	const name = trimToNull(aName);
 	if (name == null) throw new TypeError("The option name takes a name, not an empty string!");
 	for (let index = 0; index < name.length; index++)
-		if (!isNameCharacter(name.charCodeAt(index))) throw new TypeError(`The name "${name}" carries a character a scope name cannot carry (SPECIFICATION.md 3.3)!`);
+		if (!isNameCharacter(name.charCodeAt(index))) throw new TypeError(`The name "${name}" carries a character a scope name cannot carry - only ASCII letters, digits, "-", "_" and whitespace are allowed!`);
 
 	return name;
 };
 
 /**
  * The scope name a filter of the data methods selects, read like a scope prefix: trimmed, and null
- * where there is none - SPECIFICATION.md 6.6.
+ * where there is none.
  *
  * @param {?string} aFilter
  * @returns {?string}
@@ -63,7 +64,7 @@ const toScope = (aFilter) => {
 
 /**
  * The property key a data method works with - a string, "" included, a symbol, or a number, which
- * names the same property as its string and is looked up as one - SPECIFICATION.md 6.6.
+ * names the same property as its string and is looked up as one.
  *
  * @param {string|number|symbol} aKey
  * @returns {string|symbol}
@@ -78,13 +79,13 @@ const toKey = (aKey) => {
 };
 
 const execute = async function (anExecuter, aStatement, aContext) {
-	// 3.4: an empty statement answers undefined, the same as `return;` in JavaScript. The scanner
+	// an empty statement answers undefined, the same as `return;` in JavaScript. The scanner
 	// hands every statement over trimmed, and an empty one as null.
 	if (aStatement == null) return undefined;
 	if (typeof aStatement !== "string") return aStatement;
 
-	// an error is deliberately not caught here: section 7 gives the two entry points different
-	// answers to it, so each of them handles it for itself
+	// an error is deliberately not caught here: the two entry points answer it differently, so
+	// each of them handles it for itself
 	return await anExecuter.execute(aStatement, aContext);
 };
 
@@ -104,10 +105,9 @@ const withDefault = (aResult, aDefault) => {
 };
 
 const resolveInScope = async function (anExecuter = DEFAULT_EXECUTER, aResolver, aStatement, aScope, aDefault) {
-	// 5.3: climbs in a loop rather than by recursion - one call per resolver climbed cost a promise
+	// climbs in a loop rather than by recursion - one call per resolver climbed cost a promise
 	// each and overflowed the stack on a deep chain. A scope no resolver of the chain carries
-	// answers undefined, and the default applies to it like to any other result - see
-	// SPECIFICATION.md 5.4
+	// answers undefined, and the default applies to it like to any other result
 	if (aScope)
 		while (aResolver.name != aScope) {
 			aResolver = aResolver.parent;
@@ -117,16 +117,16 @@ const resolveInScope = async function (anExecuter = DEFAULT_EXECUTER, aResolver,
 	return withDefault(await execute(anExecuter, aStatement, aResolver.context), aDefault);
 };
 
-// 4.1: the first argument of a static entry point is a string, or a configuration object
+// the first argument of a static entry point is a string, or a configuration object
 const isConfiguration = (aValue) => aValue !== null && typeof aValue === "object";
 
-// 4.1: a configuration counts as passing a default where it carries the key, whatever it holds
+// a configuration counts as passing a default where it carries the key, whatever it holds
 const defaultOf = (aConfiguration) => ("defaultValue" in aConfiguration ? aConfiguration.defaultValue : DEFAULT_NOT_DEFINED);
 
 /**
  * Resolves `${...}` expressions against a context. A resolver may have a parent, and the resolvers
  * from it up to the root form a chain: a name is looked up from this resolver towards the root, and
- * a scope prefix `${name::statement}` addresses one resolver of the chain - SPECIFICATION.md 2, 5.
+ * a scope prefix `${name::statement}` addresses one resolver of the chain.
  *
  * Used statically with an ad-hoc context (`resolve`, `resolveText`), or as an instance within a
  * chain.
@@ -138,7 +138,7 @@ const defaultOf = (aConfiguration) => ("defaultValue" in aConfiguration ? aConfi
 export default class ExpressionResolver {
 	/**
 	 * Sets the executer a resolver without a parent takes where the `executer` option is left out,
-	 * and so the executer of the static entry points - SPECIFICATION.md 9.1.
+	 * and so the executer of the static entry points.
 	 *
 	 * @param {string|Executer} anExecuter a registered name or an `Executer` instance
 	 * @throws {Error} where a name is not registered
@@ -151,7 +151,7 @@ export default class ExpressionResolver {
 
 	/**
 	 * The executer a resolver without a parent takes where the `executer` option is left out;
-	 * `context-deconstruction-executer` until it is set - SPECIFICATION.md 9.2.
+	 * `context-deconstruction-executer` until it is set.
 	 *
 	 * @type {Executer}
 	 */
@@ -174,16 +174,16 @@ export default class ExpressionResolver {
 	 * @constructor
 	 * @param {object} [options]
 	 * @param {object} [options.context] any object; where none is passed - left out, null or
-	 * undefined - the resolver has no context of its own - 4.2, 6.3
+	 * undefined - the resolver has no context of its own
 	 * @param {ExpressionResolver} [options.parent=null]
-	 * @param {?string} [options.name=null] kept trimmed; where none is passed, one is generated - 5.1
+	 * @param {?string} [options.name=null] kept trimmed; where none is passed, one is generated
 	 * @param {(string|Executer)} [options.executer] the registered name of an executer, or an
 	 * `Executer` instance. A name that is not registered throws; an instance needs no registration,
 	 * because it addresses the executer directly. Anything else counts as left out. Without the
 	 * option the resolver takes the executer of its parent, and one without a parent
-	 * `ExpressionResolver.defaultExecuter` - 4.2.
-	 * @throws {TypeError} where the parent is no resolver, the context a primitive, or the name breaks
-	 * the rule of 5.1 - 4.2
+	 * `ExpressionResolver.defaultExecuter`.
+	 * @throws {TypeError} where the parent is no resolver, the context a primitive, or the name no
+	 * string, empty, or carrying a character a scope name cannot carry
 	 * @throws {Error} where the executer is named and the name is not registered
 	 */
 	constructor({ context, parent = null, name = null, executer } = {}) {
@@ -202,7 +202,7 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * The name this resolver is addressed by in a scope prefix and a filter - 5.1.
+	 * The name this resolver is addressed by in a scope prefix and a filter.
 	 *
 	 * @readonly
 	 * @type {string}
@@ -221,8 +221,8 @@ export default class ExpressionResolver {
 
 	/**
 	 * The context of this resolver as an expression sees it. It is not the object passed to the
-	 * constructor and it answers for the whole chain - 6.1. Over the global object it is the global
-	 * object itself - 6.4.
+	 * constructor and it answers for the whole chain. Over the global object it is the global
+	 * object itself.
 	 *
 	 * @readonly
 	 * @type {object}
@@ -232,7 +232,7 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * The executer in use, chosen once in the constructor - 4.2.
+	 * The executer in use, chosen once in the constructor.
 	 *
 	 * @readonly
 	 * @type {Executer}
@@ -242,7 +242,7 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * The internal handle behind the context. Public only for `resetCache` (6.2), and only until the
+	 * The internal handle behind the context. Public only for `resetCache`, and only until the
 	 * name cache is measured - DECISIONS.md, 2026-09-30.
 	 *
 	 * @readonly
@@ -254,7 +254,7 @@ export default class ExpressionResolver {
 
 	/**
 	 * The names of every resolver from the root down to this one, as a path - `/root/…/this`. It
-	 * describes the structure and does not change - SPECIFICATION.md 5.5.
+	 * describes the structure and does not change.
 	 *
 	 * @readonly
 	 * @type {string}
@@ -274,7 +274,7 @@ export default class ExpressionResolver {
 	/**
 	 * The names of the resolvers from the root down to this one that provide a context, as a path
 	 * like `chain`. A resolver built without a context joins it the moment a value is set on it, so
-	 * this describes a state and not the structure - SPECIFICATION.md 5.5. Where none provides one,
+	 * this describes a state and not the structure. Where none provides one,
 	 * the answer is the empty string.
 	 *
 	 * @readonly
@@ -294,7 +294,7 @@ export default class ExpressionResolver {
 
 	/**
 	 * The contexts of exactly the resolvers `effectiveChain` names, as an array, this resolver's
-	 * first and the root's last. A state like `effectiveChain` - SPECIFICATION.md 5.5.
+	 * first and the root's last. A state like `effectiveChain`.
 	 *
 	 * @readonly
 	 * @type {Array<object>}
@@ -315,9 +315,9 @@ export default class ExpressionResolver {
 	 * The resolver a call addresses: the one the filter names, or the resolver the call was made on
 	 * where no filter is given.
 	 *
-	 * A filter selects exactly one resolver by the rule of 5.3, and a filter matching none throws -
-	 * a wrong name in an API call is a mistake in the calling code, unlike a scope prefix inside an
-	 * expression, which answers undefined (5.4). See SPECIFICATION.md 6.6.
+	 * A filter selects exactly one resolver, the nearest of that name from here towards the root, and
+	 * a filter matching none throws - a wrong name in an API call is a mistake in the calling code,
+	 * unlike a scope prefix inside an expression, which answers undefined.
 	 *
 	 * @param {?string} aScope the filter as `toScope` reads it
 	 * @returns {ExpressionResolver}
@@ -336,8 +336,7 @@ export default class ExpressionResolver {
 
 	/**
 	 * The nearest resolver from here to the root that carries the key itself, or null where none
-	 * carries it. What decides is whether a resolver provides the name, not what it holds -
-	 * SPECIFICATION.md 5.2.
+	 * carries it. What decides is whether a resolver provides the name, not what it holds.
 	 *
 	 * @param {string} key
 	 * @returns {ExpressionResolver|null}
@@ -353,9 +352,9 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * Reads a value along the chain from the addressed resolver by the rule of 5.2. Without a key -
+	 * Reads a value along the chain, from the addressed resolver towards the root. Without a key -
 	 * null or undefined - it answers the whole context of that resolver, which still sees the chain on
-	 * every access - SPECIFICATION.md 6.1, 6.6.
+	 * every access.
 	 *
 	 * @param {?(string|number|symbol)} [key] a property key; a number is looked up as its string
 	 * @param {?string} [filter] the scope name of the resolver the call addresses; without one, this
@@ -374,7 +373,7 @@ export default class ExpressionResolver {
 	/**
 	 * Sets a value, in the object the caller handed over. Without a filter the value is changed where
 	 * the key lives, counting from here towards the root, and created here where no resolver carries
-	 * it. With a filter the addressed resolver is the target outright - SPECIFICATION.md 6.6.
+	 * it. With a filter the addressed resolver is the target outright.
 	 *
 	 * @param {string|number|symbol} key a property key; a number is looked up as its string
 	 * @param {*} value
@@ -395,7 +394,7 @@ export default class ExpressionResolver {
 	/**
 	 * Removes the key from one resolver - the addressed one with a filter, and without one the first
 	 * resolver carrying it, counting from here towards the root. Removing it uncovers the value of
-	 * the next resolver that carries the same key - SPECIFICATION.md 6.6.
+	 * the next resolver that carries the same key.
 	 *
 	 * @param {string|number|symbol} key a property key; a number is looked up as its string
 	 * @param {?string} [filter] the scope name of the resolver the call addresses
@@ -415,7 +414,7 @@ export default class ExpressionResolver {
 	/**
 	 * A shallow assignment, key by key, into the context of the addressed resolver, replacing what is
 	 * there and adding what is not. No search along the chain: a merged key shadows the resolvers
-	 * above from here on - SPECIFICATION.md 6.6.
+	 * above from here on.
 	 *
 	 * @param {?object} context the keys to assign; null or undefined changes nothing
 	 * @param {?string} [filter] the scope name of the resolver the call addresses
@@ -433,27 +432,27 @@ export default class ExpressionResolver {
 
 	/**
 	 * Resolves one expression to its value, of whatever type the statement answers. Takes the
-	 * delimited form `${...}`, a scope prefix included, or a bare statement - SPECIFICATION.md 4.2,
-	 * 4.3. An error of the statement is logged and handed on, and the default never covers it - 7.
+	 * delimited form `${...}`, a scope prefix included, or a bare statement. An error of the statement
+	 * is logged and handed on, and the default never covers it.
 	 *
 	 * @async
 	 * @param {string} aExpression
 	 * @param {*} [aDefault] replaces a result of null or undefined where it is passed, undefined
-	 * included - 4.4
+	 * included
 	 * @returns {Promise<*>}
 	 * @throws {TypeError} where the expression is no string
 	 * @throws {SyntaxError} where the input opens with "${" and does not end with "}"
 	 */
 	async resolve(aExpression, aDefault) {
-		// 4.2: a mistake in the calling code, not a failed statement - so no warning and no default
+		// a mistake in the calling code, not a failed statement - so no warning and no default
 		if (typeof aExpression !== "string") throw new TypeError(`resolve takes an expression as a string, not a ${typeof aExpression}!`);
 		const defaultValue = arguments.length == 2 ? toDefaultValue(aDefault) : DEFAULT_NOT_DEFINED;
 		try {
-			// 4.3: the delimited form or a bare statement, told apart by the scanner
+			// the delimited form or a bare statement, told apart by the scanner
 			const { scope, statement } = parseExpression(aExpression);
 			return await resolveInScope(this.#executer, this, statement, scope, defaultValue);
 		} catch (e) {
-			// 7: the error is logged and handed on. resolve answers a value or says why it cannot,
+			// the error is logged and handed on. resolve answers a value or says why it cannot,
 			// and a default value covers a missing result, never an error.
 			warnFailedStatement(aExpression, e);
 			throw e;
@@ -461,14 +460,13 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * Replaces every expression of a text by its value and answers the text - SPECIFICATION.md 4.2,
-	 * 4.3. An expression whose statement fails stands as written, a warning names it, and the rest of
-	 * the text keeps rendering - 7.
+	 * Replaces every expression of a text by its value and answers the text. An expression whose
+	 * statement fails stands as written, a warning names it, and the rest of the text keeps rendering.
 	 *
 	 * @async
 	 * @param {string} aText
 	 * @param {*} [aDefault] replaces a result of null or undefined, per expression, where it is
-	 * passed - 4.4
+	 * passed
 	 * @returns {Promise<string>}
 	 * @throws {TypeError} where the text is no string
 	 */
@@ -482,7 +480,7 @@ export default class ExpressionResolver {
 		let text = "";
 		let position = 0;
 		for (const occurrence of occurrences) {
-			// 3.2: an escaping backslash is consumed, everything else in front of the expression
+			// an escaping backslash is consumed, everything else in front of the expression
 			// stands as written
 			text += aText.substring(position, occurrence.escaped ? occurrence.start - 1 : occurrence.start);
 			position = occurrence.end;
@@ -493,7 +491,7 @@ export default class ExpressionResolver {
 				try {
 					text += await resolveInScope(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue);
 				} catch (e) {
-					// 7: an expression whose statement failed stands as written, and the default value
+					// an expression whose statement failed stands as written, and the default value
 					// does not cover it. The rest of the text keeps rendering.
 					warnFailedStatement(occurrence.statement, e);
 					text += aText.substring(occurrence.start, occurrence.end);
@@ -506,19 +504,19 @@ export default class ExpressionResolver {
 
 	/**
 	 * Resolves one expression against an ad-hoc context, through a resolver of its own, as the instance
-	 * `resolve` does - SPECIFICATION.md 4.1, 4.2.
+	 * `resolve` does.
 	 *
 	 * Takes the arguments positionally, or one configuration object
-	 * `{ expression, context, defaultValue, timeout }`, behind which every argument is ignored -
-	 * SPECIFICATION.md 4.1. A first argument that is neither a string nor an object, and a
-	 * configuration without a string under `expression`, reject with a `TypeError`.
+	 * `{ expression, context, defaultValue, timeout }`, behind which every argument is ignored. A first
+	 * argument that is neither a string nor an object, and a configuration without a string under
+	 * `expression`, reject with a `TypeError`.
 	 *
 	 * @static
 	 * @async
 	 * @param {string|{ expression: string, context?: object, defaultValue?: *, timeout?: number }} aExpression
 	 * @param {?object} [aContext]
-	 * @param {*} [aDefault] replaces a result of null or undefined where it is passed - 4.4
-	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline - 4.5
+	 * @param {*} [aDefault] replaces a result of null or undefined where it is passed
+	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline
 	 * @returns {Promise<*>}
 	 * @throws {TypeError} where the arguments take neither form, or the context is a primitive
 	 */
@@ -544,20 +542,20 @@ export default class ExpressionResolver {
 
 	/**
 	 * Replaces every expression of a text against an ad-hoc context, through a resolver of its own, as
-	 * the instance `resolveText` does - SPECIFICATION.md 4.1, 4.2.
+	 * the instance `resolveText` does.
 	 *
 	 * Takes the arguments positionally, or one configuration object
-	 * `{ text, context, defaultValue, timeout }`, behind which every argument is ignored -
-	 * SPECIFICATION.md 4.1. A first argument that is neither a string nor an object, and a
-	 * configuration without a string under `text`, reject with a `TypeError`.
+	 * `{ text, context, defaultValue, timeout }`, behind which every argument is ignored. A first
+	 * argument that is neither a string nor an object, and a configuration without a string under
+	 * `text`, reject with a `TypeError`.
 	 *
 	 * @static
 	 * @async
 	 * @param {string|{ text: string, context?: object, defaultValue?: *, timeout?: number }} aText
 	 * @param {?object} [aContext]
 	 * @param {*} [aDefault] replaces a result of null or undefined, per expression, where it is
-	 * passed - 4.4
-	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline - 4.5
+	 * passed
+	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline
 	 * @returns {Promise<string>}
 	 * @throws {TypeError} where the arguments take neither form, or the context is a primitive
 	 */
@@ -582,7 +580,7 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * Builds a resolver over a filtered copy of the context - SPECIFICATION.md 6.7.
+	 * Builds a resolver over a filtered copy of the context.
 	 *
 	 * The filter is applied to the context only, never to the globals, so this is a way to hand
 	 * over a cleaned context and not a sandbox.
@@ -612,7 +610,7 @@ export default class ExpressionResolver {
 
 	/**
 	 * The former name of `buildFiltered`, kept until 4.0. It promised a security the method does not
-	 * give - SPECIFICATION.md 6.7.
+	 * give.
 	 *
 	 * @deprecated use `buildFiltered`
 	 * @static

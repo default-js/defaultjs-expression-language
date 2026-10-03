@@ -1,6 +1,6 @@
 /**
  * A default value as the resolver carries it, which tells "no default passed" apart from "the
- * default is undefined" - SPECIFICATION.md 4.4.
+ * default is undefined".
  *
  * @export
  * @class DefaultValue

@@ -8,10 +8,10 @@
 /**
  * @typedef {Object} CodeCacheOptions
  * @property {number} [size] - Maximum number of entries in the cache, a fraction rounded down. If set
- * to 0 or less, caching is disabled. Left out, the size stays as it is - SPECIFICATION.md 9.3.
+ * to 0 or less, caching is disabled. Left out, the size stays as it is.
  */
 
-/** The size every cache starts with - SPECIFICATION.md 9.3. */
+/** The size every cache starts with. */
 const START_SIZE = 5000;
 
 /**

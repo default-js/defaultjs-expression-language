@@ -7,7 +7,7 @@
 export const WHITESPACE = /\s/;
 
 /**
- * Whether a character may stand in a scope name - SPECIFICATION.md 3.3: an ASCII letter, a digit,
+ * Whether a character may stand in a scope name: an ASCII letter, a digit,
  * "-", "_", or whitespace in the sense of `\s`, which past ASCII is left to the regular expression.
  *
  * @param {number} aCode the char code
