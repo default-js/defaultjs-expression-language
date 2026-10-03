@@ -45,7 +45,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-30) | — |
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
-| 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; Frank's review of the specification open | B-21, B-54, B-55 |
+| 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; Frank's review of the specification open | B-21 |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-40 |
 
 **Markers, counted 2026-10-01** (`npm test`: 326 passed, 326 cases). No `it.fails` is left and no
@@ -58,10 +58,10 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | ID | Title | Status | Kind | 3.0.0 | Prio |
 | --- | --- | --- | --- | --- | --- |
 | B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
+| B-57 | The context proxy intercepts six operations, and every other one meets an empty target | idea | gap | | |
+| B-58 | `buildSecure` is removed in 4.0 | agreed | refactor | | low |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
 | B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
-| B-54 | Published files point at `DECISIONS.md` and `AGENTS.md`, which the package does not ship | decision | docs | | |
-| B-55 | `CHANGELOG.md` says two things the code does not do | agreed | docs | | |
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
@@ -100,6 +100,32 @@ cache is keyed by string. Cheap fix if confirmed: answer non-string properties i
 without walking, or give the handle its own `Symbol.unscopables`. Costs every consumer who keeps
 the `with`-based executer; the default moved away from it on 2026-09-01.
 
+### B-57 · The context proxy intercepts six operations, and every other one meets an empty target
+
+- **Status:** idea — moved here on 2026-10-03 from a `TODO` in `src/ResolverContextHandle.js`
+  ("need to support the other proxy actions"), since a published file carries no open work
+- **Kind:** gap · **Spec:** 6.1
+
+The proxy a context hands out traps `has`, `get`, `set`, `deleteProperty`,
+`getOwnPropertyDescriptor` and `ownKeys`. Every other operation — `Object.defineProperty`,
+`Object.getPrototypeOf`, `Object.setPrototypeOf`, `Object.isExtensible`,
+`Object.preventExtensions` — reaches the empty object the proxy stands over, not the chain; the
+changelog states this for three of them. 6.1 says nothing about these operations. Open: which of
+them a context should answer for the chain, and what that costs, before anything is trapped.
+
+### B-58 · `buildSecure` is removed in 4.0
+
+- **Status:** agreed — Frank's decision of 2026-10-01
+- **Kind:** refactor · **Priority:** low — due with 4.0, nothing before it
+- **Spec:** 6.7
+- **Records:** `CHANGELOG.md`, `README.md`, `SPECIFICATION.md`, `DECISIONS.md`
+
+`ExpressionResolver.buildSecure` is a silent alias of `buildFiltered`, deprecated in 3.0.0. It goes
+in 4.0, not earlier (`DECISIONS.md`, 2026-10-01). Since 2026-10-03 no published file names that
+version, so the changelog of 4.0 is the first place a consumer reads it. With it go the alias in
+`src/ExpressionResolver.js`, its rows in `README.md`, its cases in `test/package/surface.Test.js`
+and `test/expressionresolver/buildfiltered.Test.js`, and the sentence in 6.7.
+
 ## Executers
 
 ### B-13 · Should the `ctx` prefix of `ContextObjectExecuter` be configurable?
@@ -125,39 +151,6 @@ statement text alone — entries compiled under the old identifier would answer 
 The read-through against the code, the suite and a node probe is done, and every finding of it is
 fixed or has its own entry. What is left: Frank has further points from reviewing the restructure.
 They are added here when they come, and the entry is closed once they are worked in.
-
-### B-54 · Published files point at `DECISIONS.md` and `AGENTS.md`, which the package does not ship
-
-- **Status:** decision — found 2026-10-03 while taking the specification out of the published files
-- **Kind:** docs
-- **Records:** `CHANGELOG.md`, `DECISIONS.md`
-
-The case of the specification (`DECISIONS.md`, 2026-10-03), for two other internal records.
-`package.json` ships neither of them, but:
-
-- `CHANGELOG.md` names `DECISIONS.md` in its header — "`DECISIONS.md` carries the reasoning" — and
-  points at it from six entries.
-- Six comments under `src/` cite `DECISIONS.md` with a date: `ExpressionResolver.js`,
-  `ExpressionScanner.js`, `ResolverContextHandle.js` twice, `ContextDeconstructorExecuter.js` twice.
-  The header of `src/Utils.js` cites `AGENTS.md`, Conventions.
-
-To decide: whether the rule of 2026-10-03 covers every internal record. Unlike the rules of the
-specification, the reasoning of a decision is not restated in any published file, so dropping the
-pointers drops the only path from the changelog to the *why*, which a reader on GitHub can follow.
-
-### B-55 · `CHANGELOG.md` says two things the code does not do
-
-- **Status:** agreed — the code and the specification (4.2, 7) decide the wording; found 2026-10-03
-- **Kind:** docs
-- **Records:** `CHANGELOG.md`
-
-- The entry *The static entry points reject a first argument that is neither a string nor an
-  object* ends: "The instance method `resolveText` still hands a non-string back as it is." It
-  rejects one with a `TypeError`, as the entry *The instance `resolve` and `resolveText` reject an
-  argument that is not a string* says.
-- The entry *`resolve` rejects a delimited expression that does not end with `}`* says that an
-  invalid statement between the delimiters "is caught as before". Under `resolve` it is logged and
-  handed on, as the entry *`resolve` no longer catches an error* says; only `resolveText` catches it.
 
 ## Benchmarks
 

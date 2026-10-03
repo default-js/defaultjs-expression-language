@@ -1,6 +1,6 @@
 /**
- * The helpers more than one component uses - AGENTS.md, Conventions. Internal to the package:
- * index.js does not export them.
+ * The helpers more than one component uses. Internal to the package: index.js does not export
+ * them.
  */
 
 /** Whitespace in the sense of `\s`. */

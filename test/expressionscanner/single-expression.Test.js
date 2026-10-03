@@ -1,14 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { parseExpression } from "../../src/ExpressionScanner.js";
-import { catchError } from "../TestUtils.js";
 
 /**
  * ExpressionScanner - the single expression `resolve` takes. SPECIFICATION.md 4.3, with 3.1, 3.2
  * and 3.3 as they apply to it.
  *
- * `parseExpression` decides which of the two forms is in hand by the first characters of the
- * trimmed input: the delimited form, which must end with "}" and may carry a scope prefix, or a
- * bare statement taken as it stands. What `resolve` then does with scope and statement is
+ * `parseExpression` decides which of the two forms is in hand by the two ends of the trimmed input:
+ * the delimited form, which opens with "${", ends with "}" and may carry a scope prefix, or a bare
+ * statement taken as it stands. What `resolve` then does with scope and statement is
  * ExpressionResolver's.
  */
 
@@ -43,10 +42,14 @@ describe("ExpressionScanner - the single expression of resolve", () => {
 		expect(parseExpression("scope::value").statement).toBe("scope::value");
 	});
 
-	// A form the scanner rejects itself is not an execution error - it is thrown, and never answered
-	// with a default value.
-	it("throws a SyntaxError where a delimited expression does not end with a closing brace", async () => {
-		const error = await catchError(() => parseExpression("${ value"));
-		expect(error instanceof SyntaxError).toBe(true);
+	// The delimited form needs both delimiters. An input that opens with "${" and does not end with
+	// "}" is a bare statement like any other and is handed on as it stands - that it does not
+	// compile is the executer's answer.
+	it("takes an input that opens with the delimiter and does not end with a closing brace as a bare statement", () => {
+		expect(parseExpression("${ value")).toEqual({ scope: null, statement: "${ value" });
+	});
+
+	it("does not recognize a scope prefix where the closing brace is missing", () => {
+		expect(parseExpression("${scope::value")).toEqual({ scope: null, statement: "${scope::value" });
 	});
 });

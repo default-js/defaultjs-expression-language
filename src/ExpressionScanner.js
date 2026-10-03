@@ -82,9 +82,8 @@ const isLineTerminator = (aCode) => aCode === LINE_FEED || aCode === CARRIAGE_RE
  * Two splits take the text between the delimiters apart into the scope prefix and the
  * statement - this one for a text, `splitScopeAndStatementBySeparator` behind `parseExpression` for
  * the single expression of `resolve`. They are two implementations of the one rule, each measured
- * faster for other statements (DECISIONS.md, 2026-09-27): a text reads forwards, the single
- * expression from the first "::" backwards. test/expressionscanner/scope-prefix.Test.js asks every
- * case of both.
+ * faster for other statements: a text reads forwards, the single expression from the first "::"
+ * backwards. Both have to answer every case alike.
  */
 
 /**
@@ -252,23 +251,20 @@ export const scan = (aText) => {
 /**
  * Takes the one expression `resolve` is handed apart.
  *
- * Which form is in hand is decided by the first characters of the trimmed input. The whole input
+ * Which form is in hand is decided by the two ends of the trimmed input: an input that opens with
+ * "${" and ends with "}" is the delimited form, anything else is a bare statement. The whole input
  * is one expression, so its end is the end of the input. Escaping a delimiter does not apply here -
  * it is a rule of the text form, and there is no surrounding text, so a backslash belongs to the
  * statement.
  *
  * @param {string} aExpression
  * @returns {{ scope: ?string, statement: ?string }}
- * @throws {SyntaxError} where the input opens with "${" and does not end with "}"
  */
 export const parseExpression = (aExpression) => {
 	aExpression = aExpression.trim();
 
-	if (aExpression.startsWith(EXPRESSION_START)) {
-		if (!aExpression.endsWith("}")) throw new SyntaxError(`Expression does not end with "}": ${aExpression}`);
-
+	if (aExpression.startsWith(EXPRESSION_START) && aExpression.endsWith("}"))
 		return splitScopeAndStatementBySeparator(aExpression.substring(2, aExpression.length - 1));
-	}
 
 	// anything else is a statement in full, and carries no scope prefix
 	return { scope: null, statement: trimToNull(aExpression) };

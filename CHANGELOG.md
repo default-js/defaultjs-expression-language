@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Only what reaches a consumer of the package belongs here: the public api, the published
 files, runtime dependencies, the supported environment. Build and test work stays out.
-`DECISIONS.md` carries the reasoning, this file carries the effect.
+This file carries the effect of a change, and its reason where a consumer needs it to decide.
 
 Versions up to 2.0.4 predate this file — the git history is the record for those.
 
@@ -78,7 +78,6 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   them, from an expression — `ctx["test-test"]` under `context-object-executer`. `Object.keys`, a
   spread and `JSON.stringify` of a context include them. The warning is gone. Under
   `with-scoped-executer` a context key named like `undefined` now shadows it inside an expression.
-  See `DECISIONS.md`, 2026-09-22.
 
 - **`context-deconstruction-executer`, the default, no longer runs over a context whose names it
   cannot bind — and says so.** It binds every name a context carries as a variable and filters
@@ -91,8 +90,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   context-deconstruction-executer, so this statement cannot run over this context! statement: 1 + 1*.
   A compilation that a Content Security Policy without `'unsafe-eval'` refuses is not blamed on a
   name: the browser's `EvalError` reaches the caller as it is. A consumer who hands over such a context picks `context-object-executer`, which addresses a name
-  through an object and needs no name to be a variable. `README.md` describes the executer, and
-  `DECISIONS.md` (2026-09-22) the reasoning.
+  through an object and needs no name to be a variable. `README.md` describes the executer.
 
 - **The default executer warns about a large context while it compiles, not on every execution.**
   `High count of properties at first level …` used to be written on every resolution, which in a
@@ -118,8 +116,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `ExpressionResolver.resolve` and `resolveText` now reject a number, a boolean, a function,
   `undefined` or `null` in first place with a `TypeError` that names the call.
   Before, `resolve(123)` failed by accident inside a string method, and `resolveText(123)`
-  answered `123` unchanged. The instance method `resolveText` still hands a non-string back as it
-  is.
+  answered `123` unchanged.
 
 - **A resolver without an executer of its own takes the one of its parent.** Until now a
   resolver built without the `executer` option used `ExpressionResolver.defaultExecuter`, whatever
@@ -150,8 +147,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   deprecation on the first expression it resolved. The new default destructures the context into
   the parameters of the compiled function instead. How an expression is written does not change:
   a context property `value` is still addressed as `${value}`, so nothing has to be rewritten for
-  the switch itself. Why the default moved, and why it moved to this one rather than to
-  `context-object-executer`, is in `DECISIONS.md`.
+  the switch itself. It moved because `with-scoped-executer` is deprecated and the slowest of them
+  over a deep chain, and to this one rather than to `context-object-executer` because that one
+  addresses a value as `${ctx.value}` where every expression written so far says `${value}`.
 
   **A write from inside an expression no longer reaches the context**, and this is the part to read
   before upgrading. The new default runs the statement over local bindings destructured from the
@@ -175,8 +173,8 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 
   The default is the fast implementation rather than the complete one, and the write-back is what a
   cache miss paid for — about eleven times the cost at a shallow chain, measured both ways.
-  `README.md` describes what it keeps and what it does not, and `DECISIONS.md` (2026-09-20) carries
-  the reasoning. A write to a name **no resolver of the chain carries** was never kept by this executer
+  `README.md` describes what it keeps and what it does not. A write to a name **no resolver of the
+  chain carries** was never kept by this executer
   or by `with-scoped-executer` and still is not: it creates a global instead.
 
 - **Escaping is a rule of `resolveText` alone.** `resolve("\${value}")` used to answer the text
@@ -189,12 +187,6 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   landed it was not recognized as an expression at all. It is one now, and it answers what
   `return;` answers in JavaScript. A default value applies to it like to any other result, and in
   a text it renders as `undefined`.
-
-- **`resolve` rejects a delimited expression that does not end with `}`.** It throws a
-  `SyntaxError` instead of answering the default value: nothing has been executed at that point,
-  so it is a rejection of the form rather than an execution error, and the rules for a failing
-  statement do not cover it. Whether the statement between the delimiters is valid JavaScript is
-  still the executer's business and an error there is caught as before.
 
 - **Every occurrence of an expression in a text is evaluated on its own.** `resolveText` used to
   scan a text once per *distinct* expression and replace all identical occurrences with that one
@@ -284,7 +276,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 ### Deprecated
 
 - **`ExpressionResolver.buildSecure`**, the former name of `buildFiltered`. It still works and
-  writes no warning, and it is removed in 4.0.
+  writes no warning.
 
 ### Removed
 
@@ -293,7 +285,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   the statement finished. The timer cost more than the rest of the resolver's own work per
   statement together; without it `resolveText` does about 3.6 times as much of that work in the
   same time. A consumer who wants to know about slow statements measures around `resolve` or
-  `resolveText`. See `DECISIONS.md`, 2026-09-27.
+  `resolveText`.
 
 - **`Executer` no longer has a default context.** The option `defaultContext` of
   `new Executer({ … })` and the getter `executer.defaultContext` are gone. A resolver built without
@@ -310,7 +302,7 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   value inside a function, a literal or a ternary, reached only a fixed list of globals, and could
   not run an assignment to a context name. A consumer who used it moves to
   `context-deconstruction-executer` (the default) or `context-object-executer`; `README.md`
-  describes both. See `DECISIONS.md`, 2026-09-28.
+  describes both.
 
 - **The entry `browser-all-executers.js` and its bundles are gone.** They differed from
   `browser.js` and `dist/browser-…` only by registering `EsprimaExecuter`. Load

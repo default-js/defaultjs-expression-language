@@ -214,17 +214,17 @@ own**, so an expression with a side effect means what it says: `${counter++}` tw
 increments twice.
 
 `resolve` additionally accepts a **bare statement** without the `${…}` delimiters. Which of the two
-forms is in hand is decided by the first characters of the trimmed input alone: an input that
-starts with `${` is the delimited form and **must** end with `}`; anything else is a statement in
-full and is passed to the executer as it stands.
+forms is in hand is decided by the two ends of the trimmed input alone: an input that starts with
+`${` **and** ends with `}` is the delimited form; anything else — one that starts with `${` and does
+not end with `}` included — is a statement in full and is passed to the executer as it stands. The
+rule is `resolve`'s alone: in a text, an expression is always delimited (3.1).
 
 The scope prefix is recognized only in the delimited form: `resolve("${scope::statement}")`
 addresses the scope, `resolve("scope::statement")` does not. Both entry points parse the prefix by
 the same rule (3.3).
 
-A delimited input that does not end with `}` is **rejected with a `SyntaxError`**. Nothing beyond
-that is checked — whether the statement between the delimiters is valid JavaScript is the
-executer's business, and whatever it raises reaches the caller (7).
+`resolve` checks nothing about the form beyond its two ends — whether the statement is valid
+JavaScript is the executer's business, and whatever it raises is a failing statement (7).
 
 The escaping of 3.2 does **not** apply to `resolve`. A leading backslash is part of the statement,
 so `resolve("\${value}")` hands `\${value}` to the executer, which cannot compile it.
@@ -528,8 +528,8 @@ documented as one.
 `option` carries the filter's own `deep` together with the **full constructor option set**, which
 `buildFiltered` hands on unchanged.
 
-`buildSecure` is its former name, kept until 4.0 and deprecated: it takes the same arguments and
-answers the same resolver.
+`buildSecure` is its former name, deprecated: it takes the same arguments and answers the same
+resolver.
 
 ## 7. Errors
 
@@ -552,11 +552,11 @@ in it, and a single broken expression in it is a defect in that expression, not 
 `resolve` is called from code, for one value, and answering `undefined` there hides a mistake at
 the place where it can still be found.
 
-A **form that an entry point rejects itself** follows the same line: `resolve` throws a
-`SyntaxError` for a delimited input that does not end with `}` (4.3), an argument of the wrong type
+A **form that an entry point rejects itself** follows the same line: an argument of the wrong type
 is rejected with a `TypeError` by the static entry points (4.1), the constructor and the instance
-entry points (4.2) and the data methods (6.6), while in a text anything that is not an expression
-is text and no error arises at all (3.1).
+entry points (4.2) and the data methods (6.6). `resolve` rejects no form of a string — what is not
+the delimited form is a bare statement (4.3) — and in a text anything that is not an expression is
+text and no error arises at all (3.1).
 
 ## 8. Public surface
 

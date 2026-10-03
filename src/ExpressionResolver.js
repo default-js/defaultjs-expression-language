@@ -242,8 +242,7 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * The internal handle behind the context. Public only for `resetCache`, and only until the
-	 * name cache is measured - DECISIONS.md, 2026-09-30.
+	 * The internal handle behind the context, public for `resetCache`.
 	 *
 	 * @readonly
 	 * @type {ResolverContextHandle}
@@ -432,8 +431,9 @@ export default class ExpressionResolver {
 
 	/**
 	 * Resolves one expression to its value, of whatever type the statement answers. Takes the
-	 * delimited form `${...}`, a scope prefix included, or a bare statement. An error of the statement
-	 * is logged and handed on, and the default never covers it.
+	 * delimited form `${...}`, a scope prefix included, or a bare statement; an input that does not
+	 * both open with `${` and end with `}` is a bare statement. An error of the statement is logged
+	 * and handed on, and the default never covers it.
 	 *
 	 * @async
 	 * @param {string} aExpression
@@ -441,7 +441,6 @@ export default class ExpressionResolver {
 	 * included
 	 * @returns {Promise<*>}
 	 * @throws {TypeError} where the expression is no string
-	 * @throws {SyntaxError} where the input opens with "${" and does not end with "}"
 	 */
 	async resolve(aExpression, aDefault) {
 		// a mistake in the calling code, not a failed statement - so no warning and no default
@@ -609,8 +608,7 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * The former name of `buildFiltered`, kept until 4.0. It promised a security the method does not
-	 * give.
+	 * The former name of `buildFiltered`. It promised a security the method does not give.
 	 *
 	 * @deprecated use `buildFiltered`
 	 * @static

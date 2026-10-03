@@ -15,7 +15,7 @@ v3 is an AI-assisted modernization cycle with five goals. This section says what
 1. **Modernize the toolchain** — current build and test chain, Karma replaced. The reasoning that outlived the work is in `DECISIONS.md`.
 2. **Raise code quality** — fix existing defects, sharpen the structure. `SPECIFICATION.md` says what the resolver is meant to do, so a fix is derived from it rather than from the code. It is written as though every rule in it holds, which makes it **the release gate for 3.0.0**: where the code does not keep a rule yet, `BACKLOG.md` carries an entry marked `Blocks 3.0.0` and a test pins it. A fix is finished when its markers can be removed and the gate is still green. The `it.fails` marker says *this requirement is wanted and not kept yet*; it may stand in any component suite, never in an executer's, which tests what that executer guarantees and marks nothing. A fixed limit is pinned by an ordinary `it`. **No release carries an `it.fails`.**
 3. **Raise test coverage** — every rule of `SPECIFICATION.md` pinned by the suite of the component that keeps it. The current figures and what is still uncovered are in `BACKLOG.md`.
-4. **Documentation** — for human consumers *and* for AI systems meant to use this package. `SPECIFICATION.md` is the internal reference the published documentation is written against; it does not ship, so no published file refers to it.
+4. **Documentation** — for human consumers *and* for AI systems meant to use this package. `SPECIFICATION.md` is the internal reference the published documentation is written against; like every record it does not ship, so no published file refers to it. Published documentation states facts only (Conventions).
 5. **Do not lose performance** — the resolver must not come out of this cycle slower than it went in, and coming out faster is the actual goal. Every change that touches a hot path is measured against `npm run bench` before and after, and a regression is a defect like any other. Decisions are taken on measurements rather than taste. Note the benchmark caveats in `BACKLOG.md` before comparing single runs.
 
 What this repository is meant to become a template for is **the way we work and shape the project** — the sibling repositories are otherwise none of this project's business. Carrying results over to them is Frank's own task and must not influence decisions made here.
@@ -72,7 +72,7 @@ During the modernization the staging rule from the plan applies on top: secure a
 
 ## Records
 
-Split by shape: independent items go in the backlog, settled questions get written down with their reasoning, and an undertaking whose steps depend on each other gets its own plan.
+Split by shape: independent items go in the backlog, settled questions get written down with their reasoning, and an undertaking whose steps depend on each other gets its own plan. None of these records ships with the package, and no published file refers to one — by name, by date or by section number (`DECISIONS.md`, 2026-10-03).
 
 - `BACKLOG.md` — every open task: findings, open decisions, agreed work, ideas, and the status of the v3 goals. Each entry has an ID, a status and a kind; the file's own header defines the format. Entries are deleted once done; git history is the archive.
 - `CHANGELOG.md` — what changed for consumers, per released version, newest first. Keep a Changelog format. Written while the change is made, released by moving `## [Unreleased]` to a version heading.
@@ -126,6 +126,11 @@ A consumer who wants to tune an executer imports its module explicitly; that imp
   another one: a cache caches, a proxy proxies, and a check lives with the part that needs it.
   Where two parts need the same constant, it is provided centrally rather than duplicated. The
   decision of 2026-08-30 in `DECISIONS.md` carries the case that produced this rule.
+- **Published files state facts.** The sources, `README.md` and `CHANGELOG.md` describe the code as
+  it is: no `TODO`, nothing about what may change, goes in a later version, or is still to be
+  measured or checked. That is a `BACKLOG.md` entry and stands nowhere else. Nor does a published
+  file name an internal record or a file the package does not ship, a test file included
+  (`DECISIONS.md`, 2026-10-03).
 - **A function more than one component uses moves into the shared helper module**, `src/Utils.js`
   — one module collecting all such helpers, not a module per function, and not an import of one
   component from another.

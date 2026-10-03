@@ -19,29 +19,84 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
-## 2026-10-03 — Does `SPECIFICATION.md` ship with the package, and may a published file cite it?
+## 2026-10-03 — What does `resolve` do with an input that opens with `${` and does not end with `}`?
 
-**Decision:** No to both. `SPECIFICATION.md` is internal: `package.json` does not list it under
-`files`, and no published file refers to it — not `README.md`, not `CHANGELOG.md`, no comment under
-`src/` and no error message, by name or by section number. Where a published file needs a rule, it
-states the rule in its own words. Frank's decisions, the first on 2026-10-01 for `README.md`, the
-rest on 2026-10-03.
+**Decision:** It hands the input to the executer as a bare statement. An input is the delimited
+form where its trimmed text starts with `${` **and** ends with `}`, and only then is a scope prefix
+looked for; anything else goes to the executer as it stands. The rule is `resolve`'s alone — in a
+text an expression is always delimited. Frank's decision, reversing the `SyntaxError` decided on
+2026-08-29.
 
-**Reasoning:** The specification is written for the people who maintain the package: it is the
-release gate for 3.0.0 (2026-09-05) and the reference a fix is derived from. `README.md` is the
-document a consumer reads. A published file that cites the specification points the consumer at a
-file the package does not carry. That holds for the comments under `src/` too, because the sources
-ship untranspiled and a consumer reads their JSDoc in the editor.
+**Reasoning:** `resolve` takes one expression, delimited or bare, and its two ends are all it needs
+to tell the two apart: the input is one expression by definition, so its end is the end of the
+input and no brace matching is needed. An input without the closing `}` is no delimited
+expression, which leaves it a bare statement, and whether a statement compiles is the executer's
+business. It is also the rule 2.x had (`startsWith("${") && endsWith("}")`). The rejection had made
+the form a check of its own, and since `parseExpression` ran inside the `try` of `resolve`, it was
+logged as `Execution error on statement!` for an input nothing had executed. Measured with
+`ColdResolve`, `WarmResolve` and `RandomScope` before and after: no difference beyond the noise of a
+run.
+
+**Alternatives:** Keeping the `SyntaxError` and moving the parse in front of the `try`, so the
+rejection writes no warning — rejected with the decision. Checking more than the two ends, already
+rejected on 2026-08-29: whether a statement is valid JavaScript is the executer's business and it
+reports it.
+
+**Consequences:** `resolve("${ a + 1")` reaches the executer, which cannot compile it: the caller
+gets the executer's error after a warning, as for any failing statement, and no default covers it.
+`resolve` rejects no string for its form; the only form it rejects is an argument that is no string.
+
+## 2026-10-03 — May a published file say what is planned, open or not yet checked?
+
+**Decision:** No. A published file — the sources, `README.md`, `CHANGELOG.md` — documents the code
+as it is, as facts. No comment, JSDoc or document says that something may change, goes in a later
+version, is to be measured or checked, or is an idea, and none carries a `TODO`. Anything of that
+kind is an entry in `BACKLOG.md` and stands nowhere else. Frank's decision.
+
+**Reasoning:** A consumer reads a published file as a description of what they can rely on. A
+sentence about what may change is nothing to build on, and it goes stale without anyone noticing,
+because nothing ties it to the backlog entry that decides it. Open work kept in one place is what
+makes `BACKLOG.md` the authoritative status.
+
+**Alternatives:** Announcing a planned removal, as the changelog did for `buildSecure` in 4.0 —
+rejected: the deprecation is a fact and is published, the version it goes in is planned work. A
+"may change" or `@experimental` marker on a public member — rejected for the same reason.
+
+**Consequences:** The JSDoc of `contextHandle` says what the getter is for, not for how long.
+`buildSecure` is published as deprecated, and its removal in 4.0 is a backlog entry. The `TODO` on
+the context proxy became one too. When a deprecated member goes, the changelog of that release
+says so.
+
+## 2026-10-03 — Does an internal record ship with the package, and may a published file cite one?
+
+**Decision:** No to both. The internal records — `SPECIFICATION.md`, `DECISIONS.md`, `AGENTS.md`,
+`BACKLOG.md`, `TESTING.md` — are not listed under `files` in `package.json`, and no published file
+refers to one: not `README.md`, not `CHANGELOG.md`, no comment under `src/` and no error message, by
+name, by date or by section number. The same holds for any other file the package does not ship, a
+test file among them. Where a published file needs a rule or a reason, it states it in its own
+words. Frank's decisions: on 2026-10-01 for the specification in `README.md`, on 2026-10-03 for the
+specification in every published file and then for every internal record.
+
+**Reasoning:** The records are written for the people who maintain the package: the specification
+is the release gate for 3.0.0 (2026-09-05) and the reference a fix is derived from, this file
+carries the reasoning, the others the working agreement and the open work. `README.md` is the
+document a consumer reads. A published file that cites a record points the consumer at a file the
+package does not carry. That holds for the comments under `src/` too, because the sources ship
+untranspiled and a consumer reads their JSDoc in the editor. A pointer into this file fails even a
+reader on GitHub: a date names up to nine entries, and a superseded entry is deleted, while a
+released changelog is never rewritten.
 
 **Alternatives:** Shipping the specification, decided on 2026-08-22 and withdrawn here, because it
-would make the internal reference a second consumer document beside `README.md`. Keeping the
-citations in the JSDoc as pointers for maintainers was rejected for the reason above. It becomes the
-better choice if the sources stop being published as they are.
+would make the internal reference a second consumer document beside `README.md`. Shipping this
+file, rejected for the same reason and because it cites the specification throughout. Keeping the
+pointers for maintainers, or turning them into permalinks to a commit, rejected for the reasons
+above; it becomes the better choice if the sources stop being published as they are. The section
+*Development* of `README.md` addresses someone who cloned the repository and may name its paths.
 
 **Consequences:** The only link from a rule to the code left is the header of each test file,
 which names the sections it pins (`TESTING.md`). A comment under `src/` that has to explain a
-rule explains it. A change to the specification is no longer visible to consumers and needs no
-changelog entry of its own.
+rule explains it, and a changelog entry carries the reason a consumer needs to decide. A change to
+the specification is no longer visible to consumers and needs no changelog entry of its own.
 
 ## 2026-10-01 — Does a scope name take letters beyond ASCII?
 
@@ -65,8 +120,9 @@ scope.
 
 **Decision:** Per name, with no blanket rule. `ExecuterRegistry.registrate` becomes `register` and
 the old name goes without an alias. `ExpressionResolver.buildSecure` becomes `buildFiltered`.
-`buildSecure` stays as a silent alias, marked `@deprecated` in JSDoc and announced in the changelog,
-writes no console warning and is removed in 4.0. `chain`, `effectiveChain`, `contextChain`,
+`buildSecure` stays as a silent alias, marked `@deprecated` in JSDoc and announced as deprecated in
+the changelog, writes no console warning and is removed in 4.0, a version no published file names
+(2026-10-03). `chain`, `effectiveChain`, `contextChain`,
 `getData` and `setupExecuter` keep their names, and their JSDoc says what they answer. Frank's
 decisions.
 
@@ -84,8 +140,8 @@ break is the better choice for `buildSecure` once its consumers are known to hav
 the chain getters to `path`, `contextPath` and `contexts`, which say the type they answer, is the
 better choice if 5.5 is ever rewritten anyway.
 
-**Consequences:** 3.0.0 breaks every call of `registrate`. Removing `buildSecure` in 4.0 is a
-promise in the changelog, so the alias is not dropped earlier. The private and internal names were
+**Consequences:** 3.0.0 breaks every call of `registrate`. Removing `buildSecure` in 4.0 is an
+entry in `BACKLOG.md`, and the alias is not dropped earlier. The private and internal names were
 renamed in the same pass from a list Frank approved. They are no surface, so no record carries them
 beyond git history.
 
@@ -1210,8 +1266,8 @@ made while the version is still unreleased.
 
 ## 2026-08-29 — What do the open edges of the expression syntax do?
 
-**Decision:** Four rules, all now in `SPECIFICATION.md`, settled with Frank before the parser was
-written.
+**Decision:** Three rules, all now in `SPECIFICATION.md`, settled with Frank before the parser was
+written. A fourth, on the form of `resolve`, is superseded by 2026-10-03.
 
 **Escaping is about the delimiter, and parity decides.** The backslashes before the `$` are
 counted: an odd number escapes the `${`, an even number does not, and exactly one backslash is
@@ -1226,10 +1282,6 @@ been its statement is an expression of its own. `Test \${"${test}"} Test` answer
 meant to be JavaScript, and a second opening delimiter cannot be part of it, so the open one is
 abandoned and its text stands.
 
-**`resolve` decides the form on the first characters alone.** An input that starts with `${` is
-the delimited form and must end with `}` — otherwise it is rejected with a `SyntaxError`, which is
-thrown rather than caught. Anything else is a statement in full and carries no scope prefix.
-
 **Reasoning:** These are the edges that had no answer when the specification was written, and the
 parser had to be told what to do at each of them. Parity is the rule every language with an escape
 character uses, and it is the only one under which an escaped backslash can be written down at all.
@@ -1237,12 +1289,9 @@ The delimiter reading of the escape follows from there: the syntax has no concep
 escaping cannot open one, and the alternative — skipping the whole would-be statement — would make
 one backslash silently disable expressions the author cannot see. `undefined` for the empty
 statement is what the language itself answers, and 3.4 promises arbitrary JavaScript, so the
-resolver has no business inventing something else. For `resolve`, the input is one expression by
-definition, so its end is the end of the input and no brace matching is needed at all — which is
-also why the scanner stayed a private helper of `resolveText` instead of becoming its own module.
+resolver has no business inventing something else.
 
-**Alternatives:** For `resolve`, checking more than the two delimiters — rejected, because whether
-the statement is valid JavaScript is the executer's business and it reports it. For the escape,
+**Alternatives:** For the escape,
 treating an escaped expression as a region that stands verbatim — that was the first
 implementation, and Frank rejected it: it hides expressions behind a single backslash. For the
 empty statement, answering `null` — that was the accident the code had, and nothing argued for it.

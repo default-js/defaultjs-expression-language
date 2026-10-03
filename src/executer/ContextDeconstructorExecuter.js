@@ -87,7 +87,7 @@ const getOrCreateFunction = (aStatement, contextProperties) => {
  * write-back this executer carried between 2026-09-07 and 2026-09-20 cost a factor of eleven on a
  * cache miss, because it needs every context name declared in the body instead of listed in the
  * parameter list. Speed is what this executer is for, and a consumer who needs a write to persist
- * picks `context-object-executer`. See `DECISIONS.md`, 2026-09-20.
+ * picks `context-object-executer`.
  *
  * What still reaches the context is a **mutation**: `holder.name = "after"` changes an object the
  * binding and the context both point at, and needs nothing carried back.
@@ -103,7 +103,7 @@ const getOrCreateFunction = (aStatement, contextProperties) => {
  * array. Such a context cannot be run over by this executer at all, and dropping the name silently
  * would hide a property the caller defined. What this executer owes the caller instead is a message
  * that says which statement failed and which name did it, because the statement itself need not
- * mention that name - see `DECISIONS.md`, 2026-09-22.
+ * mention that name.
  *
  * @param {string} aStatement
  * @param {string} thePropertyNameString the context names, comma separated, as the destructuring

@@ -136,9 +136,8 @@ Each static call builds a resolver of its own over an ad-hoc context and runs un
   `${…}`, with or without a scope prefix, or a bare statement. `context` is any object; `null` or
   left out means none. A `defaultValue` replaces a result of `null` or `undefined` and counts as
   passed when the third argument is present, `undefined` included. A positive `timeout` delays the
-  start by that many milliseconds. Rejects with the statement's error after logging it, with a
-  `TypeError` for an argument of the wrong type, and with a `SyntaxError` for an input that opens
-  with `${` and does not end with `}`. See [Resolving](#resolving).
+  start by that many milliseconds. Rejects with the statement's error after logging it, and with a
+  `TypeError` for an argument of the wrong type. See [Resolving](#resolving).
 - **`ExpressionResolver.resolve({ expression, context, defaultValue, timeout })`** — the same as one
   configuration object. The first argument alone decides the form, and every argument behind a
   configuration is ignored. A default counts as passed when the key `defaultValue` is present.
@@ -159,7 +158,7 @@ Each static call builds a resolver of its own over an ad-hoc context and runs un
   `parent` and `executer`. It filters the context, never the globals — see
   [Filtered contexts](#filtered-contexts).
 - **`ExpressionResolver.buildSecure(…)`** — the former name of `buildFiltered`, with the same
-  arguments. Deprecated, removed in 4.0.
+  arguments. Deprecated.
 - **`ExpressionResolver.defaultExecuter`**, read and written — the executer of a resolver built
   without a parent and without the `executer` option, and so of the static calls. It is set to a
   registered name or an `Executer` instance; an unregistered name throws, and every set writes a
@@ -226,7 +225,7 @@ All of them are read-only.
 | `chain` | the names from the root down to this resolver as a path, `/root/…/this`. It describes the structure and never changes |
 | `effectiveChain` | the same path with only the resolvers that provide a context, `""` where none does. It changes when a resolver without a context gets a value |
 | `contextChain` | the contexts of the resolvers `effectiveChain` names, as `context` answers them, this resolver's first |
-| `contextHandle` | the internal handle behind the context. It is public only for `contextHandle.resetCache()`, which takes up keys added to the handed-over object past the resolver, and only until the name cache behind it is reviewed |
+| `contextHandle` | the internal handle behind the context. It is public only for `contextHandle.resetCache()`, which takes up keys added to the handed-over object past the resolver |
 
 ### `ExecuterRegistry`
 
@@ -301,7 +300,8 @@ runs under the default.
 ### `resolve` and `resolveText`
 
 `resolve` evaluates **one** expression and answers its value with its type intact. It also takes a
-bare statement without delimiters; an input that begins with `${` has to end with `}`.
+bare statement without delimiters: an input that begins with `${` and ends with `}` is the
+delimited form, anything else is a bare statement and goes to the executer as it stands.
 
 `resolveText` replaces **every** expression of a text by its value, converted to a string, and
 answers the text. Each occurrence is evaluated on its own, so `${ counter() }` twice calls twice.
@@ -461,11 +461,11 @@ item.deleteData("currency");              // removed from item, shop's "USD" sho
   caller who wants a fallback writes the `try`/`catch`.
 - **A default value never covers an error.**
 - **A mistake in the calling code** is rejected outright: an argument of the wrong type with a
-  `TypeError`, a `resolve` input opening with `${` and not ending with `}` with a `SyntaxError`.
+  `TypeError`.
 
 ```javascript
 await ExpressionResolver.resolveText("a ${ broken( } b", {}); // "a ${ broken( } b", and a warning
-await ExpressionResolver.resolve("${ broken( }", {});        // rejects with the SyntaxError
+await ExpressionResolver.resolve("${ broken( }", {});        // logs, then rejects with the statement's SyntaxError
 ```
 
 ## Globals
@@ -496,7 +496,7 @@ await page.resolve("${ user.password }"); // undefined
 
 It filters the context, **not the globals**: `fetch`, `document` and `console` stay reachable, so it
 does not make an untrusted expression safe — see [Security](#security).
-`buildSecure` is the former name, deprecated and kept until 4.0.
+`buildSecure` is the former name, deprecated.
 
 ## Executers
 
@@ -664,7 +664,7 @@ described in full in [CHANGELOG.md](CHANGELOG.md):
   none; `updateData` and `deleteData` without a filter act where the key lives.
 - **A resolver without the `executer` option takes the executer of its parent.**
 - **Renamed:** `ExecuterRegistry.registrate` is `register`, the old name is gone;
-  `ExpressionResolver.buildSecure` is `buildFiltered`, the old name works until 4.0.
+  `ExpressionResolver.buildSecure` is `buildFiltered`, the old name still works and is deprecated.
 - **Removed:** `EsprimaExecuter`, the bundle `browser-all-executers`, the option `defaultContext` of
   `Executer`, and the warning for a statement running longer than a second.
 

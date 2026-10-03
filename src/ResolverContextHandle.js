@@ -71,7 +71,7 @@ const createGlobalNameCache = (handle) => {
  * and the name cache that tells which names this resolver provides. It hands out the context an
  * expression sees, a proxy that answers for the whole chain.
  *
- * Internal to the package: index.js does not export it (DECISIONS.md, 2026-09-30).
+ * Internal to the package: index.js does not export it.
  *
  * @export
  * @class ResolverContextHandle
@@ -164,8 +164,6 @@ export default class ResolverContextHandle {
 					}
 					return Array.from(result);
 				},
-
-				//@TODO need to support the other proxy actions
 			});
 		}
 	}
@@ -258,7 +256,7 @@ export default class ResolverContextHandle {
 			return createGlobalNameCache(this);
 
 		// every key JavaScript says the object carries, nothing filtered - which of them an executer
-		// can put into its code is the executer's business (DECISIONS.md 2026-08-30, 2026-09-22)
+		// can put into its code is the executer's business
 		const cache = new Map();
 		let type = data;
 		while (!isNullOrUndefined(type)) {
