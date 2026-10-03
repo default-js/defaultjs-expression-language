@@ -36,7 +36,8 @@ describe("ExpressionResolver - buildFiltered", () => {
 		expect(await filtered.resolve("${ secret }")).toBeUndefined();
 	});
 
-	// Which value `deep` takes when it is left out is not a rule of 6.7, so both cases pass it.
+	// Both cases pass `deep`, so each says what one value does; the value it takes when left out is
+	// the case after them.
 	it("filters a sub object as well with deep", async () => {
 		ExpressionResolver.defaultExecuter = lookup();
 		const filtered = ExpressionResolver.buildFiltered({ context: { sub: { open: "ok", secret: "hidden" } }, propFilter, option: { deep: true } });
@@ -49,6 +50,29 @@ describe("ExpressionResolver - buildFiltered", () => {
 		const filtered = ExpressionResolver.buildFiltered({ context: { sub: { open: "ok", secret: "hidden" } }, propFilter, option: { deep: false } });
 		const sub = await filtered.resolve("${ sub }");
 		expect(sub.secret).toBe("hidden");
+	});
+
+	// The cases from here to the next comment pin what 6.7 took over from README.md on 2026-10-03.
+	// Written after the behaviour - they guard it, they prove no fix.
+	it("filters a sub object as well where deep is left out", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const filtered = ExpressionResolver.buildFiltered({ context: { sub: { open: "ok", secret: "hidden" } }, propFilter, option: { name: "filtered" } });
+		const sub = await filtered.resolve("${ sub }");
+		expect(sub.secret).toBeUndefined();
+	});
+
+	// What arrived is recorded by the filter itself.
+	it("calls the filter with the name, the value and the object the property is read from", async () => {
+		const context = { open: "ok" };
+		const calls = [];
+		ExpressionResolver.buildFiltered({ context, propFilter: (aName, aValue, aHolder) => calls.push([aName, aValue, aHolder]) });
+		expect(calls.length === 1 && calls[0][0] === "open" && calls[0][1] === "ok" && calls[0][2] === context).toBe(true);
+	});
+
+	it("offers an inherited enumerable property to the filter", async () => {
+		const names = [];
+		ExpressionResolver.buildFiltered({ context: Object.create({ inherited: "from the prototype" }), propFilter: (aName) => names.push(aName) });
+		expect(names.includes("inherited")).toBe(true);
 	});
 
 	// That a statement can still reach a global - buildFiltered is no sandbox - is not a rule of 6.7

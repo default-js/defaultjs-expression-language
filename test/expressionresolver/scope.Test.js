@@ -67,6 +67,14 @@ describe("ExpressionResolver - lookup with a prefix", () => {
 	it("climbs to the ancestor the prefix names however deep the chain is", async () => {
 		expect(await deepChain(DEEP).resolve("${root::value}")).toBe("from root");
 	});
+
+	// The executer of the resolver the call is made on used to run it. The only case here whose leaf
+	// names an executer of its own: the rule is which of two executers answers.
+	it("runs the statement with the executer of the resolver the prefix addresses", async () => {
+		const root = new ExpressionResolver({ context: {}, name: "root", executer: new TestExecuter(() => "root's executer") });
+		const leaf = new ExpressionResolver({ context: {}, name: "leaf", parent: root, executer: new TestExecuter(() => "leaf's executer") });
+		expect(await leaf.resolve("${root::value}")).toBe("root's executer");
+	});
 });
 
 // The resolver does not exist, so there is nothing to hand a statement to; the answer is the

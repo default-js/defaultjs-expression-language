@@ -125,6 +125,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   A resolver whose parent runs a non-default executer changes behaviour with this, since it now
   evaluates in that executer's dialect. The new getter `executer` answers the executer in use.
 
+- **A statement with a scope prefix runs with the executer of the resolver it addresses.**
+  `${name::statement}` was run by the executer of the resolver the call was made on, against the
+  context of the named one. It now runs there with that resolver's executer as well. Only a chain
+  whose resolvers hold different executers notices: an expression with a prefix is written in the
+  dialect of the resolver it names, so `${shop::ctx.title}` where `shop` runs
+  `context-object-executer`, and one text may carry both dialects side by side.
+
 - **`resolve` no longer catches an error — it logs it and hands it on.** A statement that fails
   used to answer `undefined`, or the default value where one was passed, and the caller had no way
   to tell a broken expression from one that legitimately resolved to nothing. `resolve` now writes
@@ -227,8 +234,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   changes over a resolver's lifetime, while `chain` stays structural — a consumer must not cache
   either. Where no resolver provides a context, `effectiveChain` is the empty string.
 
-- **The constructor rejects a `parent`, a `context` or a `name` it cannot use.** Each raises a
-  `TypeError` naming the option, where the mistake used to surface somewhere else or not at all:
+- **The constructor rejects a `parent`, a `context`, a `name` or an `executer` it cannot use.** Each
+  raises a `TypeError` naming the option, where the mistake used to surface somewhere else or not at
+  all:
   - a `parent` that is not an `ExpressionResolver` — a context object, a resolver from another copy
     of the package — was dropped, which left a resolver without a chain whose executer answered
     `undefined`. `null` and `undefined` still mean no parent;
@@ -239,12 +247,21 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   - a `name` must obey the character rule of a scope prefix — ASCII letters, digits, whitespace, `-`
     and `_` — so that every name can be addressed by one; a name carrying `.`, `:` or `/`, an empty or
     whitespace-only name and one that is no string are rejected. `""` and `0` used to get a generated
-    name. A passed name is kept **trimmed**: `" root "` is the resolver `root`.
+    name. A passed name is kept **trimmed**: `" root "` is the resolver `root`;
+  - an `executer` that is neither a string nor an `Executer` instance — a number, a plain object, an
+    executer from another copy of the package — fell back to the default without a word. `null` and
+    `undefined` still mean the option is left out. `ExpressionResolver.defaultExecuter` rejects the
+    same values with a `TypeError`, where it used to throw an `Error` saying the value was not
+    registered.
 
 - **The `filter` of the data methods is read like a scope prefix.** `getData`, `updateData`,
   `deleteData` and `mergeContext` trim it, and a filter that is empty or whitespace only means no
   filter, where `"  "` used to throw as a name no resolver carries. A filter that is no string raises
   a `TypeError`.
+
+- **A scope prefix with an empty name is no prefix.** `${::value}` handed `::value` to the
+  executer, which could not run it, while `${ ::value}` already dropped the blank name and evaluated
+  `value`. Both now evaluate `value` on the resolver the call was made on.
 
 - **The instance `resolve` and `resolveText` reject an argument that is not a string.** Both reject
   with a `TypeError`, as the static entry points do, and no default value applies. `resolveText(42)`
@@ -317,6 +334,9 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   dependencies, which mattered while `espree` and `escodegen` were among them. The one runtime
   dependency left, `@default-js/defaultjs-common-utils`, comes from the same author under the same
   MIT licence as this package, see `LICENSE`.
+
+- **`src/index.js` is no longer published.** It repeated the exports of `index.js` from inside
+  `src/`, and nothing in the package used it. `index.js` at the package root exports the same.
 
 ### Fixed
 

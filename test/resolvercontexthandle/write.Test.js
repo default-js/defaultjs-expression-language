@@ -3,7 +3,7 @@ import ResolverContextHandle from "../../src/ResolverContextHandle.js";
 import { catchError } from "../TestUtils.js";
 
 /**
- * ResolverContextHandle - where a write lands. SPECIFICATION.md 6.1, 6.5, 6.6.
+ * ResolverContextHandle - where a write lands. SPECIFICATION.md 5.2, 6.1, 6.5, 6.6.
  *
  * A handle keeps the object it was handed rather than a copy, so a write through the proxy or
  * through `mergeData` changes that object and code outside sees the change. Which handle of a chain
@@ -37,6 +37,24 @@ describe("ResolverContextHandle - writing into the object the caller handed over
 		handle.mergeData({ holder: { fresh: 2 } });
 		expect(handle.context.holder.keep).toBeUndefined();
 		expect(handle.context.holder.fresh).toBe(2);
+	});
+});
+
+// SPECIFICATION.md 5.2, 6.6 - a delete cannot take a key off an object that only inherits it, and
+// the handle stops providing the name anyway, until the names are rebuilt. Decided on 2026-10-03 and
+// written after the behaviour - these cases pin the exception, they prove no fix.
+describe("ResolverContextHandle - deleting a key the object only inherits", () => {
+
+	it("leaves the key on the object", () => {
+		const handed = Object.create({ inherited: "from the prototype" });
+		delete new ResolverContextHandle(handed).context.inherited;
+		expect("inherited" in handed).toBe(true);
+	});
+
+	it("no longer provides the name", () => {
+		const handle = new ResolverContextHandle(Object.create({ inherited: "from the prototype" }));
+		delete handle.context.inherited;
+		expect("inherited" in handle.context).toBe(false);
 	});
 });
 

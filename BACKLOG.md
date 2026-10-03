@@ -43,25 +43,24 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | # | Goal | Status | Open entries |
 | --- | --- | --- | --- |
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-30) | — |
-| 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
+| 2 | Raise code quality | done 2026-10-03 — no `defect` and no `Blocks 3.0.0` entry open | — |
 | 3 | Raise test coverage | largely done | B-30 |
-| 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; Frank's review of the specification open | B-21 |
-| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26 |
+| 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; the specification reviewed | — |
+| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-25, B-26 |
 
-**Markers, counted 2026-10-01** (`npm test`: 326 passed, 326 cases). No `it.fails` is left and no
-entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
-the suite is marked: an executer's suite tests what that executer guarantees, and what it does not do
-is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
+**Markers, counted 2026-10-03** (`npm test`: 342 passed, 342 cases). No `it.fails` is left and no
+entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). No
+executer's suite carries one: it tests what that executer guarantees, and what it does not do is
+documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
 ## Overview
 
 | ID | Title | Status | Kind | 3.0.0 | Prio |
 | --- | --- | --- | --- | --- | --- |
-| B-07 | A name found at the top of a resolver chain costs as much as one found at the bottom | investigate | defect | | |
 | B-57 | The context proxy intercepts six operations, and every other one meets an empty target | idea | gap | | |
 | B-58 | `buildSecure` is removed in 4.0 | agreed | refactor | | low |
+| B-65 | What the copy of `buildFiltered` keeps of the context is not specified | idea | gap | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
-| B-21 | `SPECIFICATION.md` has not been read rule by rule since it was written | agreed | docs | | |
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
@@ -74,30 +73,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 None open.
 
 ## Resolver
-
-### B-07 · A name found at the top of a resolver chain costs as much as one found at the bottom
-
-- **Status:** investigate — confirm with a counter in the trap, then fix
-- **Kind:** defect (performance) · **Spec:** none
-- **Records:** `DECISIONS.md`
-
-**A second case since 2026-09-22**, and it is the same rule from the other side: a name that only
-the **root** carries costs the whole chain. `ContextDeconstructorExecuter` reads every name of the
-context on every execution, the seven of `Object.prototype` among them, and since a resolver without
-a context holds no object those seven are carried by the root alone. Over a chain of 100 000
-resolvers without contexts one `resolve` takes 40 ms against 10 ms before (chromium, 2026-09-22),
-while `ownKeys` of the same proxy got faster, 3.1 ms against 9.4. Before, each empty resolver held
-`{}` and answered such a name itself, which hid the walk. A negative result cached per handle, or the
-`Symbol.unscopables` fix above, would answer both halves.
-
-Under `WithScopedExecuter` a lookup scales with the full chain depth even when the name sits a few
-resolvers up: `RandomScope` at depth 100 000 answers 138 hz under `with-scoped` against 662 000 hz
-under `context-object` (2026-08-30). `#findHandle` does stop at
-the first match; what walks the whole chain is a lookup that can never match —
-`proxy[Symbol.unscopables]`, which `with` asks on every binding, walks every resolver because the
-cache is keyed by string. Cheap fix if confirmed: answer non-string properties in `get`/`has`
-without walking, or give the handle its own `Symbol.unscopables`. Costs every consumer who keeps
-the `with`-based executer; the default moved away from it on 2026-09-01.
 
 ### B-57 · The context proxy intercepts six operations, and every other one meets an empty target
 
@@ -125,6 +100,19 @@ version, so the changelog of 4.0 is the first place a consumer reads it. With it
 `src/ExpressionResolver.js`, its rows in `README.md`, its cases in `test/package/surface.Test.js`
 and `test/expressionresolver/buildfiltered.Test.js`, and the sentence in 6.7.
 
+### B-65 · What the copy of `buildFiltered` keeps of the context is not specified
+
+- **Status:** idea — found 2026-10-03 reading `filter` of `@default-js/defaultjs-common-utils`, not
+  probed
+- **Kind:** gap · **Spec:** 6.7
+
+6.7 says only that `buildFiltered` builds over a filtered copy. `ObjectUtils.filter` walks the
+context with `for … in` into a new plain object, which decides more than the specification says: a
+symbol key never reaches the copy, a non-enumerable member — the methods and getters of a class
+among them — is dropped, an enumerable getter is read once while the copy is built and its value
+kept, and the copy has no prototype of the context's class. Open: which of these 6.7 states, and
+whether each needs a case in `test/expressionresolver/buildfiltered.Test.js`.
+
 ## Executers
 
 ### B-13 · Should the `ctx` prefix of `ContextObjectExecuter` be configurable?
@@ -138,18 +126,6 @@ and intended (`DECISIONS.md`, 2026-08-24). But the identifier is hard-coded, and
 a property named `ctx` has no way out. Open with it: whether the option belongs on
 `setupExecuter(options)` next to `size`, and what happens to the code cache, which is keyed by the
 statement text alone — entries compiled under the old identifier would answer for the new one.
-
-## Documentation
-
-### B-21 · `SPECIFICATION.md` has not been read rule by rule since it was written
-
-- **Status:** agreed — the read-through is done, only Frank's review points are open
-- **Kind:** docs · **Spec:** all of it
-- **Records:** `SPECIFICATION.md`
-
-The read-through against the code, the suite and a node probe is done, and every finding of it is
-fixed or has its own entry. What is left: Frank has further points from reviewing the restructure.
-They are added here when they come, and the entry is closed once they are worked in.
 
 ## Benchmarks
 
@@ -176,6 +152,20 @@ The mode is decided per file, not per run, so two files of the same run cannot b
 a recorded number has to name its mode, and a single run is never compared against a single earlier
 one. Looks like a JIT or GC state decided early. Check whether it also happens outside the browser
 runner.
+
+**A lead from 2026-10-03:** which files share a run decides at least part of it. At depth 100 000
+the warm row of `context-deconstruction-executer` took 11.5–22.4 ms when `ColdResolve.bench.js` ran
+before it in the same `vitest bench` call, and 7.2–8.8 ms with `WarmResolve.bench.js` alone — the
+first is slower than the cold row of the same call, 2.2–2.3 ms, which recompiles on every iteration.
+Under the sources of `4cc573e` the pairing made no difference, 7.9–9.1 against 7.8–8.2. Until this
+is understood, both sides of a comparison run the same set of files.
+
+A full `npm run bench` showed it again the same day, on two sources that differ in no measured path:
+the deep rows of `WarmResolve.bench.js` landed in a slow mode — `context-deconstruction-executer` at
+depth 1 000 000 about 240 ms — or a fast one of about 70 ms, a factor of three, and the mode changed
+between runs of the same side. `WarmResolve.bench.js` alone put both sides level, 0.91–1.06. A deep
+`WarmResolve` row from a full run is therefore no evidence for or against a change; run the file on
+its own.
 
 ### B-26 · No benchmark exercises the cache eviction, the one thing `CodeCache` now does differently
 

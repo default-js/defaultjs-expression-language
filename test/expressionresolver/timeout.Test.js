@@ -46,6 +46,16 @@ describe("ExpressionResolver - the timeout delays the start", () => {
 		expect(negative).toBe("resolved");
 	});
 
+	// Unlike a wrong option of the constructor, a timeout of another type is not rejected: 4.5 makes it
+	// no delay, like zero. Written after the behaviour - it pins that exception, it proves no fix.
+	it("treats a timeout that is not a number as no delay", async () => {
+		ExpressionResolver.defaultExecuter = lookup();
+		const start = Date.now();
+		const result = await ExpressionResolver.resolve("${ value }", { value: "resolved" }, undefined, "500");
+		expect(result).toBe("resolved");
+		expect(Date.now() - start < 400).toBe(true);
+	});
+
 	// The timeout delays the start; what the statement then takes is its own business. The answer is
 	// a promise that settles well after the delay, so nothing but a deadline could cut it short.
 	it("is not a deadline - a statement that runs longer is not aborted", async () => {

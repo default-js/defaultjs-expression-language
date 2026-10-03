@@ -88,10 +88,12 @@ describe("ExpressionResolver - the instance entry points", () => {
 		expect(resolver.executer === executer).toBe(true);
 	});
 
-	it("takes the executer of its parent where the option is neither a name nor an instance", async () => {
+	// Any other value of the wrong type is rejected since 2026-10-03, the case further down; null
+	// still counts as the option left out.
+	it("takes the executer of its parent where the option is null", async () => {
 		const executer = new Executer({ execution: () => null });
 		const parent = new ExpressionResolver({ context: {}, executer });
-		const resolver = new ExpressionResolver({ context: {}, parent, executer: 42 });
+		const resolver = new ExpressionResolver({ context: {}, parent, executer: null });
 		expect(resolver.executer === executer).toBe(true);
 	});
 
@@ -202,6 +204,15 @@ describe("ExpressionResolver - the constructor rejects what cannot mean an optio
 	it("throws a TypeError on a name that is not a string", async () => {
 		for (const name of [42, 0, true, {}]) {
 			const error = await catchError(() => new ExpressionResolver({ context: {}, name }));
+			expect(error instanceof TypeError).toBe(true);
+		}
+	});
+
+	// Such a value used to count as left out, so the mistake went unnoticed. The last one stands for an
+	// Executer of another copy of the package, which is no instance of this one's class.
+	it("throws a TypeError on an executer that is neither a name nor an Executer", async () => {
+		for (const executer of [42, true, {}, { execute: () => "another copy" }]) {
+			const error = await catchError(() => new ExpressionResolver({ context: {}, executer }));
 			expect(error instanceof TypeError).toBe(true);
 		}
 	});

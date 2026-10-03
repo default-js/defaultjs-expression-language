@@ -48,6 +48,12 @@ describe("ExpressionScanner - the scope prefix in a text", () => {
 	it("treats a name that is whitespace only as no prefix at all", () => {
 		expect(only("${  ::value}").scope).toBe(null);
 	});
+
+	// An empty name is no name either, so its separator goes as well. The statement used to keep it,
+	// and no executer can run "::value".
+	it("takes the separator off the statement where the name is empty", () => {
+		expect(only("${::value}").statement).toBe("value");
+	});
 });
 
 describe("ExpressionScanner - the scope prefix of the single expression", () => {
@@ -78,5 +84,9 @@ describe("ExpressionScanner - the scope prefix of the single expression", () => 
 
 	it("treats a name that is whitespace only as no prefix at all", () => {
 		expect(parseExpression("${  ::value}").scope).toBe(null);
+	});
+
+	it("takes the separator off the statement where the name is empty", () => {
+		expect(parseExpression("${::value}").statement).toBe("value");
 	});
 });

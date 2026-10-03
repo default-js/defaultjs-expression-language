@@ -4,6 +4,7 @@ import Executer from "../../src/Executer.js";
 import getExecuter from "../../src/ExecuterRegistry.js";
 import * as ContextObjectModule from "../../src/executer/ContextObjectExecuter.js";
 import * as ContextDeconstructorModule from "../../src/executer/ContextDeconstructorExecuter.js";
+import { catchError } from "../TestUtils.js";
 
 /**
  * ExpressionResolver - the default executer. SPECIFICATION.md 9.1, 9.2.
@@ -40,5 +41,16 @@ describe("ExpressionResolver - the default executer switch", () => {
 		ExpressionResolver.defaultExecuter = own;
 		expect(ExpressionResolver.defaultExecuter === own).toBe(true);
 		ExpressionResolver.defaultExecuter = reset;
+	});
+
+	// The same values the constructor rejects; the setter used to look them up as a name and throw
+	// the Error of an unregistered one.
+	it("throws a TypeError on a value that is neither a name nor an Executer", async () => {
+		for (const executer of [42, true, {}]) {
+			const error = await catchError(() => {
+				ExpressionResolver.defaultExecuter = executer;
+			});
+			expect(error instanceof TypeError).toBe(true);
+		}
 	});
 });

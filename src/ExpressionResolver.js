@@ -108,11 +108,14 @@ const resolveInScope = async function (anExecuter = DEFAULT_EXECUTER, aResolver,
 	// climbs in a loop rather than by recursion - one call per resolver climbed cost a promise
 	// each and overflowed the stack on a deep chain. A scope no resolver of the chain carries
 	// answers undefined, and the default applies to it like to any other result
-	if (aScope)
+	if (aScope) {
 		while (aResolver.name != aScope) {
 			aResolver = aResolver.parent;
 			if (!aResolver) return withDefault(undefined, aDefault);
 		}
+		// a statement runs where its prefix addresses it, so with the executer of that resolver
+		anExecuter = aResolver.executer;
+	}
 
 	return withDefault(await execute(anExecuter, aStatement, aResolver.context), aDefault);
 };
@@ -141,11 +144,13 @@ export default class ExpressionResolver {
 	 * and so the executer of the static entry points.
 	 *
 	 * @param {string|Executer} anExecuter a registered name or an `Executer` instance
+	 * @throws {TypeError} where the value is neither a string nor an `Executer` instance
 	 * @throws {Error} where a name is not registered
 	 */
 	static set defaultExecuter(anExecuter) {
-		if ( anExecuter instanceof Executer) DEFAULT_EXECUTER = anExecuter;
-		else DEFAULT_EXECUTER = getExecuter(anExecuter);
+		if (anExecuter instanceof Executer) DEFAULT_EXECUTER = anExecuter;
+		else if (typeof anExecuter === "string") DEFAULT_EXECUTER = getExecuter(anExecuter);
+		else throw new TypeError(`ExpressionResolver.defaultExecuter takes a registered name or an Executer, not a ${typeof anExecuter}!`);
 		console.info(`Changed default executer for ExpressionResolver!`);
 	}
 
@@ -179,16 +184,18 @@ export default class ExpressionResolver {
 	 * @param {?string} [options.name=null] kept trimmed; where none is passed, one is generated
 	 * @param {(string|Executer)} [options.executer] the registered name of an executer, or an
 	 * `Executer` instance. A name that is not registered throws; an instance needs no registration,
-	 * because it addresses the executer directly. Anything else counts as left out. Without the
+	 * because it addresses the executer directly. Null and undefined count as left out. Without the
 	 * option the resolver takes the executer of its parent, and one without a parent
 	 * `ExpressionResolver.defaultExecuter`.
-	 * @throws {TypeError} where the parent is no resolver, the context a primitive, or the name no
-	 * string, empty, or carrying a character a scope name cannot carry
+	 * @throws {TypeError} where the parent is no resolver, the context a primitive, the name no
+	 * string, empty, or carrying a character a scope name cannot carry, or the executer neither a
+	 * string nor an `Executer` instance
 	 * @throws {Error} where the executer is named and the name is not registered
 	 */
 	constructor({ context, parent = null, name = null, executer } = {}) {
 		if (parent != null && !(parent instanceof ExpressionResolver)) throw new TypeError("The option parent takes an ExpressionResolver!");
 		if (context != null && typeof context !== "object" && typeof context !== "function") throw new TypeError(`The option context takes an object, not a ${typeof context}!`);
+		if (executer != null && typeof executer !== "string" && !(executer instanceof Executer)) throw new TypeError(`The option executer takes a registered name or an Executer, not a ${typeof executer}!`);
 		this.#name = toName(name);
 
 		if(executer instanceof Executer) this.#executer =  executer;

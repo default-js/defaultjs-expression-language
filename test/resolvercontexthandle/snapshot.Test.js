@@ -26,6 +26,16 @@ describe("ResolverContextHandle - names are a snapshot, values are live", () => 
 		expect(handle.context.added).toBe(2);
 	});
 
+	// mergeData rebuilds the whole set rather than adding the merged keys, so it takes up a key added
+	// directly as well - written into 6.2 on 2026-10-03, after the behaviour; it proves no fix.
+	it("sees that key after mergeData of another one", () => {
+		const handed = { known: 1 };
+		const handle = new ResolverContextHandle(handed);
+		handed.added = 2;
+		handle.mergeData({ merged: 3 });
+		expect(handle.context.added).toBe(2);
+	});
+
 	it("reads a value at the moment of the lookup, so a mutation is visible immediately", () => {
 		const handed = { holder: { name: "before" } };
 		const handle = new ResolverContextHandle(handed);

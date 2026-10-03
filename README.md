@@ -161,8 +161,8 @@ Each static call builds a resolver of its own over an ad-hoc context and runs un
   arguments. Deprecated.
 - **`ExpressionResolver.defaultExecuter`**, read and written — the executer of a resolver built
   without a parent and without the `executer` option, and so of the static calls. It is set to a
-  registered name or an `Executer` instance; an unregistered name throws, and every set writes a
-  line to the console. Read, it answers the instance. A resolver keeps the executer it was built
+  registered name or an `Executer` instance; an unregistered name throws, any other value is
+  rejected with a `TypeError`, and every set writes a line to the console. Read, it answers the instance. A resolver keeps the executer it was built
   with, so a change affects only resolvers built afterwards. Starts as
   `context-deconstruction-executer`.
 
@@ -176,7 +176,7 @@ left out.
 | `context` | any object, a function included. The resolver keeps this object, not a copy, and writes into it. A primitive is rejected with a `TypeError`. | `null` or `undefined` as well: the resolver has no context of its own until a value is written to it |
 | `parent` | an `ExpressionResolver`, which makes this one part of its chain. Anything else is rejected with a `TypeError`. | the resolver is the root of a chain |
 | `name` | a string by the rule of [Names](#names), kept trimmed. Any other is rejected with a `TypeError`. | a unique name is generated |
-| `executer` | a registered name, where an unregistered one throws, or an `Executer` instance, which needs no registration | any value that is neither as well: the executer of `parent`, and without a parent `defaultExecuter` |
+| `executer` | a registered name, where an unregistered one throws, or an `Executer` instance, which needs no registration. Any other value is rejected with a `TypeError`. | `null` or `undefined` as well: the executer of `parent`, and without a parent `defaultExecuter` |
 
 #### Instance methods
 
@@ -397,8 +397,11 @@ A resolver built without the `executer` option takes the executer of its parent.
   the root; the **nearest** resolver carrying the key answers. What counts is that the key
   exists, not what it holds: a key holding `undefined` shadows a value further up.
 - **With a prefix**, `${name::statement}` climbs to the nearest resolver of that name and evaluates
-  the statement there, against its context and those above it.
+  the statement there, against its context and those above it and with its executer. In a chain
+  that mixes executers, each expression is written for the resolver it addresses.
 - **A prefix no resolver carries** answers `undefined`, and a default applies to it.
+- **A prefix whose name is empty** — `${::title}` or `${ ::title}` — is no prefix: the statement
+  is evaluated on the resolver the call was made on.
 
 ```javascript
 await item.resolve("${ nowhere::title }");          // undefined

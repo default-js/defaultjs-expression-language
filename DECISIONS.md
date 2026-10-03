@@ -19,6 +19,117 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-10-03 — What does the resolver do with an `executer` or a `timeout` of the wrong type?
+
+**Decision:** An `executer` option that is neither a string nor an `Executer` instance is rejected
+with a `TypeError`, by the constructor and by the setter `defaultExecuter` alike; `null` and
+`undefined` count as the option left out, and an unregistered name keeps throwing the `Error` of
+`getExecuter`. A `timeout` of the wrong type is not rejected: anything but a positive number means no
+delay. `SPECIFICATION.md` 4.2, 4.5, 7. Frank's decision.
+
+**Reasoning:** The constructor rejects what is a mistake in the calling code rather than data — a
+`parent`, a `context` or a `name` of the wrong type (2026-09-27). An `executer` of the wrong type is
+the same kind of mistake, and it went unnoticed: the resolver silently ran its parent's executer
+instead. An `Executer` from another copy of the package is no instance of this one's class and is
+rejected like a `parent` from another copy. The setter got the same value through `getExecuter`, which
+answered with "not registered" for something that was never a name. For the timeout Frank chose to
+keep the behaviour against the proposal to reject it; he gave no reason of his own. What speaks for
+it: zero and a negative timeout already mean no delay and are pinned, and a value of another type
+extends that rather than adding a second rule.
+
+**Alternatives:** Ignoring a wrong `executer` and writing the exception into section 7 — the
+behaviour so far, rejected because it hides the mistake. Rejecting a timeout that is no finite number
+with a `TypeError`, as `setupExecuter` does for its `size` — proposed and not taken.
+
+**Consequences:** A consumer who passes such an `executer` gets a `TypeError` where the resolver
+used to fall back, a breaking change for 3.0.0. Section 7 carries the timeout as the one argument of
+the wrong type that is not rejected.
+
+## 2026-10-03 — Which executer runs a statement that carries a scope prefix?
+
+**Decision:** The executer of the resolver the prefix addresses, against that resolver's context.
+Without a prefix the resolver the call was made on runs the statement with its own executer, as
+before. `SPECIFICATION.md` 5.3. Frank's decision, against the proposal to specify the behaviour so
+far.
+
+**Reasoning:** Frank gave no reason of his own. What speaks for it: 5.3 evaluates the statement
+"there", and 4.2 lets every resolver name its own executer, so the resolver that answers is the one
+whose executer applies. An expression written for a resolver then means the same from every resolver
+below it, whichever executer those hold.
+
+**Alternatives:** The executer of the resolver the call was made on — the behaviour so far. It gives
+a text or a call one spelling throughout, and the prefix selects the context only. It would be the
+better choice where chains mix executers and their authors write every expression for the resolver
+they hold.
+
+**Consequences:** In a chain that mixes executers, every expression is spelled for the resolver it
+addresses, and one text may carry two spellings side by side. A mixed chain that relied on the
+caller's spelling breaks — a breaking change for 3.0.0. The benchmarks use no prefix and are not
+affected.
+
+## 2026-10-03 — What does a scope prefix that is empty after trimming mean?
+
+**Decision:** Nothing — it is no prefix, and its separator goes with it. `${::value}` and
+`${ ::value}` both carry the statement `value`, run on the resolver the call was made on.
+`SPECIFICATION.md` 3.3. Frank's decision.
+
+**Reasoning:** The two cases answered differently: a whitespace-only name was dropped and the
+statement evaluated, an empty one left `::value` to the executer, which cannot run it — `::` is no
+JavaScript. 6.6 already reads a filter like a scope prefix and takes an empty one for none, so this
+is the reading the specification gave the same question elsewhere.
+
+**Alternatives:** Both as no prefix with the separator kept in the statement, so the executer fails
+and a text shows the expression as written — makes the slip visible, but turns `${ ::value}` from
+working into failing. A prefix with an empty name as one no resolver carries, answering `undefined`
+by 5.4 — changes both cases and hides the slip.
+
+**Consequences:** `${::value}` turns from failing into evaluating. Both splits of the scanner change,
+a hot path, so the change is measured before and after.
+
+## 2026-10-03 — What does removing a key do that the object only inherits?
+
+**Decision:** The resolver stops carrying the name, and the object is left as it is. A lookup passes
+the name on to the parent until `resetCache` or `mergeContext` rebuilds the names or the key is
+written again. This holds for `deleteData`, a `delete` on `getData()` and a `delete` from an
+expression an executer lets through. `SPECIFICATION.md` 5.2, 6.2, 6.6. Frank's decision, against the
+proposal to follow JavaScript.
+
+**Reasoning:** Frank gave no reason of his own. What speaks for it: the caller asked for the key to
+be gone from that resolver, and JavaScript cannot take an inherited property off the object without
+changing a prototype other objects share; dropping the name is the only way the call takes effect.
+It is also the behaviour the code had.
+
+**Alternatives:** Following JavaScript — the delete changes nothing and the resolver keeps the name,
+so 5.2 holds without an exception. Rejecting the removal of an inherited key with a `TypeError`,
+stricter than JavaScript, where such a delete silently does nothing.
+
+**Consequences:** 5.2 carries one exception to "what JavaScript says it carries". `deleteData`
+without a filter reaches the nearest resolver that carries the key, inherited or not, so it never
+reaches an own key of the same name further up while a nearer resolver inherits one.
+
+## 2026-10-03 — Does `with-scoped-executer` get a fix for the walk of `Symbol.unscopables`?
+
+**Decision:** No. `WithScopedExecuter` stays as it is, and so does the handle. Frank's decision.
+
+**Reasoning:** Under `with-scoped-executer` a lookup costs the full depth of the chain even when the
+name sits a few resolvers up: `RandomScope` at depth 100 000 answers 138 hz against 662 000 hz under
+`context-object-executer` (2026-08-30). Every measurement is consistent with `with` asking the context
+for `Symbol.unscopables` while it resolves a binding: no context of a chain carries that symbol, so
+the lookup is a miss and walks to the root. The executer is deprecated and off the default path
+since 2026-09-01, and a consumer who needs deep chains has the two other executers.
+
+**Alternatives:** Answering a symbol in `get` and `has` of the handle without walking — it breaks
+5.2, a symbol is a name like any other and an array handed over as a context carries
+`Symbol.unscopables` (2026-09-22). Any rule of that kind in the handle answers for one executer,
+against the separation of concerns (2026-08-30). A negative result cached per handle is a variant of
+the chain-wide index not pursued on 2026-10-03 ("Is a context a snapshot or read live?"). A proxy of
+the executer's own over the context that answers `Symbol.unscopables` keeps every rule, at one more
+proxy hop on every lookup; it becomes the better choice if `with-scoped-executer` returns to the
+default path.
+
+**Consequences:** `with-scoped-executer` stays the slowest of the three over deep chains. The cause is
+not proven with a counter in the trap and is not pursued further unless the question is reopened.
+
 ## 2026-10-03 — What does `resolve` do with an input that opens with `${` and does not end with `}`?
 
 **Decision:** It hands the input to the executer as a bare statement. An input is the delimited
@@ -792,9 +903,14 @@ exception into 6.3: the cheapest, and it leaves a special case every consumer ha
 **Measured** when the work closed, `npm run bench`, four runs of `4cc573e` against two of the
 result: **1.02 over all rows**, 1.11 for the three executers that do not read every name, and 1.05
 for the default one over everything but a chain of 100 000 resolvers or more that carries no context
-at all. That one case costs a factor of three and is in `BACKLOG.md` under B-07: the seven names of
-`Object.prototype` are now carried by the root alone, so each of them walks the whole chain, where an
-empty resolver holding `{}` used to answer them at the first step.
+at all. That one case cost a factor of three: the seven names of `Object.prototype` are now carried
+by the root alone, so each of them walks the whole chain, where an empty resolver holding `{}` used
+to answer them at the first step. The walk is still there, but
+since 2026-10-03 it passes a handle without an object by a field read, and that took the cost back:
+measured that day with the bench files of the time, the sources of `4cc573e` and the current ones
+alternating, four runs each, the default executer over a chain without contexts answers at 0.71,
+0.99, 0.98 and 0.84 of the old time at depths 10, 1 000, 100 000 and 1 000 000 when
+`WarmResolve.bench.js` runs alone, and at 0.23 to 0.55 in `ColdResolve.bench.js`.
 
 **Consequences:** A context value named `valueOf`, `toString` or `hasOwnProperty` further up the
 chain is shadowed by every resolver below that holds a plain object — that is `in` answering, and
@@ -1121,8 +1237,8 @@ every executer walks the whole chain anyway, puts the same three within a factor
 other (13 / 41 / 41 hz at depth 1 000 000). The gap is therefore not one executer being faster in
 general — it is a full-chain walk that only `with` triggers, which matches the `@@unscopables`
 lookup a `with` block performs while resolving a binding. That explanation is consistent with every
-number measured so far but has not been proven with a counter in the trap; the walk itself is
-carried in `BACKLOG.md`. Third, of the two candidates that do not use `with`, the deconstructor is
+number measured so far but has not been proven with a counter in the trap; the walk stays
+(2026-10-03, "Does `with-scoped-executer` get a fix for the walk of `Symbol.unscopables`?"). Third, of the two candidates that do not use `with`, the deconstructor is
 the only one that leaves the way an expression is written alone: `context-object-executer` hands the
 context to the statement as `ctx` and therefore demands `${ctx.value}` where every expression
 written so far says `${value}` (9.2). Changing a default must not rewrite every consumer's
@@ -1501,7 +1617,8 @@ sees a value where one was passed, so the effect surfaces only when no default i
 **Decision:** **Names are a snapshot, values are live.** The set of keys a resolver contributes is
 captured when it is built; the values behind them are read at the moment of the lookup.
 A key added directly to the handed-in object afterwards is invisible until
-`contextHandle.resetCache()`, `updateData` or `mergeContext` rebuilds the set.
+`contextHandle.resetCache()` or `mergeContext` rebuilds the set; `updateData` adds only the key it
+writes.
 
 **Reasoning:** The cache does not spare the walk — a lookup still steps from handle to handle, a
 miss up to the root — but it makes each step one `Map.has`, and it lets the `ownKeys` trap list

@@ -98,9 +98,10 @@ const splitScopeAndStatementForward = (aContent) => {
 	let index = 0;
 	while (index < length && isNameCharacter(aContent.charCodeAt(index))) index++;
 
-	if (index === 0 || aContent.charCodeAt(index) !== COLON || aContent.charCodeAt(index + 1) !== COLON)
+	if (aContent.charCodeAt(index) !== COLON || aContent.charCodeAt(index + 1) !== COLON)
 		return { scope: null, statement: trimToNull(aContent) };
 
+	// an empty name is no name, but its separator goes with it all the same
 	return { scope: trimToNull(aContent.substring(0, index)), statement: trimToNull(aContent.substring(index + 2)) };
 };
 
@@ -281,7 +282,7 @@ export const parseExpression = (aExpression) => {
  */
 const splitScopeAndStatementBySeparator = (aContent) => {
 	const end = aContent.indexOf(SCOPE_SEPARATOR);
-	if (end < 1) return { scope: null, statement: trimToNull(aContent) };
+	if (end < 0) return { scope: null, statement: trimToNull(aContent) };
 
 	for (let index = end - 1; index >= 0; index--)
 		if (!isNameCharacter(aContent.charCodeAt(index))) return { scope: null, statement: trimToNull(aContent) };

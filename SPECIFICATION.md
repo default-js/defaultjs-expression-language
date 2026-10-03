@@ -35,10 +35,10 @@ deeper must never overwrite values further up.
 |---|---|
 | **Statement** | A piece of JavaScript to be evaluated, without delimiters. |
 | **Expression** | A statement in its delimited form, `${…}`, optionally carrying a scope prefix. |
-| **Resolver** | One `ExpressionResolver` instance: a name, a context, and optionally a parent. |
+| **Resolver** | One `ExpressionResolver` instance: a name, optionally a context, and optionally a parent. |
 | **Chain** | A resolver and its parents. |
 | **Root** | The resolver that has no parent. A resolver without a parent is its own root. |
-| **Context** | The data an expression is evaluated against, one object per resolver. |
+| **Context** | The data an expression is evaluated against: the object handed to a resolver, at most one per resolver (6.3). |
 | **Executer** | The strategy that turns a statement into a value. Pluggable. |
 
 **Direction.** The chain is drawn as a tree in the usual way of computer science: the **root at
@@ -49,6 +49,10 @@ the root. A lookup climbs; a template descends as it builds and unwinds as it fi
 ## 3. Expression syntax
 
 ### 3.1 Delimiters
+
+**This is the rule of a text.** `resolveText` finds the expressions of a text by it. `resolve` takes
+one expression, so its input ends where the input ends, and only its two ends decide whether it is
+the delimited form (4.3).
 
 An expression begins with `${` and ends at the **matching** closing brace. Braces inside the
 statement — an object literal, an arrow function body, a nested template literal — are part of
@@ -73,10 +77,10 @@ the literal also carries a brace.
 written, unchanged, and nothing is evaluated. There is no error and no partial replacement.
 
 **A `${` met outside a literal or a comment while a statement is still open starts a new
-expression.** The open
-one is abandoned and the text it covered stands as written. So `"a ${ x b ${value}"` answers
-`"a ${ x b "` with the second expression resolved behind it. Everything between the delimiters is
-meant to be JavaScript, and a second opening delimiter cannot be part of it.
+expression.** The open one is abandoned and the text it covered stands as written. So
+`"a ${ x b ${value}"` answers `"a ${ x b "` with the second expression resolved behind it.
+Everything between the delimiters is meant to be JavaScript, and a second opening delimiter cannot
+be part of it.
 
 ### 3.2 Escaping
 
@@ -106,9 +110,14 @@ elsewhere in the text, and the other way round.
 `name`. The prefix is optional; without it the resolver the call was made on applies.
 
 The name is a label, not a JavaScript identifier. Allowed are **the ASCII letters `a`–`z` and
-`A`–`Z`, digits, whitespace, `-` and `_`** — nothing else. The name is trimmed at both ends, so leading and trailing
-whitespace is not part of it. The character set is narrow enough that scope and statement can always
-be separated, and that a quoted `::` inside a statement cannot be read as a prefix.
+`A`–`Z`, digits, whitespace, `-` and `_`** — nothing else. The name is trimmed at both ends, so
+leading and trailing whitespace is not part of it. The character set is narrow enough that scope and
+statement can always be separated, and that a quoted `::` inside a statement cannot be read as a
+prefix.
+
+A name that is **empty after trimming is no name**, and the prefix it stands in is no prefix: the
+separator goes with it. `${::value}` and `${ ::value}` both carry the statement `value`, evaluated on
+the resolver the call was made on.
 
 ### 3.4 The empty statement
 
@@ -180,20 +189,24 @@ code rather than data:
   copy of the package included, since the chain reaches into its private state;
 - a `context` that is a primitive — a string, a number, a boolean, a symbol or a bigint, `0`, `""`
   and `false` included. Any object is a context (6.1), and `null` or `undefined` is none;
-- a `name` that breaks the rule of 5.1.
+- a `name` that breaks the rule of 5.1;
+- an `executer` that is neither a string nor an `Executer` instance — an executer from another copy
+  of the package included, as for `parent`.
 
 The static entry points build their resolver through the constructor, so a context of the wrong type
 rejects their call as well.
 
-`executer` takes the **registered name** of an executer or an **`Executer` instance**. A name is looked up in the registry and an unregistered one throws; an
-instance is taken as it is and needs no registration, because it already addresses the executer.
-Anything that is neither is ignored, as though the option were left out.
+`executer` takes the **registered name** of an executer or an **`Executer` instance**. A name is
+looked up in the registry and an unregistered one throws; an instance is taken as it is and needs no
+registration, because it already addresses the executer. `null` and `undefined` count as the option
+left out.
 
 Without the option the resolver takes the executer of its **parent**, and only a resolver without
 a parent falls back to `ExpressionResolver.defaultExecuter`, whose setter accepts either form as
-well. The choice is made once, in the constructor, and the parent's executer is whatever that parent
-holds, however it got it — so one executer named at the root of a chain applies to every resolver
-built under it that does not name its own. The getter `executer` answers the one in use.
+well and rejects anything else with a `TypeError`. The choice is made once, in the constructor, and
+the parent's executer is whatever that parent holds, however it got it — so one executer named at
+the root of a chain applies to every resolver built under it that does not name its own. The getter
+`executer` answers the one in use.
 
 The instance methods stay **positional** and get no configuration form of their own. Everything a
 configuration would carry beyond the default value — the context and the executer — is already
@@ -227,14 +240,14 @@ the same rule (3.3).
 JavaScript is the executer's business, and whatever it raises is a failing statement (7).
 
 The escaping of 3.2 does **not** apply to `resolve`. A leading backslash is part of the statement,
-so `resolve("\${value}")` hands `\${value}` to the executer, which cannot compile it.
+so `resolve("\\${value}")` hands `\${value}` to the executer, which cannot compile it.
 
 ### 4.4 Default value
 
 A default value replaces a result of `null` **and** of `undefined`. It never covers an **error**,
 in neither entry point: whatever default was passed, `resolve` raises and `resolveText` leaves the
-expression standing (7). Whether it was passed at all is what counts, not what it holds: passing `undefined` as the default is
-honoured, and its effect cannot be told from passing nothing.
+expression standing (7). Whether it was passed at all is what counts, not what it holds: passing
+`undefined` as the default is honoured, and its effect cannot be told from passing nothing.
 
 In `resolveText` the default applies per expression. Without a default, `undefined` and `null`
 are rendered as the literal texts `undefined` and `null`.
@@ -243,6 +256,10 @@ are rendered as the literal texts `undefined` and `null`.
 
 `aTimeout`, in milliseconds, **delays the start** of the resolution by that amount. It is not a
 deadline: nothing is aborted when the resolution takes longer.
+
+Only a positive number delays. Zero, a negative number and a value that is no number at all —
+`"500"` included — mean no delay. Such a timeout is **not rejected**, unlike an argument of the wrong
+type anywhere else (7).
 
 ### 4.6 Asynchrony
 
@@ -284,6 +301,11 @@ that: a key inherited through the **prototype chain** counts, so a getter or a m
 class is reachable from an expression; so do a key that could not stand for a variable
 (`test-test`), one named like a reserved word (`class`), an index, and a symbol.
 
+There is **one exception**, and it comes from removing a key (6.6). Where a resolver's object only
+inherits the key, the removal cannot take it off the object, and the resolver stops carrying the name
+all the same: a lookup passes it on to the parent until the names are rebuilt (6.2) or the key is
+written again.
+
 Two consequences are worth naming, because both follow from the language rather than from a choice
 made here. A context object inherits from `Object.prototype` unless it was built without a
 prototype, so a resolver over a plain object **carries `toString`, `valueOf`, `hasOwnProperty` and
@@ -294,7 +316,10 @@ reads it — how a statement addresses a name is the executer's own (9.2).
 ### 5.3 Lookup with a prefix
 
 `${name::statement}` climbs the chain until it reaches the resolver whose `name` equals the prefix,
-and evaluates the statement there — against that resolver's context and the contexts above it.
+and evaluates the statement there — against that resolver's context and the contexts above it, and
+with **that resolver's executer** (4.2), not the one of the resolver the call was made on. In a chain
+that mixes executers, every expression is written for the resolver it addresses, so one text may
+carry two spellings side by side (9.2).
 
 Where more than one resolver carries the name, the **first one found while climbing** answers, and
 the ones above it are shadowed — the same rule as 5.2, and for the same reason: a chain is built
@@ -315,12 +340,12 @@ resolver.contextChain      // → [context, …] from this resolver upwards
 
 `chain` names **every** resolver from the root down to this one, one path segment each.
 
-`effectiveChain` names only the resolvers that **provide a context**. Since every one of them now
-carries a name, the context is what tells them apart: a resolver that exists only to hold a name and
-a parent adds nothing to a lookup, and does not appear here.
+`effectiveChain` names only the resolvers that **provide a context**: a resolver that exists only to
+hold a name and a parent adds nothing to a lookup, and does not appear here.
 
 `contextChain` answers the contexts of exactly those resolvers, this resolver's first, the root's
-last.
+last. Each is a context as 6.1 describes it, answering for the chain above its resolver, not the
+object handed to that resolver alone: enumerating the first one lists every name the chain carries.
 
 A resolver counts as providing a context when the caller **handed one to the constructor** — any
 value that is neither `null` nor `undefined` — **or** when a value has been set on it since,
@@ -330,8 +355,8 @@ reach.
 
 A resolver therefore provides no context only in one case: it was built without one —
 `context: null`, `context: undefined`, or the option left out — and nothing has been written to it
-since. Note that this is the one place where `context: null` and `context: {}` are told apart; for
-a lookup they behave the same (6.3).
+since. So `context: {}` provides a context and `context: null` does not; a lookup tells the two apart
+as well, since `{}` carries what every object inherits (6.3).
 
 One consequence follows from that and is part of the rule: `effectiveChain` and `contextChain`
 describe a **state, not a structure**. A resolver built without a context joins both the moment a
@@ -358,8 +383,8 @@ names them, and `Object.getOwnPropertySymbols` answers the symbol keys.
 Three further rules hold for any context:
 
 - **Values are read at the moment of the lookup** (6.2), never collected up front.
-- **A write lands on the resolver it was made on**, never on one nearer the root (section 1). Where that
-  resolver was built over a frozen object, the write fails as it would on the object itself.
+- **A write lands on the resolver it was made on**, never on one nearer the root (section 1). Where
+  that resolver was built over a frozen object, the write fails as it would on the object itself.
 - **Any object works as a context**, a frozen or sealed one included, and so do an array, a `Map`, a
   `Set`, a `NodeList` and a DOM element. Which of them a given executer can run a statement over is
   that executer's own (9.2). A primitive is no context and is rejected (4.2).
@@ -369,13 +394,16 @@ A context that **is** the global object is the exception to all of this; see 6.4
 ### 6.2 Names are a snapshot, values are live
 
 The set of keys a resolver contributes is captured when the resolver is built. Adding a key to the
-handed-in object afterwards has no effect until `contextHandle.resetCache()` runs.
+handed-in object afterwards has no effect until the set is rebuilt: `contextHandle.resetCache()`
+rebuilds it, and so does `mergeContext`, which takes up every key the object carries by then along
+with the ones it merges.
 
 Values are always read at the moment of the lookup, so mutating what a key holds
 (`data.user.name = "x"`, a `push` into an array) is visible immediately.
 
 Writing **through** the resolver — `updateData`, `mergeContext`, or an assignment an executer let
-through (6.5) — keeps the set of keys in step.
+through (6.5) — keeps the set of keys in step. Removing a key the object only inherits is the
+exception of 5.2.
 
 ### 6.3 A resolver without a context
 
@@ -389,19 +417,18 @@ an expression evaluated on it (6.5).
 
 ### 6.4 The global object as a context
 
-Whether an expression can reach a global variable or function **is not the resolver's business** and
-follows from how the executer runs the statement, and is that executer's own (9.2). What follows
-from that here is a rule of the resolver: a name the chain does not
-carry may resolve against the global object, which is what makes a typo in an expression
-indistinguishable from an empty value — accepted, see section 7. A consumer who wants a name resolved
-locally puts it into the context, so it is found before the lookup walks out.
+Whether an expression can reach a global variable or function is decided by how the executer runs
+the statement, and is that executer's own (9.2). The resolver only states the consequence: a name
+the chain does not carry may resolve against the global object, which is what makes a typo in an
+expression indistinguishable from an empty value — accepted, see section 7. A consumer who wants a
+name resolved locally puts it into the context, so it is found before the lookup walks out.
 
 The global object may also be handed in **as a context object**; it is then an ordinary resolver of
 the chain. Four things follow from what such a resolver is, and all four are intended:
 
 - It carries **every** name, so it answers every lookup that reaches it and no resolver nearer the
-  root is ever consulted. A resolver over the global object therefore belongs at the root of a chain, not in
-  the middle of one.
+  root is ever consulted. A resolver over the global object therefore belongs at the root of a
+  chain, not in the middle of one.
 - It contributes **no name to an enumeration** below it. A lookup still finds everything it holds,
   from any resolver of the chain, but `Object.keys` of a context below it does not list the globals:
   a statement reaches a global through the ordinary scope chain, so listing them would only
@@ -464,8 +491,8 @@ answers the whole context (below), while `updateData` and `deleteData` have noth
 reject with a `TypeError`. A key of any other type is rejected with a `TypeError` by all three.
 
 They act **on the chain**, not on one isolated resolver, and how far each one reaches is per method,
-listed below. The rule of section 1 — a value introduced further from the root never overwrites one nearer
-to it — describes the *expression* path; it is not a prohibition on these methods.
+listed below. The rule of section 1 — a value introduced further from the root never overwrites one
+nearer to it — describes the *expression* path; it is not a prohibition on these methods.
 
 `filter` is a scope name and selects **the one resolver** the call applies to, by the rule of 5.3.
 It is read like a scope prefix (3.3): trimmed, and empty or whitespace only it is no filter. Without
@@ -489,14 +516,17 @@ looks:
 - **With a filter** the addressed resolver is the target outright. The value is written there,
   whatever the rest of the chain holds.
 
-This is the counterpart to section 1: the chain protects a resolver's value against an expression evaluated
-further from the root, while the data methods are the path that may reach across resolvers.
+This is the counterpart to section 1: the chain protects a resolver's value against an expression
+evaluated further from the root, while the data methods are the path that may reach across
+resolvers.
 
 `deleteData` removes a key from **one** resolver — the addressed one with a filter, and without one
 the first resolver carrying it, counting from the resolver the call was made on towards the root.
 Removing it there uncovers the value of the next resolver that carries the same key, if any: that is
 the inverse of shadowing (5.2) and it is intended. There is no chain-wide variant; a caller who
-wants one walks the chain and deletes per resolver.
+wants one walks the chain and deletes per resolver. Where that resolver's object only inherits the
+key, nothing is taken off the object, and the resolver stops carrying the name all the same — the
+exception of 5.2.
 
 `mergeContext` assigns the keys of the passed object into the context of the addressed resolver — a
 **shallow** assignment, key by key, replacing what is there and adding what is not. No deep merge,
@@ -525,8 +555,14 @@ expression through the mechanism of 6.4, as far as the executer in use reaches t
 `buildFiltered` is a way to hand over a cleaned context; it is not a sandbox and must not be
 documented as one.
 
-`option` carries the filter's own `deep` together with the **full constructor option set**, which
-`buildFiltered` hands on unchanged.
+`propFilter(name, value, holder)` is called for every enumerable property of the context, inherited
+ones included, with the object the property is read from as `holder`; a property it answers `false`
+for is left out of the copy. The context itself stays untouched.
+
+`option` carries the filter's own `deep`, which filters nested objects as well and is `true` where
+it is left out, together with the constructor options `name`, `parent` and `executer`, which
+`buildFiltered` hands on unchanged. The context is the one passed beside `option`; an
+`option.context` is not read.
 
 `buildSecure` is its former name, deprecated: it takes the same arguments and answers the same
 resolver.
@@ -553,10 +589,15 @@ in it, and a single broken expression in it is a defect in that expression, not 
 the place where it can still be found.
 
 A **form that an entry point rejects itself** follows the same line: an argument of the wrong type
-is rejected with a `TypeError` by the static entry points (4.1), the constructor and the instance
-entry points (4.2) and the data methods (6.6). `resolve` rejects no form of a string — what is not
-the delimited form is a bare statement (4.3) — and in a text anything that is not an expression is
-text and no error arises at all (3.1).
+is rejected with a `TypeError` by the static entry points (4.1), the constructor, the setter of the
+default executer and the instance entry points (4.2), and the data methods (6.6). The one argument
+of the wrong type that is not rejected is the timeout, which then means no delay (4.5). `resolve`
+rejects no form of a string — what is not the delimited form is a bare statement (4.3) — and in a
+text anything that is not an expression is text and no error arises at all (3.1).
+
+**Rejected**, throughout this document, means the caller receives the error in the way the call
+answers: a synchronous call — the constructor, a setter, the data methods, `setupExecuter` — throws
+it, and an entry point, which always answers a promise (4.6), answers a rejected one.
 
 ## 8. Public surface
 
@@ -566,8 +607,8 @@ exist so a consumer can build their own debug output.
 **`ExpressionResolver`** — static `resolve`, `resolveText`, `buildFiltered`, `defaultExecuter`, and
 `buildSecure`, deprecated (6.7);
 constructor `{ context, parent, name, executer }`;
-instance `resolve`, `resolveText`, `getData`, `updateData`, `deleteData`, `mergeContext`; getters `name`, `parent`, `context`, `contextHandle`,
-`executer`, `chain`, `effectiveChain`, `contextChain`.
+instance `resolve`, `resolveText`, `getData`, `updateData`, `deleteData`, `mergeContext`; getters
+`name`, `parent`, `context`, `contextHandle`, `executer`, `chain`, `effectiveChain`, `contextChain`.
 
 **`ExecuterRegistry`** — `register`, `getExecuter`.
 
@@ -611,7 +652,7 @@ chain (5.1).
 registers it.
 
 `ExpressionResolver.defaultExecuter` reads and writes the default; the setter takes a registered
-name or an `Executer` instance.
+name or an `Executer` instance and rejects anything else (4.2).
 
 ### 9.2 The implementations
 

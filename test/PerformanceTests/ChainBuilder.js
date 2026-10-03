@@ -20,8 +20,10 @@ export const DEPTHS = [10, 1000, 100000, 1000000];
 /**
  * Answers an entry into the chain that resolves under the given executer.
  *
- * The executer of a resolution is the one of the resolver the call is made on, and it is carried
- * along the whole walk - `resolve(this.#executer, this, …)` in `ExpressionResolver`. So one chain
+ * The executer of a resolution without a scope prefix is the one of the resolver the call is made
+ * on, and it is carried along the whole walk - `resolveInScope(this.#executer, this, …)` in
+ * `ExpressionResolver`. No benchmark uses a prefix, which would hand the statement to the executer
+ * of the resolver it addresses. So one chain
  * serves every executer: a resolver on top of it, built with that executer and an empty context of
  * its own, resolves over the same resolvers below. Building one chain per executer is not an
  * option, the deepest is a million resolvers.
