@@ -256,16 +256,15 @@ the fix if contexts with getters become common under the default.
 **Decision:** No. The name `Context` is gone; nothing ever exported it. `ResolverContextHandle`
 stays internal and is not listed in section 8. Frank's decision.
 
-**Reasoning:** Nothing needs the handle from outside except `resetCache`, which 6.2 names, and
-whether the name cache and with it `resetCache` survive is what the measurement of the name cache
-decides (`BACKLOG.md`, "What the name cache costs and saves when reading and writing along a
-chain"). Making the class public now would add surface that measurement may take away again.
+**Reasoning:** Nothing needs the handle from outside except `resetCache`, which 6.2 names, and the
+getter `contextHandle` reaches it. Exporting the class would add surface for no further use.
 
 **Alternatives:** Exporting the handle from `index.js` and covering `get parent` and `updateData`.
 
 **Consequences:** `get parent` and `updateData` of the handle are internal; their coverage is a
-question of reachability, not of surface. The getter `contextHandle` stays public until the
-measurement is done.
+question of reachability, not of surface. The getter `contextHandle` stays public for `resetCache`,
+since the name cache stays (2026-08-22, "Is a context a snapshot or read live?", measured
+2026-10-03).
 
 ## 2026-09-30 — Do the benchmarks get rid of the long pause at depth 10?
 
@@ -800,8 +799,8 @@ empty resolver holding `{}` used to answer them at the first step.
 **Consequences:** A context value named `valueOf`, `toString` or `hasOwnProperty` further up the
 chain is shadowed by every resolver below that holds a plain object — that is `in` answering, and
 5.2 says so. An executer that turns names into code has to cope with names it cannot express;
-`ContextDeconstructorExecuter` reports them (the entry above). Whether
-the name snapshot of 6.2 still earns its place once it filters nothing is left to a measurement.
+`ContextDeconstructorExecuter` reports them (the entry above). The name snapshot of 6.2 still earns
+its place without the filter — measured 2026-10-03, see "Is a context a snapshot or read live?".
 
 ## 2026-09-22 — Does an executer offer a default context?
 
@@ -1504,17 +1503,35 @@ captured when it is built; the values behind them are read at the moment of the 
 A key added directly to the handed-in object afterwards is invisible until
 `contextHandle.resetCache()`, `updateData` or `mergeContext` rebuilds the set.
 
-**Reasoning:** That cache is what makes the chain walk cheap — one map lookup per resolver. It also
-matches how the package is used: a resolver of a chain is filled and then used, not
-extended while it is being read.
+**Reasoning:** The cache does not spare the walk — a lookup still steps from handle to handle, a
+miss up to the root — but it makes each step one `Map.has`, and it lets the `ownKeys` trap list
+prepared keys instead of reading every object and its prototype chain on every execution.
+Measured on 2026-10-03, when the cache was removed and names were read live — `npm run bench`, two
+runs each, old and new alternating: where every resolver carries a context,
+`context-deconstruction-executer` fell to 0.56 of its rate at depth 10 and to 0.10 at depth 1 000,
+`context-object-executer` to 0.87 and 0.45, `with-scoped-executer` to 0.81 and 0.58, and
+`resolveText` on a single resolver to 0.84–0.88 under the default executer. The removal was
+reverted. The snapshot also matches how the package is used: a resolver of a chain is filled and
+then used, not extended while it is being read.
 
-**Alternatives:** A live fallback — `Reflect.has(data, property)` on every cache miss — was
-weighed and rejected. It doubles the cost of the miss path, which is the path that walks the
-entire chain, and `ownKeys`, which `ContextDeconstructorExecuter` calls on *every* execution,
-would have to be rebuilt live along with it.
+**Alternatives:** Reading names live throughout — implemented on 2026-10-03 and reverted on the
+numbers above. It gained only where resolvers carry no context, and the walk keeps that gain
+anyway: a handle without an object is passed by without asking its cache. A live fallback,
+`Reflect.has(data, property)` on every cache miss — it doubles the miss path, which walks the
+entire chain, and `ownKeys` would have to be rebuilt live along with it. A chain-wide index that
+tells for every name which handle carries it and so does spare the walk — worked out with Frank on
+2026-10-03 and not pursued, since the template engine, which builds the deepest chains, shows no
+performance problem in real use.
 
 **Consequences:** Mutating an object handed to a resolver is not enough to make a new key visible,
-which is a documented side effect rather than a defect.
+which is a documented side effect rather than a defect. Passing a handle without an object costs one
+more field read on every step past a handle that has one: measured on 2026-10-03, alternating, a
+chain without contexts got faster by 1.1–1.3 at depth 10, 1.5–2.0 at depth 1 000 and about 3
+deeper, while three rows where every resolver carries a context lost 7–9 % (`RandomScope` under
+`with-scoped-executer` and `context-object-executer`, `ColdResolve` under `context-object-executer`
+at depth 1 000). Frank accepted that trade, since most resolvers of the template engine carry no
+context; a variant keeping `#cache` at `null` while `#data` is, which would avoid the extra read,
+was not tried.
 
 ## 2026-08-22 — Is reaching the global object a promise of the package?
 

@@ -157,8 +157,11 @@ export default class ResolverContextHandle {
 					const result = new Set();
 					let handle = this;
 					while (handle) {
-						for (let key of handle.#cache.keys()) {
-							result.add(key);
+						// a handle without an object carries no name - its empty cache is passed by
+						if (handle.#data !== null) {
+							for (let key of handle.#cache.keys()) {
+								result.add(key);
+							}
 						}
 						handle = handle.#parent;
 					}
@@ -274,11 +277,12 @@ export default class ResolverContextHandle {
 	 * @returns {ResolverContextHandle|null}
 	 */
 	#findHandle(property) {
-		if (this.#cache.has(property)) return this.#cache.get(property);
-		let parent = this.#parent;
-		while (parent) {
-			if (parent.#cache.has(property)) return parent.#cache.get(property);
-			parent = parent.#parent;
+		// A handle without an object carries no name, so it is passed by without asking its cache -
+		// most resolvers of a chain are built without a context.
+		let handle = this;
+		while (handle) {
+			if (handle.#data !== null && handle.#cache.has(property)) return handle.#cache.get(property);
+			handle = handle.#parent;
 		}
 		return null;
 	}

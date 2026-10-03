@@ -46,7 +46,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 2 | Raise code quality | open — gated by the `Blocks 3.0.0` entries | every `defect` |
 | 3 | Raise test coverage | largely done | B-30 |
 | 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; Frank's review of the specification open | B-21 |
-| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26, B-40 |
+| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-47, B-07, B-25, B-26 |
 
 **Markers, counted 2026-10-01** (`npm test`: 326 passed, 326 cases). No `it.fails` is left and no
 entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). Nothing in
@@ -65,7 +65,6 @@ is documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
-| B-40 | What the name cache costs and saves when reading and writing along a chain | agreed | bench | | |
 | B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | | |
 
 ---
@@ -165,35 +164,6 @@ code and a stack only once a literal opens, or one array reused across the expre
 To be measured with `ResolveTextShare`, old and new alternating (`DECISIONS.md`, 2026-09-27, "Does
 `resolveText` scan and replace in one pass?"): scanning is a small share of the resolver's work,
 so the gain is bounded by it.
-
-### B-40 · What the name cache costs and saves when reading and writing along a chain
-
-- **Status:** agreed 2026-09-22 — Frank's order, measure before anything is changed
-- **Kind:** bench · **Spec:** 6.2
-- **Records:** `DECISIONS.md`, and `SPECIFICATION.md` 6.2 if the cache goes
-
-Every handle keeps `#cache`, a `Map` from every name its context carries to the handle carrying it
-(`src/ResolverContextHandle.js`: built in `#buildNameCache`, read by `#findHandle`, the
-`ownKeys` trap and `hasName`, kept in step by the `set` and `deleteProperty` traps, `replaceData`,
-`mergeData` and `resetCache`). **Since 2026-09-22 it filters nothing**, so it holds exactly what
-`key in object` would answer, one `Map` per resolver, built on construction.
-
-**Measure what it costs and what it saves**, over a chain, for both directions:
-
-- **Reading** — a name the resolver carries itself, one only an ancestor carries, one nobody
-  carries, and one the root alone carries (the case B-07 got on 2026-09-22). Against the cache and
-  against a live `in` walking `#data` of each handle.
-- **Writing** — `updateData`, `mergeContext`, `deleteData` and an assignment from inside an
-  expression. Each of those rebuilds or amends the cache today, which is work a live lookup would
-  not do at all.
-- **Building** — one `#buildNameCache` per resolver, which a chain pays once per resolver and a
-  template engine pays on every nesting level it enters.
-
-What hangs on the answer: **6.2 itself.** Without the cache, names are as live as values, the
-snapshot rule of 6.2 falls away and `resetCache` loses its purpose — a rule and a public method
-would go, so the measurement decides a specification question and not only an implementation.
-Note the benchmark caveats of B-25 and of `AGENTS.md` (Benchmarks), and compare alternating runs
-rather than single ones.
 
 ### B-25 · The deep-chain benchmarks are bimodal by a factor of two across runs
 
