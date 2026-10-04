@@ -55,8 +55,8 @@ alternating with the order swapped, hz, `HEAD` → change:
 | | `with-scoped` | 1.03M–1.14M | 1.13M–1.26M | 1.10–1.13 |
 
 The control rows, which resolve nothing, stayed level. The few ratios below 1 are single runs inside
-the range of the other side; the rows over 1,000 keys are the name snapshot of the static call
-(B-68), which this change does not touch. The resolver's own share of `resolveText` came out at
+the range of the other side; the rows over 1,000 keys are the name snapshot of the static call,
+which this change does not touch. The resolver's own share of `resolveText` came out at
 about 1.7×, more than the sixth per layer that the probe of 2026-09-27 suggested.
 
 **Alternatives:** One `async` helper instead of two — unmeasured; it keeps a frame and a promise per
@@ -1060,7 +1060,7 @@ declaration, a snapshot of the value it started with, and a guarded assignment b
 parameter list spells it once. `new Function` parses that source on every miss, and **a context of
 two keys already produces eight names**, because the property cache walks the prototype chain (5.2)
 and `hasOwnProperty`, `toString` and the rest come with it. The deep depths of the table are the
-bimodal ones `BACKLOG.md` warns about and decide nothing here; the shallow cold figures are the
+bimodal ones `AGENTS.md` warns about and decide nothing here; the shallow cold figures are the
 measurement.
 
 The write-back is not worth that to this implementation. `SPECIFICATION.md` 6.5 promises nothing
