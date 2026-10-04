@@ -19,6 +19,55 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-10-04 — Does a resolved expression pass `async` functions of the resolver besides the entry point?
+
+**Decision:** No. The instance `resolve` and `resolveText` await what `#execute` answers, once per
+expression. `#execute` is synchronous: it walks to the resolver the scope prefix addresses and
+answers what that resolver's executer answers, a promise included, or `undefined` for an empty
+statement and a prefix no resolver carries. The two `async` functions it replaced, `resolveInScope`
+and `execute`, are gone. Settled on B-66.
+
+**Reasoning:** Each of the two cost a frame, a promise and its microtasks per expression on top of the
+one the executer answers. Measured 2026-10-04, `HEAD` against the change, four pairs, strictly
+alternating with the order swapped, hz, `HEAD` → change:
+
+| Bench | Case | `HEAD` | change | per pair |
+| --- | --- | --- | --- | --- |
+| `ResolveTextShare` | 20 distinct | 227k–243k | 402k–419k | 1.68–1.83 |
+| | one expression 20 times | 222k–247k | 429k–443k | 1.75–1.99 |
+| | literals | 132k–181k | 298k–310k | 1.69–2.29 |
+| | comments | 132k–161k | 192k–247k | 1.33–1.82 |
+| | 200 distinct | 19.2k–23.9k | 33.2k–35.8k | 1.50–1.76 |
+| | 2,000 distinct | 1.67k–2.26k | 3.13k–3.55k | 1.57–1.87 |
+| | no expression *(control)* | 3.97M–4.16M | 4.07M–4.10M | 0.98–1.03 |
+| | 20 escaped *(control)* | 0.73M–1.07M | 1.01M–1.03M | 0.97–1.39 |
+| `StaticShare` | `resolve`, instance | 2.49M–3.12M | 3.93M–4.18M | 1.27–1.61 |
+| | `resolve`, static, 2 keys | 0.87M–1.07M | 1.08M–1.18M | 1.09–1.36 |
+| | `resolve`, static, 1,000 keys | 17.8k–23.8k | 18.7k–23.5k | 0.87–1.32 |
+| | `resolveText`, instance | 1.78M–2.24M | 2.20M–2.70M | 1.08–1.52 |
+| | `resolveText`, static, 2 keys | 0.66M–0.98M | 0.79M–1.04M | 0.89–1.57 |
+| | `resolveText`, static, 1,000 keys | 20.2k–24.1k | 22.2k–23.4k | 0.92–1.13 |
+| `WarmResolve`, depth 10 | `context-deconstruction` | 409k–435k | 430k–453k | 0.99–1.11 |
+| | `context-object` | 2.29M–2.38M | 2.86M–2.98M | 1.23–1.30 |
+| | `with-scoped` | 1.54M–1.56M | 1.69M–1.81M | 1.10–1.16 |
+| `ColdResolve`, depth 10 | `context-deconstruction` | 297k–368k | 366k–422k | 1.01–1.30 |
+| | `context-object` | 1.43M–1.59M | 1.64M–1.82M | 1.07–1.28 |
+| | `with-scoped` | 1.03M–1.14M | 1.13M–1.26M | 1.10–1.13 |
+
+The control rows, which resolve nothing, stayed level. The few ratios below 1 are single runs inside
+the range of the other side; the rows over 1,000 keys are the name snapshot of the static call
+(B-68), which this change does not touch. The resolver's own share of `resolveText` came out at
+about 1.7×, more than the sixth per layer that the probe of 2026-09-27 suggested.
+
+**Alternatives:** One `async` helper instead of two — unmeasured; it keeps a frame and a promise per
+expression for nothing, since the entry point awaits anyway.
+
+**Consequences:** Code on the per-expression path between an entry point and the executer is
+synchronous and hands the executer's answer on unawaited; the entry point awaits it once. That keeps
+a synchronous throw of the executer inside the entry point's `try`, which is where 7 is answered —
+the call has to stay inside it. The scope walk exists once, `#resolverForScope`, and a filter of the
+data methods and a scope prefix give their own answer to a miss: a throw and `undefined`.
+
 ## 2026-10-03 — What does the resolver do with an `executer` or a `timeout` of the wrong type?
 
 **Decision:** An `executer` option that is neither a string nor an `Executer` instance is rejected

@@ -78,17 +78,6 @@ const toKey = (aKey) => {
 	throw new TypeError(`A key is a string, a number or a symbol, not ${aKey == null ? "missing" : `a ${type}`}!`);
 };
 
-const execute = async function (anExecuter, aStatement, aContext) {
-	// an empty statement answers undefined, the same as `return;` in JavaScript. The scanner
-	// hands every statement over trimmed, and an empty one as null.
-	if (aStatement == null) return undefined;
-	if (typeof aStatement !== "string") return aStatement;
-
-	// an error is deliberately not caught here: the two entry points answer it differently, so
-	// each of them handles it for itself
-	return await anExecuter.execute(aStatement, aContext);
-};
-
 const warnFailedStatement = (aStatement, anError) => {
 	console.warn(`Execution error on statement!
 		statement:
@@ -98,26 +87,15 @@ const warnFailedStatement = (aStatement, anError) => {
 		`);
 };
 
+/**
+ * @param {*} aResult
+ * @param {DefaultValue} aDefault
+ * @returns {*}
+ */
 const withDefault = (aResult, aDefault) => {
 	if (aResult !== null && typeof aResult !== "undefined") return aResult;
-	else if (aDefault instanceof DefaultValue && aDefault.hasValue) return aDefault.value;
+	else if (aDefault.hasValue) return aDefault.value;
 	return aResult;
-};
-
-const resolveInScope = async function (anExecuter = DEFAULT_EXECUTER, aResolver, aStatement, aScope, aDefault) {
-	// climbs in a loop rather than by recursion - one call per resolver climbed cost a promise
-	// each and overflowed the stack on a deep chain. A scope no resolver of the chain carries
-	// answers undefined, and the default applies to it like to any other result
-	if (aScope) {
-		while (aResolver.name != aScope) {
-			aResolver = aResolver.parent;
-			if (!aResolver) return withDefault(undefined, aDefault);
-		}
-		// a statement runs where its prefix addresses it, so with the executer of that resolver
-		anExecuter = aResolver.executer;
-	}
-
-	return withDefault(await execute(anExecuter, aStatement, aResolver.context), aDefault);
 };
 
 // the first argument of a static entry point is a string, or a configuration object
@@ -331,13 +309,52 @@ export default class ExpressionResolver {
 	#findResolver(aScope) {
 		if (!aScope) return this;
 
-		let resolver = this;
-		while (resolver) {
-			if (resolver.name === aScope) return resolver;
-			resolver = resolver.parent;
-		}
+		const resolver = this.#resolverForScope(aScope);
+		if (resolver) return resolver;
 
 		throw new Error(`Filter "${aScope}" matches no resolver of the chain!`);
+	}
+
+	/**
+	 * The nearest resolver from here to the root that carries the scope name, or null where none
+	 * carries it. A filter and a scope prefix answer a miss differently, so each caller does that
+	 * for itself.
+	 *
+	 * @param {string} aScope
+	 * @returns {ExpressionResolver|null}
+	 */
+	#resolverForScope(aScope) {
+		// a loop, not a recursion into the parent: one call per resolver climbed overflowed the
+		// stack on a deep chain
+		let resolver = this;
+		while (resolver) {
+			if (resolver.#name === aScope) return resolver;
+			resolver = resolver.#parent;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Hands a statement to the resolver it addresses - the one its scope prefix names, or this one
+	 * without a prefix - and answers what that resolver's executer answers, a promise included. An
+	 * empty statement and a prefix no resolver of the chain carries answer undefined, and the default
+	 * applies to it like to any other result.
+	 *
+	 * Deliberately not async: the entry point awaits the answer once, and a synchronous throw of the
+	 * executer lands in its `try` all the same. An error is not caught here, because the two entry
+	 * points answer it differently.
+	 *
+	 * @param {?string} aStatement trimmed, and null where it is empty
+	 * @param {?string} aScope the scope prefix, null where there is none
+	 * @returns {*}
+	 */
+	#execute(aStatement, aScope) {
+		const resolver = aScope ? this.#resolverForScope(aScope) : this;
+		// an empty statement answers undefined, the same as `return;` in JavaScript
+		if (resolver === null || aStatement == null) return undefined;
+
+		return resolver.#executer.execute(aStatement, resolver.#context);
 	}
 
 	/**
@@ -456,7 +473,7 @@ export default class ExpressionResolver {
 		try {
 			// the delimited form or a bare statement, told apart by the scanner
 			const { scope, statement } = parseExpression(aExpression);
-			return await resolveInScope(this.#executer, this, statement, scope, defaultValue);
+			return withDefault(await this.#execute(statement, scope), defaultValue);
 		} catch (e) {
 			// the error is logged and handed on. resolve answers a value or says why it cannot,
 			// and a default value covers a missing result, never an error.
@@ -495,7 +512,7 @@ export default class ExpressionResolver {
 				text += aText.substring(occurrence.start, occurrence.end);
 			} else {
 				try {
-					text += await resolveInScope(this.#executer, this, occurrence.statement, occurrence.scope, defaultValue);
+					text += withDefault(await this.#execute(occurrence.statement, occurrence.scope), defaultValue);
 				} catch (e) {
 					// an expression whose statement failed stands as written, and the default value
 					// does not cover it. The rest of the text keeps rendering.

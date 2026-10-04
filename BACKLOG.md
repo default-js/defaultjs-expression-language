@@ -46,7 +46,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | 2 | Raise code quality | done 2026-10-03 — no `defect` and no `Blocks 3.0.0` entry open | — |
 | 3 | Raise test coverage | largely done | B-30 |
 | 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; the specification reviewed | — |
-| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-66, B-47, B-25, B-26, B-67 |
+| 5 | Do not lose performance | standing rule, see `AGENTS.md` | B-68, B-47, B-25, B-26 |
 
 **Markers, counted 2026-10-03** (`npm test`: 342 passed, 342 cases). No `it.fails` is left and no
 entry blocks 3.0.0. **No release carries an `it.fails`** (`DECISIONS.md`, 2026-09-27). No
@@ -60,11 +60,11 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | B-57 | The context proxy intercepts six operations, and every other one meets an empty target | idea | gap | | |
 | B-58 | `buildSecure` is removed in 4.0 | agreed | refactor | | low |
 | B-65 | What the copy of `buildFiltered` keeps of the context is not specified | idea | gap | | |
-| B-66 | Every resolved expression passes two `async` functions besides the executer's own | idea | refactor | | |
+| B-68 | A static call snapshots every name of its context before it resolves | idea | refactor | | |
+| B-69 | The decision on the inherited executer still argues from the executer a prefix used to run with | idea | docs | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
 | B-25 | The deep-chain benchmarks are bimodal by a factor of two | investigate | bench | | |
 | B-26 | No benchmark exercises the cache eviction | idea | bench | | |
-| B-67 | No benchmark measures what a static entry point costs beyond the executer | idea | bench | | |
 | B-30 | Coverage, and what is still uncovered | investigate | test | | |
 | B-47 | `readExpression` allocates a stack array for every expression | idea | refactor | | |
 
@@ -115,33 +115,30 @@ among them — is dropped, an enumerable getter is read once while the copy is b
 kept, and the copy has no prototype of the context's class. Open: which of these 6.7 states, and
 whether each needs a case in `test/expressionresolver/buildfiltered.Test.js`.
 
-### B-66 · Every resolved expression passes two `async` functions besides the executer's own
+### B-68 · A static call snapshots every name of its context before it resolves
 
-- **Status:** idea — found 2026-10-03 reading `src/ExpressionResolver.js`, unmeasured
-- **Kind:** refactor · **Spec:** 4.3, 4.6, 5.3
+- **Status:** idea — measured 2026-10-04 with `test/PerformanceTests/StaticShare.bench.js`, one run,
+  not profiled
+- **Kind:** refactor · **Spec:** 4.1, 6.2
 
-The instance `resolve` and `resolveText` await `resolveInScope`, which awaits `execute`, which
-awaits the executer — two `async` frames, two promises and their microtasks per expression on top of
-the one the executer answers. One such layer cost about a sixth of the resolver's own share per
-expression when measured (`DECISIONS.md`, 2026-09-27, "Does `resolveText` scan and replace in one
-pass?"). Candidate: one synchronous function that walks to the addressed resolver and answers what
-its executer answers, a promise included, or `undefined` for an empty statement and an unmatched
-scope; the caller awaits it once. A synchronous throw of the executer still lands in the caller's
-`try`.
+The resolver a static entry point builds takes the name snapshot of 6.2 over the whole context and
+its prototype chain, and is dropped after one resolution. Under `TestExecuter`, hz: `resolve` as an
+instance call 2.82M, static over 2 keys 1.11M, static over 1,000 keys 21.9k — about 45 µs a call,
+growing with the keys; `resolveText` 1.74M, 576k and 18.4k. Presumably the `Map` of
+`#buildNameCache`; confirm before changing anything. Candidate: build the snapshot on the first
+lookup. Open with it: whether 6.2 still holds when the snapshot is taken later — a key added to the
+object during the delay of 4.5 would then count.
 
-Goes with it, since the same functions change:
+### B-69 · The decision on the inherited executer still argues from the executer a prefix used to run with
 
-- The parameter `anExecuter` of `resolveInScope` is redundant since a prefixed statement runs with
-  the executer of the resolver it addresses (2026-10-03): it is always that resolver's executer, and
-  its default `DEFAULT_EXECUTER` is never used.
-- The `typeof aStatement !== "string"` branch of `execute`, item 6 of B-30.
-- The scope walk of `resolveInScope` and `#findResolver` is one walk with two answers to a miss,
-  `undefined` and a throw.
-- `withDefault` asks `instanceof DefaultValue`, although every caller hands it one.
+- **Status:** idea — found 2026-10-04 while closing B-66
+- **Kind:** docs · **Records:** `DECISIONS.md`
 
-To be measured with `ResolveTextShare`, and with `WarmResolve` and `ColdResolve` at depth 10, where
-the walk does not hide the call, old and new alternating. The header of
-`test/PerformanceTests/ChainBuilder.js` names `resolveInScope` and moves along.
+The reasoning of "Which executer does a resolver use when the `executer` option is left out?"
+(2026-09-22) says a scoped statement runs with the executer of the resolver the call was made on and
+cites `src/ExpressionResolver.js:84-89`. Since 2026-10-03 it runs with the executer of the resolver
+it addresses, and the cited lines are gone. The decision itself stands; that bullet is to be rewritten
+to the state in force, as the header of `DECISIONS.md` asks — Frank's call, since the entry is his.
 
 ## Executers
 
@@ -207,18 +204,6 @@ from write-time to use-time eviction (2026-08-21) is invisible to `npm run bench
 past `size` and then measures the hit rate on a hot subset would show it and give the eviction order
 a regression guard beyond `test/codecache/caching.Test.js`.
 
-### B-67 · No benchmark measures what a static entry point costs beyond the executer
-
-- **Status:** idea — found 2026-10-03 reading `src/ExpressionResolver.js`
-- **Kind:** bench · **Spec:** 4.1
-
-`ExpressionResolver.resolve` and `resolveText` build a resolver of their own on every call: a
-generated name, a `ResolverContextHandle` with its name snapshot over the context and its prototype
-chain, and the proxy. Every bench file calls instance methods only, so that cost is invisible to
-`npm run bench`, and no change to the static path or to the handle's construction can be judged. A
-case per static entry point, over a small and a larger context and under `TestExecuter` like
-`ResolveTextShare`, would show it.
-
 ## Tests
 
 ### B-30 · Coverage, and what is still uncovered
@@ -243,10 +228,6 @@ numbers when the picture changes rather than adding another baseline. Uncovered 
 5. **New on 2026-09-22:** the `return null` of `findPropertyDescriptor`, and the `get` of the
    descriptor the `getOwnPropertyDescriptor` trap hands out, which no case ever calls. Look at both
    before deciding whether they are reachable.
-6. **New on 2026-09-27:** `if (typeof aStatement !== "string") return aStatement;` in `execute` of
-   `ExpressionResolver.js`. Since the instance `resolve` rejects a non-string (4.2), every statement
-   reaching it is a string or null from the scanner, so the branch looks unreachable — check, then
-   delete it rather than cover it.
 
 `src/version.js` is generated; its 0 % is noise. The 15 open branches sit in the scanner's state
 machine — combinations of literal states — and in the lines listed above; none is a rule without a
