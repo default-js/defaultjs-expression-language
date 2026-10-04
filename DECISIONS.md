@@ -19,6 +19,32 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-10-04 — Is the name `ctx` of `context-object-executer` configurable?
+
+**Decision:** Yes, for the executer as a whole. `setupExecuter({ contextVar })` sets the name a
+statement addresses the context by, `ctx` until it is set, for every statement the executer runs
+from then on, whichever resolver hands it over. `getContextVar()` answers it and is public. `null`,
+`undefined` and a string that is empty after trimming leave the name as it is; a name that cannot be
+a parameter name is not rejected. `SPECIFICATION.md` 9.3. Frank's decision and implementation.
+
+**Reasoning:** The idea was raised on 2026-08-24 for a context carrying a key named `ctx`, and that
+case never needed it: the context is not put into scope, so the key is reached as `ctx.ctx`. What
+the option gives is a choice of spelling. `setupExecuter` kept its name on 2026-10-01 as the place
+for such options. An option left out changes nothing, as for `size`: the first version reset the
+name to `ctx` on every call without it, so a later `setupExecuter({ size })` from other code on the
+page would have switched the dialect back silently.
+
+**Alternatives:** A name per executer instance — an `Executer` built with its own name and handed to
+a resolver as an instance (2026-09-01) — scopes the spelling to a chain, the way the inherited
+executer scopes the executer (2026-09-22). It would be the better choice once two chains on one page
+need different spellings. Rejecting a name that cannot be a parameter name with a `TypeError` in
+`setupExecuter`, as for `size` — proposed and not taken.
+
+**Consequences:** The spelling is page-wide: code that sets the name sets it for every other user of
+the executer on the page. A name that is no identifier shows as a `SyntaxError` on every statement
+rather than at the call that set it, and a value that is not a string is rejected with the
+`TypeError` the engine raises for it, not one of the package's own.
+
 ## 2026-10-04 — Does a resolved expression pass `async` functions of the resolver besides the entry point?
 
 **Decision:** No. The instance `resolve` and `resolveText` await what `#execute` answers, once per
@@ -223,7 +249,7 @@ rejected: the deprecation is a fact and is published, the version it goes in is 
 "may change" or `@experimental` marker on a public member — rejected for the same reason.
 
 **Consequences:** The JSDoc of `contextHandle` says what the getter is for, not for how long.
-`buildSecure` is published as deprecated, and its removal in 4.0 is a backlog entry. The `TODO` on
+`buildSecure` is published as deprecated, without the version it goes in. The `TODO` on
 the context proxy became one too. When a deprecated member goes, the changelog of that release
 says so.
 
@@ -291,17 +317,17 @@ renamed call is a cheap migration in a major release. `buildSecure` promised the
 it does not give, a sandbox, and the name sits in CMS integrations, so it gets a way out rather
 than a break. The three chain getters are defined precisely in 5.5, and `getData` without a key
 answering the whole context is specified as intended in 6.6, so a rename would cost consumers and
-add no precision. `setupExecuter` sets only the cache size today, but it is the place for further
-executer options, among them the `ctx` prefix of `BACKLOG.md` "Should the `ctx` prefix of
-`ContextObjectExecuter` be configurable?", and a name like `setupCache` would close that path.
+add no precision. `setupExecuter` set only the cache size then, but it is the place for further
+executer options — `context-object-executer` takes the name of its context there since 2026-10-04 —
+and a name like `setupCache` would have closed that path.
 
 **Alternatives:** One rule for every public rename, either a hard break or an alias each. A hard
 break is the better choice for `buildSecure` once its consumers are known to have moved. Renaming
 the chain getters to `path`, `contextPath` and `contexts`, which say the type they answer, is the
 better choice if 5.5 is ever rewritten anyway.
 
-**Consequences:** 3.0.0 breaks every call of `registrate`. Removing `buildSecure` in 4.0 is an
-entry in `BACKLOG.md`, and the alias is not dropped earlier. The private and internal names were
+**Consequences:** 3.0.0 breaks every call of `registrate`. The alias `buildSecure` is not dropped
+before 4.0. The private and internal names were
 renamed in the same pass from a list Frank approved. They are no surface, so no record carries them
 beyond git history.
 
@@ -996,8 +1022,8 @@ executer that passes the option keeps working, the option is ignored.
 
 ## 2026-09-22 — Which executer does a resolver use when the `executer` option is left out?
 
-**Decision:** **The one of its parent.** The constructor takes the `executer` option where it is a
-registered name or an `Executer` instance, otherwise the executer of the `parent`, and only a
+**Decision:** **The one of its parent.** The constructor takes the `executer` option where one is
+given, otherwise the executer of the `parent`, and only a
 resolver without a parent falls back to `ExpressionResolver.defaultExecuter`. The choice is made once,
 in the constructor, and the getter `executer` answers it. `SPECIFICATION.md` 4.2.
 
@@ -1005,11 +1031,11 @@ in the constructor, and the getter `executer` answers it. `SPECIFICATION.md` 4.2
 stable along it and change only where the chain says so explicitly, rather than being named on every
 resolver. Two facts of the code make that more than convenience:
 - **The dialect belongs to the executer** (`SPECIFICATION.md` 9.2) — `context-object-executer`
-  reads `${ctx.value}` where the other three read `${value}` — and a scoped statement is executed by
-  the executer of the resolver the call was made on, not of the one it addresses: the module-level
-  `resolve` hands `aExecuter` up the chain unchanged (`src/ExpressionResolver.js:84-89`). Before this,
-  `${root::ctx.x}` on a leaf built without the option ran under the default executer although `root`
-  was built for `context-object-executer`, and failed in the dialect it was written for.
+  reads `${ctx.value}` where the other two read `${value}` — and a statement without a scope prefix
+  runs with the executer of the resolver the call was made on. Without inheritance, a leaf built
+  without the option reads every such statement of a chain built for `context-object-executer` in
+  the dialect of the default executer, and `${ctx.x}` fails there. A statement with a prefix runs
+  with the executer of the resolver it addresses (2026-10-03) and does not depend on this decision.
 - **The only other way to keep one executer across a chain is global.** Setting
   `ExpressionResolver.defaultExecuter` switches it for everything on the page, including code that
   has nothing to do with the chain. Inheritance scopes the choice to the chain it was made for.
@@ -1025,9 +1051,7 @@ package or its specification suggests.
 
 **Consequences:** Consumer-visible (`CHANGELOG.md`, `Changed`): a resolver built without the option
 under a parent with a non-default executer now runs that executer. A mixed chain stays possible and
-is now always explicit. The getter `executer` joins the public surface (section 8). The constructor
-reads `parent.executer` before it checks that `parent` is an `ExpressionResolver`, so a parent that
-is not one leaves `undefined` behind — carried in `BACKLOG.md` under the entry on such a parent.
+is now always explicit. The getter `executer` joins the public surface (section 8).
 
 ## 2026-09-20 — Does `ContextDeconstructorExecuter` keep its write-back?
 
@@ -1590,9 +1614,7 @@ the others without a consumer asking for it. It would become the better choice i
 ever have to be portable between executers — that is the cost below.
 
 **Consequences:** Switching executer can mean rewriting expressions, and that is documented rather
-than discovered. Open alongside it, and only an idea so far: making the `ctx` prefix of
-`ContextObjectExecuter` configurable, so a consumer can pick the identifier. It has its own
-`BACKLOG.md` entry.
+than discovered. The identifier itself is configurable since 2026-10-04.
 
 ## 2026-08-24 — When does a resolver count as providing a context?
 

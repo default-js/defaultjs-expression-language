@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import Executer from "../../../src/Executer.js";
 import getExecuter from "../../../src/ExecuterRegistry.js";
-import executer, { EXECUTERNAME, setupExecuter } from "../../../src/executer/ContextObjectExecuter.js";
+import executer, { EXECUTERNAME, setupExecuter, getContextVar } from "../../../src/executer/ContextObjectExecuter.js";
 
 /**
  * ContextObjectExecuter - the interface. SPECIFICATION.md 8, 9.1, 9.2.
@@ -23,6 +23,10 @@ describe("ContextObjectExecuter - the interface", () => {
 
 	it("exports setupExecuter", async () => {
 		expect(typeof setupExecuter).toBe("function");
+	});
+
+	it("exports getContextVar", async () => {
+		expect(typeof getContextVar).toBe("function");
 	});
 
 	it("exports the executer as its default export", async () => {

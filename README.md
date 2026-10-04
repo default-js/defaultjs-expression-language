@@ -266,6 +266,9 @@ Each of them exports:
   at 5000 entries. `0` or less switches the cache off and releases its entries, and a later positive
   size switches it on again, empty. A fraction is rounded down, a `size` that is not a finite number
   is a `TypeError`, and a call without `size` changes nothing.
+- **`setupExecuter({ contextVar })`** and **`getContextVar()`**, from `ContextObjectExecuter.js`
+  only — set and answer the name a statement addresses the context by, `ctx` until it is set; see
+  [context-object-executer](#context-object-executer).
 - **`setDebug(on)`**, from `ContextDeconstructorExecuter.js` only — logs every function the executer
   generates to the console.
 
@@ -530,7 +533,8 @@ which answers the instance when read and writes a line to the console when set. 
 registers it under its name, and that module is also where it is tuned: `setupExecuter({ size })`
 sets the size of its compiled-code cache, where `0` or less switches the cache off. Every executer
 starts with 5000 entries. An option left out changes nothing, a `size` that is not a finite number
-is rejected with a `TypeError`, and a fraction is rounded down.
+is rejected with a `TypeError`, and a fraction is rounded down. `context-object-executer` takes a
+second option, `contextVar`, the name a statement addresses the context by.
 
 ```javascript
 import { setupExecuter } from "@default-js/defaultjs-expression-language/src/executer/ContextObjectExecuter.js";
@@ -592,6 +596,20 @@ statement as written. Nothing about the context is compiled into the code.
 **Writing a statement.** A context value is addressed as a member of `ctx`: `${ ctx.user.name }`,
 `${ root::ctx.value }`. A bare name is a global, so `${ value }` raises unless the page defines one.
 Everything legal in expression position runs, and every global is reachable.
+
+**The name `ctx`** is the executer's setting, and `setupExecuter({ contextVar })` changes it for every
+statement the executer runs from then on, whichever resolver hands it over. `getContextVar()`
+answers the name in use.
+
+```javascript
+import { setupExecuter } from "@default-js/defaultjs-expression-language/src/executer/ContextObjectExecuter.js";
+
+setupExecuter({ contextVar: "data" });   // ${ data.user.name }
+```
+
+`null`, `undefined` and a string that is empty after trimming leave the name as it is, and any other
+value that is not a string is a `TypeError`. A name that cannot be a parameter name is not rejected:
+every statement then throws a `SyntaxError`.
 
 **What a context may be: anything.** Plain objects, class instances, arrays, `Map`, `Set`, a
 `NodeList`, a DOM element, an `arguments` object, a frozen object, one without a prototype, one with

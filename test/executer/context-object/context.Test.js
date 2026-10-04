@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import executer from "../../../src/executer/ContextObjectExecuter.js";
+import executer, { setupExecuter } from "../../../src/executer/ContextObjectExecuter.js";
 import { catchError } from "../../TestUtils.js";
 
 /**
@@ -7,6 +7,8 @@ import { catchError } from "../../TestUtils.js";
  *
  * Whether a construct carrying a context name still reaches that value. A statement addresses a
  * context value as a member of `ctx` here: the executer hands the context over as that one object.
+ * `setupExecuter` sets another name for every statement the executer runs; a case that sets one
+ * puts `ctx` back, because the name is module state.
  *
  * The statement is pasted unchanged, so the position of a name inside it changes nothing; the
  * cases here are the ones the executer's own strategy decides.
@@ -25,6 +27,27 @@ describe("ContextObjectExecuter - reaching a context value", () => {
 
 	it("addresses a context value as a member of ctx", async () => {
 		expect(await executer.execute("ctx.value", { value: "from context" })).toBe("from context");
+	});
+
+	it("addresses a context value as a member of the name setupExecuter sets", async () => {
+		setupExecuter({ contextVar: "data" });
+		try {
+			expect(await executer.execute("data.value", { value: "from context" })).toBe("from context");
+		} finally {
+			setupExecuter({ contextVar: "ctx" });
+		}
+	});
+
+	it("compiles a statement anew once setupExecuter sets another name", async () => {
+		// compiled under ctx first, where data is no variable: a cache keyed by the statement alone
+		// would keep answering that compilation
+		await catchError(() => executer.execute("data.cached", { cached: "from context" }));
+		setupExecuter({ contextVar: "data" });
+		try {
+			expect(await executer.execute("data.cached", { cached: "from context" })).toBe("from context");
+		} finally {
+			setupExecuter({ contextVar: "ctx" });
+		}
 	});
 
 	it("does not answer a bare context name", async () => {

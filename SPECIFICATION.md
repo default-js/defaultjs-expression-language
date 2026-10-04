@@ -614,8 +614,8 @@ instance `resolve`, `resolveText`, `getData`, `updateData`, `deleteData`, `merge
 
 **`Executer`** — the interface an own implementation builds on.
 
-**Each executer module** — `EXECUTERNAME`, `setupExecuter`, its default export, and `setDebug`
-where it exists.
+**Each executer module** — `EXECUTERNAME`, `setupExecuter`, its default export, and `setDebug` and
+`getContextVar` where they exist.
 
 `chain`, `effectiveChain` and `contextChain` are specified in 5.5.
 
@@ -670,9 +670,10 @@ Each implementation is a solution of its own. Which JavaScript a statement may c
 addresses a context value, which shapes of context it runs over, what an assignment inside it
 leaves behind and which globals it reaches are the executer's own, and `README.md` documents them for
 each one. An executer may demand its own spelling: `context-object-executer` hands the context over
-as the object `ctx`, so a property is addressed as `${ctx.value}` where the other two read
-`${value}`, and switching executer can mean rewriting expressions. What an executer may not change
-is which resolver of the chain answers a lookup, or any other rule of part A.
+as the object `ctx`, a name 9.3 lets a consumer change, so a property is addressed as
+`${ctx.value}` where the other two read `${value}`, and switching executer can mean rewriting
+expressions. What an executer may not change is which resolver of the chain answers a lookup, or
+any other rule of part A.
 
 ### 9.3 Tuning
 
@@ -683,3 +684,10 @@ module directly, which is the intended usage and the reason the package publishe
 Every cache starts with a size of **5000**. An option left out changes nothing, so `setupExecuter()`
 and `setupExecuter({})` leave the size where it is. A `size` that is not a finite number is rejected
 with a `TypeError`; a fraction is rounded down.
+
+`context-object-executer` takes a second option, `contextVar`: the name a statement addresses the
+context by, `ctx` until it is set, and `getContextVar()` answers it. The name is the executer's, not
+a chain's, so it holds for every statement that executer runs from then on, whichever resolver hands
+it over. `null`, `undefined` and a string that is empty after trimming leave the name as it is, and
+another value that is not a string is rejected with a `TypeError`. A name that cannot be a parameter
+name is not rejected: every statement then fails with a `SyntaxError` (7).

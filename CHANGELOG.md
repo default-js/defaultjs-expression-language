@@ -56,6 +56,14 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   the executer of its parent and only a resolver without a parent takes the default. The code
   always did the latter.
 
+- **`context-object-executer` takes the name a statement addresses the context by.**
+  `setupExecuter({ contextVar: "data" })` from `src/executer/ContextObjectExecuter.js` makes a
+  statement read `${data.value}` instead of `${ctx.value}`, for every statement the executer runs
+  from then on, and the new `getContextVar()` answers the name in use. `null`, `undefined` and a
+  string that is empty after trimming leave the name as it is, another value that is not a string
+  is a `TypeError`, and a name that cannot be a parameter name makes every statement throw a
+  `SyntaxError`. Without the option nothing changes: the name is `ctx`.
+
 ### Changed
 
 - **The package is an ES module package with an `exports` field, and a deep import outside it

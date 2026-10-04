@@ -57,10 +57,9 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
 | ID | Title | Status | Kind | 3.0.0 | Prio |
 | --- | --- | --- | --- | --- | --- |
-| B-58 | `buildSecure` is removed in 4.0 | agreed | refactor | | low |
-| B-69 | The decision on the inherited executer still argues from the executer a prefix used to run with | idea | docs | | |
 | B-30 | Are the uncovered lines of `ResolverContextHandle` dead code? | investigate | refactor | | |
-| B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | idea | feature | | |
+| B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | agreed | feature | | |
+| B-70 | `context-object-executer` binds `context` beside `ctx` | decision | gap | | |
 
 ---
 
@@ -69,30 +68,6 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 None open.
 
 ## Resolver
-
-### B-58 · `buildSecure` is removed in 4.0
-
-- **Status:** agreed — Frank's decision of 2026-10-01
-- **Kind:** refactor · **Priority:** low — due with 4.0, nothing before it
-- **Spec:** 6.7
-- **Records:** `CHANGELOG.md`, `README.md`, `SPECIFICATION.md`, `DECISIONS.md`
-
-`ExpressionResolver.buildSecure` is a silent alias of `buildFiltered`, deprecated in 3.0.0. It goes
-in 4.0, not earlier (`DECISIONS.md`, 2026-10-01). Since 2026-10-03 no published file names that
-version, so the changelog of 4.0 is the first place a consumer reads it. With it go the alias in
-`src/ExpressionResolver.js`, its rows in `README.md`, its cases in `test/package/surface.Test.js`
-and `test/expressionresolver/buildfiltered.Test.js`, and the sentence in 6.7.
-
-### B-69 · The decision on the inherited executer still argues from the executer a prefix used to run with
-
-- **Status:** idea — found 2026-10-04 while closing B-66
-- **Kind:** docs · **Records:** `DECISIONS.md`
-
-The reasoning of "Which executer does a resolver use when the `executer` option is left out?"
-(2026-09-22) says a scoped statement runs with the executer of the resolver the call was made on and
-cites `src/ExpressionResolver.js:84-89`. Since 2026-10-03 it runs with the executer of the resolver
-it addresses, and the cited lines are gone. The decision itself stands; that bullet is to be rewritten
-to the state in force, as the header of `DECISIONS.md` asks — Frank's call, since the entry is his.
 
 ### B-30 · Are the uncovered lines of `ResolverContextHandle` dead code?
 
@@ -116,12 +91,50 @@ the `setDebug` body of `ContextDeconstructorExecuter.js` has nothing observable 
 
 ### B-13 · Should the `ctx` prefix of `ContextObjectExecuter` be configurable?
 
-- **Status:** idea — raised by Frank 2026-08-24
+- **Status:** agreed — Frank's decision and implementation of 2026-10-04, unfinished
 - **Kind:** feature · **Spec:** 9.3
-- **Records:** `DECISIONS.md`, `CHANGELOG.md`
+- **Pinned by:** the two cases on the name `setupExecuter` sets in
+  `test/executer/context-object/context.Test.js`, and "exports getContextVar" in its
+  `interface.Test.js`
+- **Records:** `DECISIONS.md` — JSDoc, `README.md`, `CHANGELOG.md`, 8, 9.2, 9.3 and the decision of
+  2026-10-04 are written
 
-The executer hands the context over as `ctx`, so a value is addressed as `${ctx.value}` — settled
-and intended (`DECISIONS.md`, 2026-08-24). But the identifier is hard-coded, and a context carrying
-a property named `ctx` has no way out. Open with it: whether the option belongs on
-`setupExecuter(options)` next to `size`, and what happens to the code cache, which is keyed by the
-statement text alone — entries compiled under the old identifier would answer for the new one.
+What the option does and why is in `DECISIONS.md`, 2026-10-04. Open:
+
+1. **A regression on the hot path.** `getOrCreateFunction` keys the code cache by
+   `${CONTEXT_VAR}::${aStatement}`, built by concatenation on every execution, a cache hit
+   included. Measured 2026-10-04, `HEAD` against the change, four pairs, strictly alternating with
+   the order swapped, depth 10 and `ResolveText`, change/head per pair:
+
+   | Bench | `context-object` | controls: the other two executers |
+   | --- | --- | --- |
+   | `ResolveText`, 20 distinct | 0.87–0.90 | 0.96–1.06 |
+   | `ResolveText`, one expression 20 times | 0.81–0.88 | 0.96–1.01 |
+   | `ResolveText`, literals | 0.89–0.95 | 0.99–1.02 |
+   | `ResolveText`, no expression | 0.98–1.03 | 0.98–1.03 |
+   | `WarmResolve` | 0.88–0.97 | 0.92–1.07 |
+   | `ColdResolve`, both shapes | 0.98–1.03 | 0.98–1.09, one run 0.25 |
+
+   The alternative, measured the same way against `HEAD`: the statement alone as the key, and
+   `setupExecuter` clears the cache where it changes the name. It comes out level — `ResolveText`
+   0.98–1.13, `WarmResolve` 0.94–1.01, `ColdResolve` 0.94–1.01, the controls 0.92–1.09 — and
+   `test/executer/context-object/` is green under it, 17 of 17. Next: Frank picks; the decision
+   of 2026-10-04 then gets the cache and its numbers.
+2. The guarantees `README.md` states are pinned only in part: that an option left out, `null`,
+   `undefined` and a blank string leave the name as it is, that a value that is not a string is a
+   `TypeError`, and what `getContextVar()` answers have no case.
+3. Line 67 of `src/executer/ContextObjectExecuter.js` carries trailing whitespace.
+
+### B-70 · `context-object-executer` binds `context` beside `ctx`
+
+- **Status:** decision — found 2026-10-04 while checking B-13
+- **Kind:** gap · **Spec:** 9.2
+- **Records:** `README.md`
+
+`generate` in `src/executer/ContextObjectExecuter.js` compiles a function whose parameter is named
+`context` and hands it to the statement under the name `setupExecuter` sets, `ctx` by default. Both
+names are in the statement's scope: `${context.v}` answers the context value like `${ctx.v}`
+(checked 2026-10-04), and a global named `context` is not reached by its bare name, although
+`README.md` says every global is reachable. Naming the outer parameter after the inner one, and
+calling the function with that name, binds `context` nowhere. Next: decide whether that is done —
+a change to the compiled code, measured with `npm run bench` — or `README.md` names the second name.
