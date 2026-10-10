@@ -1,4 +1,4 @@
-import { GLOBAL } from "@default-js/defaultjs-common-utils";
+import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
 
 /**
  * The helpers more than one component uses. Internal to the package: index.js does not export
@@ -64,6 +64,12 @@ export const stringToHashcode = (aString) => {
 
 const ID_CHARACTER = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+/**
+ * A string of random ASCII letters.
+ *
+ * @param {number} aLength how many letters
+ * @returns {string}
+ */
 const generateId = (aLength) => {
 	let id = "";
 	for (let i = 0; i < aLength; i++)
@@ -71,6 +77,17 @@ const generateId = (aLength) => {
 	return id;
 };
 
+/**
+ * A variable name the global object does not carry as an own property at the time of the call:
+ * random ASCII letters between a prefix and a suffix. Where every attempt at one length hits a
+ * global, it goes on with four letters more.
+ *
+ * @param {object} [options]
+ * @param {string} [options.prefix] put before the letters, nothing where left out
+ * @param {string} [options.suffix] put after the letters, nothing where left out
+ * @param {number} [options.minLength=10] how many letters the first attempts carry
+ * @returns {string}
+ */
 export const undeclaredVarname = ({ prefix, suffix, minLength = 10 } = {}) => {
 	let count = minLength;
 	do {

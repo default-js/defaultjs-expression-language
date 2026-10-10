@@ -59,7 +59,6 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | --- | --- | --- | --- | --- | --- |
 | B-30 | Are the uncovered lines of `ResolverContextHandle` dead code? | investigate | refactor | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | agreed | feature | | |
-| B-71 | `context-deconstruction-executer` and `with-scoped-executer` bind `context` | agreed | gap | | |
 | B-72 | Every executer binds `arguments` | decision | gap | | |
 
 ---
@@ -125,27 +124,6 @@ What the option does and why is in `DECISIONS.md`, 2026-10-04. Open:
    `undefined` and a blank string leave the name as it is, that a value that is not a string is a
    `TypeError`, and what `getContextVar()` answers have no case.
 3. Line 67 of `src/executer/ContextObjectExecuter.js` carries trailing whitespace.
-
-### B-71 · `context-deconstruction-executer` and `with-scoped-executer` bind `context`
-
-- **Status:** agreed — Frank's implementation of 2026-10-10, unfinished
-- **Kind:** gap · **Spec:** 9.2
-- **Pinned by:** "reaches a global named context" in the `globals.Test.js` of
-  `test/executer/context-deconstruction/` and `test/executer/with-scoped/`
-- **Records:** `CHANGELOG.md` is written; `README.md` needs nothing
-
-Each executer reserves one name when its module loads, from `undeclaredVarname` in `src/Utils.js`
-— a random 32 letters between a prefix and a suffix of its own, not carried by the global object at
-that moment — and takes the context in under it instead of `context`. Both cases failed against a
-copy of `HEAD`, answering the context object, and pass against the change; `npm test` 348 of 348.
-Open:
-
-1. `npm run bench`, `HEAD` against the change.
-2. `src/Utils.js` against the conventions: it imports from the package root, where every other
-   module imports `@default-js/defaultjs-common-utils/src/Global.js`, and imports `UUID` without
-   using it; `undeclaredVarname` and `generateId` carry no JSDoc and end without the `;` of the
-   other helpers; line 79 carries trailing whitespace, `id  +=` a double space, and the file has no
-   final newline.
 
 ### B-72 · Every executer binds `arguments`
 
