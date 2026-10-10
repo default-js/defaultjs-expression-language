@@ -42,7 +42,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 
 | # | Goal | Status | Open entries |
 | --- | --- | --- | --- |
-| 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 on 2026-09-30, 9 again on 2026-10-10 | B-75 |
+| 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 on 2026-09-30, 5 since 2026-10-10, all of the `braces` chain | — |
 | 2 | Raise code quality | done 2026-10-03 — no `defect` and no `Blocks 3.0.0` entry open | — |
 | 3 | Raise test coverage | done 2026-10-10 — no entry open. Uncovered on purpose: `get parent` of `ResolverContextHandle` and `set`/`delete` of `createGlobalNameCache` (Frank, 2026-10-10), `stringToHashcode` in `src/Utils.js` (Frank, 2026-09-27), the body of `setDebug` in `ContextDeconstructorExecuter.js`, which has nothing observable | — |
 | 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; the specification reviewed; type declarations generated from the JSDoc since 2026-10-10 | — |
@@ -57,7 +57,6 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
 | ID | Title | Status | Kind | 3.0.0 | Prio |
 | --- | --- | --- | --- | --- | --- |
-| B-75 | `npm audit` reports nine vulnerabilities again | investigate | tooling | | |
 
 ---
 
@@ -72,18 +71,3 @@ None open.
 ## Executers
 
 None open.
-
-## Toolchain
-
-### B-75 · `npm audit` reports nine vulnerabilities again
-
-- **Status:** investigate
-- **Kind:** tooling
-
-`npm audit` on 2026-10-10 answers 9 vulnerabilities, 7 high and 2 critical: `braces`,
-`compression`, `http-proxy-middleware`, `micromatch`, `proxy-addr`, `shell-quote`,
-`source-map-js`, `webpack-cli`, `webpack-dev-server`. The same nine stand with and without
-`typescript` installed, so they came in through advisories published since 2026-09-30, not through a
-change here. All are development dependencies; nothing reaches a consumer. For `braces` npm offers
-only `npm audit fix --force`, which would install `webpack-dev-server@1.14.1` — a downgrade, not a
-fix. What a plain `npm audit fix` resolves, and what the `braces` chain needs, is not checked yet.
