@@ -298,6 +298,13 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   builds the same resolver; the new name says what it does, filter the context, where the old one
   promised a security the method does not give.
 
+- **`context-object-executer` no longer answers `context` as a second name for the context.** Its
+  generated code took the context in as a parameter named `context` before handing it over as
+  `ctx`, so `${context.value}` answered like `${ctx.value}`, and a global named `context` was out of
+  reach by its bare name. A statement now sees the context under `ctx` alone, or the name
+  `setupExecuter` sets, and a bare `context` is a global like any other name. An expression that
+  reads `${context.value}` reads `${ctx.value}` instead.
+
 ### Deprecated
 
 - **`ExpressionResolver.buildSecure`**, the former name of `buildFiltered`. It still works and

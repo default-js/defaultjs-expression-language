@@ -49,11 +49,11 @@ return (async (${CONTEXT_VAR}) => {
     }catch(e){
         throw e;
     }
-})(context || {});`;
+})(${CONTEXT_VAR} || {});`;
 
 	//console.log("code", code);
 
-	return new Function("context", code);
+	return new Function(CONTEXT_VAR, code);
 };
 
 /**
