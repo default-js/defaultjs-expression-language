@@ -632,6 +632,10 @@ instance `resolve`, `resolveText`, `getData`, `updateData`, `deleteData`, `merge
 
 Every other path is closed, `index.js` written out included.
 
+**Type declarations.** The package itself, `/browser.js`, `/src/Executer.js` and every
+`/src/executer/<module>.js` carry TypeScript declarations of the members above, generated from
+their JSDoc; the bundles under `/dist/` carry none.
+
 # Part B — The executers
 
 ## 9. Executers

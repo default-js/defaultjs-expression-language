@@ -12,9 +12,9 @@ export default class Executer{
 	#execution;
 
 	/**
-	 * @param {Object} option
-	 * @param {function(string, object): *} option.execution runs a statement over a context and
-	 * answers the result, a promise included. Without one, every execution throws.
+	 * @param {Object} [option]
+	 * @param {(aStatement: string, aContext: object) => *} [option.execution] runs a statement over
+	 * a context and answers the result, a promise included. Without one, every execution throws.
 	 */
 	constructor({execution} = {}){
 		this.#execution = execution || (() => {throw new Error("not implemented")});

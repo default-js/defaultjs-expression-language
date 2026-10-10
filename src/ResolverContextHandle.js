@@ -24,7 +24,12 @@ const findPropertyDescriptor = (data, property) => {
  * The names a handle provides, each mapped to the handle providing it: a Map, or the stand-in of
  * `createGlobalNameCache` over the global object, which answers the same calls.
  *
- * @typedef {Map<string|symbol,ResolverContextHandle>} NameCache
+ * @typedef {object} NameCache
+ * @property {(key: string|symbol) => boolean} has
+ * @property {(key: string|symbol) => (ResolverContextHandle|undefined)} get
+ * @property {(key: string|symbol, value: ResolverContextHandle) => *} set
+ * @property {(key: string|symbol) => boolean} delete
+ * @property {() => Iterable<string|symbol>} keys
  */
 
 /**
@@ -175,7 +180,6 @@ export default class ResolverContextHandle {
 	 * The context an expression sees: a proxy that answers for the whole chain, or over the global
 	 * object the global object itself.
 	 *
-	 * @readonly
 	 * @type {object}
 	 */
 	get context() {
@@ -183,7 +187,6 @@ export default class ResolverContextHandle {
 	}
 
 	/**
-	 * @readonly
 	 * @type {ResolverContextHandle|null}
 	 */
 	get parent() {
@@ -206,7 +209,6 @@ export default class ResolverContextHandle {
 	 * Whether this handle provides a context: one was handed to the constructor, or a value has been
 	 * written since. What the data holds decides nothing.
 	 *
-	 * @readonly
 	 * @type {boolean}
 	 */
 	get providesContext() {

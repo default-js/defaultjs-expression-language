@@ -114,7 +114,6 @@ const defaultOf = (aConfiguration) => ("defaultValue" in aConfiguration ? aConfi
  *
  * @export
  * @class ExpressionResolver
- * @typedef {ExpressionResolver}
  */
 export default class ExpressionResolver {
 	/**
@@ -156,11 +155,11 @@ export default class ExpressionResolver {
 	/**
 	 * @constructor
 	 * @param {object} [options]
-	 * @param {object} [options.context] any object; where none is passed - left out, null or
+	 * @param {?object} [options.context] any object; where none is passed - left out, null or
 	 * undefined - the resolver has no context of its own
-	 * @param {ExpressionResolver} [options.parent=null]
+	 * @param {?ExpressionResolver} [options.parent=null]
 	 * @param {?string} [options.name=null] kept trimmed; where none is passed, one is generated
-	 * @param {(string|Executer)} [options.executer] the registered name of an executer, or an
+	 * @param {?(string|Executer)} [options.executer] the registered name of an executer, or an
 	 * `Executer` instance. A name that is not registered throws; an instance needs no registration,
 	 * because it addresses the executer directly. Null and undefined count as left out. Without the
 	 * option the resolver takes the executer of its parent, and one without a parent
@@ -189,7 +188,6 @@ export default class ExpressionResolver {
 	/**
 	 * The name this resolver is addressed by in a scope prefix and a filter.
 	 *
-	 * @readonly
 	 * @type {string}
 	 */
 	get name() {
@@ -197,7 +195,6 @@ export default class ExpressionResolver {
 	}
 
 	/**
-	 * @readonly
 	 * @type {ExpressionResolver|null}
 	 */
 	get parent() {
@@ -209,8 +206,7 @@ export default class ExpressionResolver {
 	 * constructor and it answers for the whole chain. Over the global object it is the global
 	 * object itself.
 	 *
-	 * @readonly
-	 * @type {object}
+	 * @type {Record<string|symbol, *>}
 	 */
 	get context() {
 		return this.#context;
@@ -219,7 +215,6 @@ export default class ExpressionResolver {
 	/**
 	 * The executer in use, chosen once in the constructor.
 	 *
-	 * @readonly
 	 * @type {Executer}
 	 */
 	get executer() {
@@ -229,7 +224,6 @@ export default class ExpressionResolver {
 	/**
 	 * The internal handle behind the context, public for `resetCache`.
 	 *
-	 * @readonly
 	 * @type {ResolverContextHandle}
 	 */
 	get contextHandle() {
@@ -240,7 +234,6 @@ export default class ExpressionResolver {
 	 * The names of every resolver from the root down to this one, as a path - `/root/…/this`. It
 	 * describes the structure and does not change.
 	 *
-	 * @readonly
 	 * @type {string}
 	 */
 	get chain() {
@@ -261,7 +254,6 @@ export default class ExpressionResolver {
 	 * this describes a state and not the structure. Where none provides one,
 	 * the answer is the empty string.
 	 *
-	 * @readonly
 	 * @type {string}
 	 */
 	get effectiveChain() {
@@ -280,8 +272,7 @@ export default class ExpressionResolver {
 	 * The contexts of exactly the resolvers `effectiveChain` names, as an array, this resolver's
 	 * first and the root's last. A state like `effectiveChain`.
 	 *
-	 * @readonly
-	 * @type {Array<object>}
+	 * @type {Array<Record<string|symbol, *>>}
 	 */
 	get contextChain() {
 		const result = [];
@@ -361,7 +352,7 @@ export default class ExpressionResolver {
 	 * The nearest resolver from here to the root that carries the key itself, or null where none
 	 * carries it. What decides is whether a resolver provides the name, not what it holds.
 	 *
-	 * @param {string} key
+	 * @param {string|symbol} key
 	 * @returns {ExpressionResolver|null}
 	 */
 	#resolverForKey(key) {
@@ -529,6 +520,26 @@ export default class ExpressionResolver {
 	 * Resolves one expression against an ad-hoc context, through a resolver of its own, as the instance
 	 * `resolve` does.
 	 *
+	 * @overload
+	 * @param {string} aExpression
+	 * @param {?object} [aContext]
+	 * @param {*} [aDefault] replaces a result of null or undefined where it is passed
+	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline
+	 * @returns {Promise<*>}
+	 * @throws {TypeError} where the expression is no string, or the context is a primitive
+	 */
+	/**
+	 * Resolves one expression against an ad-hoc context, as the positional form does, with the
+	 * arguments in one configuration object. A default counts as passed where the key `defaultValue`
+	 * is present, whatever it holds.
+	 *
+	 * @overload
+	 * @param {{ expression: string, context?: ?object, defaultValue?: *, timeout?: ?number }} aConfiguration
+	 * @returns {Promise<*>}
+	 * @throws {TypeError} where the configuration carries no string under `expression`, or the
+	 * context is a primitive
+	 */
+	/**
 	 * Takes the arguments positionally, or one configuration object
 	 * `{ expression, context, defaultValue, timeout }`, behind which every argument is ignored. A first
 	 * argument that is neither a string nor an object, and a configuration without a string under
@@ -536,12 +547,11 @@ export default class ExpressionResolver {
 	 *
 	 * @static
 	 * @async
-	 * @param {string|{ expression: string, context?: object, defaultValue?: *, timeout?: number }} aExpression
+	 * @param {string|{ expression: string, context?: ?object, defaultValue?: *, timeout?: ?number }} aExpression
 	 * @param {?object} [aContext]
-	 * @param {*} [aDefault] replaces a result of null or undefined where it is passed
-	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline
+	 * @param {*} [aDefault]
+	 * @param {?number} [aTimeout]
 	 * @returns {Promise<*>}
-	 * @throws {TypeError} where the arguments take neither form, or the context is a primitive
 	 */
 	static async resolve(aExpression, aContext, aDefault, aTimeout) {
 		if (isConfiguration(arguments[0])) {
@@ -567,6 +577,27 @@ export default class ExpressionResolver {
 	 * Replaces every expression of a text against an ad-hoc context, through a resolver of its own, as
 	 * the instance `resolveText` does.
 	 *
+	 * @overload
+	 * @param {string} aText
+	 * @param {?object} [aContext]
+	 * @param {*} [aDefault] replaces a result of null or undefined, per expression, where it is
+	 * passed
+	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline
+	 * @returns {Promise<string>}
+	 * @throws {TypeError} where the text is no string, or the context is a primitive
+	 */
+	/**
+	 * Replaces every expression of a text against an ad-hoc context, as the positional form does,
+	 * with the arguments in one configuration object. A default counts as passed where the key
+	 * `defaultValue` is present, whatever it holds.
+	 *
+	 * @overload
+	 * @param {{ text: string, context?: ?object, defaultValue?: *, timeout?: ?number }} aConfiguration
+	 * @returns {Promise<string>}
+	 * @throws {TypeError} where the configuration carries no string under `text`, or the context is
+	 * a primitive
+	 */
+	/**
 	 * Takes the arguments positionally, or one configuration object
 	 * `{ text, context, defaultValue, timeout }`, behind which every argument is ignored. A first
 	 * argument that is neither a string nor an object, and a configuration without a string under
@@ -574,13 +605,11 @@ export default class ExpressionResolver {
 	 *
 	 * @static
 	 * @async
-	 * @param {string|{ text: string, context?: object, defaultValue?: *, timeout?: number }} aText
+	 * @param {string|{ text: string, context?: ?object, defaultValue?: *, timeout?: ?number }} aText
 	 * @param {?object} [aContext]
-	 * @param {*} [aDefault] replaces a result of null or undefined, per expression, where it is
-	 * passed
-	 * @param {?number} [aTimeout] delays the start by that many milliseconds; no deadline
+	 * @param {*} [aDefault]
+	 * @param {?number} [aTimeout]
 	 * @returns {Promise<string>}
-	 * @throws {TypeError} where the arguments take neither form, or the context is a primitive
 	 */
 	static async resolveText(aText, aContext, aDefault, aTimeout) {		
 		if (isConfiguration(arguments[0])) {
@@ -614,14 +643,14 @@ export default class ExpressionResolver {
 	 * @static
 	 * @param {object} arg the filter arguments, plus the whole constructor option set
 	 * @param {object} arg.context the object to copy; it is left untouched
-	 * @param {function(string, *, object): boolean} arg.propFilter called with name, value and the
-	 * object holding it for every enumerable property, inherited ones included; a property it
-	 * answers false for is left out of the copy
+	 * @param {(name: string, value: *, holder: object) => boolean} arg.propFilter called with name,
+	 * value and the object holding it for every enumerable property, inherited ones included; a
+	 * property it answers false for is left out of the copy
 	 * @param {object} [arg.option={ deep: true, name: null, parent: null, executer: null }]
 	 * @param {boolean} [arg.option.deep=true] filters sub objects as well
-	 * @param {string} [arg.option.name=null]
-	 * @param {ExpressionResolver} [arg.option.parent=null]
-	 * @param {(string|Executer)} [arg.option.executer=null]
+	 * @param {?string} [arg.option.name=null]
+	 * @param {?ExpressionResolver} [arg.option.parent=null]
+	 * @param {?(string|Executer)} [arg.option.executer=null]
 	 * @returns {ExpressionResolver}
 	 * @throws {TypeError} where a constructor option is of the wrong kind, as the constructor throws
 	 */
@@ -636,7 +665,8 @@ export default class ExpressionResolver {
 	 *
 	 * @deprecated use `buildFiltered`
 	 * @static
-	 * @param {object} arg the arguments of `buildFiltered`
+	 * @param {Parameters<typeof ExpressionResolver.buildFiltered>[0]} arg the arguments of
+	 * `buildFiltered`
 	 * @returns {ExpressionResolver}
 	 */
 	static buildSecure(arg) {

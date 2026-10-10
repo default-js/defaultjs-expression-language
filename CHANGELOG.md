@@ -65,6 +65,17 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   makes every statement throw a `SyntaxError`. Without the option nothing changes: the name is
   `ctx`.
 
+- **TypeScript declarations.** Every module a consumer can import carries a `.d.ts` beside it — the
+  package itself, `browser.js`, `src/Executer.js` and the modules under `src/executer/` — and
+  `package.json` names `index.d.ts` under `types`. A TypeScript project with `strict` failed at the
+  import with TS7016 and had to declare the module itself. The declarations are generated from the
+  JSDoc and say what it says. The static `resolve` and `resolveText` are declared in their two
+  forms, positional and with a configuration object, so an argument behind a configuration is a
+  type error. A JavaScript project that type-checks with `checkJs` reads the declarations instead
+  of the sources and no longer gets errors reported from inside the package. Type-checked with
+  TypeScript 4.7, 4.9, 5.0, 5.1, 5.9 and 7.0, with `moduleResolution` `nodenext`, `bundler` and
+  `node10`. The bundles under `dist/` carry no declarations.
+
 ### Changed
 
 - **The package is an ES module package with an `exports` field, and a deep import outside it
@@ -541,3 +552,16 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   `undefined`; `deleteData` called `deleteDataData`, a method that does not exist, so the same case
   raised a `TypeError`. Both walk the chain properly now — and an unknown filter raises a
   deliberate error instead of that `TypeError`, see the entry under *Changed*.
+
+- **The JSDoc of the `Executer` constructor required what the constructor does not.** It typed
+  `option` and `option.execution` as required, so JavaScript checked by TypeScript reported
+  `new Executer()` and `new Executer({})` as errors, although both build an executer whose every
+  execution throws. Both are typed optional now.
+
+- **The JSDoc refused `null` where the code takes it.** The constructor options `context`, `parent`
+  and `executer`, the options `name`, `parent` and `executer` of `buildFiltered`, and `contextVar`
+  of `setupExecuter` in `src/executer/ContextObjectExecuter.js` treat `null` as left out, and were
+  typed without it. `setupExecuter` of the other two executers was typed as requiring its options,
+  which it does not, and `buildSecure` as taking any object rather than the arguments of
+  `buildFiltered`. `context` and `contextChain` were typed `object`, so no key could be read from
+  them without a cast; they are typed as records of any key now.

@@ -17,6 +17,13 @@ export default defineConfig({
 		// benchmarks are timing dependent and slow, so they are deliberately not part of
 		// the test gate - the include above does not match them. `npm run bench` runs them.
 		benchmark: { include: ["test/**/*.bench.js"] },
+		// the type declarations, checked by tsc rather than run: an error in a declaration fails
+		// the run as well, because skipLibCheck is off in test/tsconfig.json
+		typecheck: {
+			enabled: true,
+			include: ["test/**/*Test-d.ts"],
+			tsconfig: "test/tsconfig.json"
+		},
 		// loads the package once, which registers the default executers, before any test file
 		setupFiles: ["test/setup.js"],
 		browser: {

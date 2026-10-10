@@ -10,7 +10,7 @@ const EXPRESSION_CACHE = new CodeCache();
  * Configures the code cache of this executer. `size` is the only option
  * today; an option left out changes nothing.
  *
- * @param {import('../CodeCache.js').CodeCacheOptions} options
+ * @param {import('../CodeCache.js').CodeCacheOptions} [options]
  * @throws {TypeError} where the size is not a finite number
  */
 export const setupExecuter = (options) => {

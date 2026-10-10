@@ -19,6 +19,53 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 ---
 
+## 2026-10-10 — Does the package ship type declarations, and how are they made?
+
+**Decision:** Yes. `tsc` generates a `.d.ts` beside every source from its JSDoc
+(`npm run build:types`, the first step of `npm run build`), and the declarations are committed like
+`dist/`. The paths are the ones a consumer imports — the package itself, `browser.js`,
+`src/Executer.js`, `src/executer/*`; the internal modules get theirs as a by-product, because tsc
+follows the imports, and `exports` keeps them closed. `exports` is unchanged: TypeScript finds the
+declaration beside the file an open path resolves to. `"types": "./index.d.ts"` serves the
+resolution that ignores `exports`. The bundles under `dist/` and the global `defaultjs.el` get no
+declarations. The suite checks the committed declarations through Vitest's `typecheck`, as part of
+`npm test`. TypeScript 7.0.2 generates them. `SPECIFICATION.md` 8. Frank's decisions: to ship them
+(for TypeScript consumers), generated, committed, checked in the gate, module paths only.
+
+**Reasoning:** Without declarations a TypeScript project with `strict` cannot import the package at
+all (TS7016) and one without `strict` gets `any` throughout; a JavaScript project with a
+`jsconfig.json` already read the types from the JSDoc of the shipped sources (measured 2026-10-10
+against a packed install). Generating keeps one source: an editor shows a consumer the comments of
+the declaration rather than of the source, and a generated declaration carries the JSDoc along.
+Committing makes a change to the declared surface visible in the diff.
+
+The JSDoc had to change for it, without a change to the code. TypeScript 7 reads the Closure
+function type `function(string): *` as `Function`, and an object carrying one as `Object`, so
+function types are written `(aStatement: string) => *`, which 5.9 reads the same. `@readonly` on a
+getter is emitted as `readonly get`, which no declaration may carry, and a `@typedef` on the class
+it names as an empty type alias; both are gone. The static `resolve` and `resolveText` carry
+`@overload` for their positional and configuration forms, so an argument behind a configuration,
+which the code ignores, is a type error. Every type that refused `null` where the code takes it was
+widened, and `context` became `Record<string|symbol, *>`, because `object` lets no key be read
+without a cast. The declarations were type-checked against a packed install with TypeScript 4.7,
+4.9, 5.0, 5.1, 5.9 and 7.0, with `nodenext`, `bundler` and `node10`, and a closed path fails under
+`nodenext` and `bundler`.
+
+**Alternatives:** Hand-written declarations — precise without touching the JSDoc, but the
+documentation stands twice and only the type test notices a drift. Generating at `prepack` and
+ignoring the files — keeps them out of the tree and out of every diff. TypeScript 5.9 as the
+generator — reads the Closure syntax and would have left the JSDoc as it was, but it is not the
+current line. Declarations for the browser script's global — the better choice once a consumer uses
+the script from TypeScript.
+
+**Consequences:** `typescript` is a development dependency. The gate checks the committed
+declarations, not a fresh generation: a JSDoc change reaches them only through `npm run build:types`.
+The JSDoc is the source of a published file now and keeps to what tsc reads (`AGENTS.md`,
+Conventions). A second generation over existing declarations fails, because tsc reads a declaration
+beside a source as that source's input, so `prebuild:types` removes them first
+(`scripts/clean-declarations.js`). `src/version.d.ts` is ignored like `src/version.js`; no other
+declaration refers to it.
+
 ## 2026-10-04 — Is the name `ctx` of `context-object-executer` configurable?
 
 **Decision:** Yes, for the executer as a whole. `setupExecuter({ contextVar })` sets the name a

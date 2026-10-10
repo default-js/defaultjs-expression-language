@@ -15,7 +15,7 @@ let CONTEXT_VAR = "ctx";
  * @param {object} [options]
  * @param {number} [options.size] the size of the code cache, as `CodeCacheOptions` describes it in
  * `CodeCache.js`
- * @param {string} [options.contextVar] the name a statement addresses the context by, `ctx` until it
+ * @param {?string} [options.contextVar] the name a statement addresses the context by, `ctx` until it
  * is set, taken trimmed. It holds for every statement this executer runs from then on, whichever
  * resolver hands it over. Null, undefined and a string that is empty after trimming leave the name
  * as it is. A name that cannot be a parameter name is not rejected here: every statement then

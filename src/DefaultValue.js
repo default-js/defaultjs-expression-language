@@ -4,7 +4,6 @@
  *
  * @export
  * @class DefaultValue
- * @typedef {DefaultValue}
  */
 export default class DefaultValue {
 	/**

@@ -77,6 +77,9 @@ These paths of the package can be imported, and every other one is closed:
 | `/dist/<file>` | the bundles |
 | `/package.json` | the manifest |
 
+The package itself, `/browser.js`, `/src/Executer.js` and every module under `/src/executer/`
+carry TypeScript declarations; the bundles under `/dist/` carry none.
+
 ## Quick start
 
 ```javascript
@@ -699,7 +702,8 @@ is developed against. The floor applies to the toolchain only, so `engines` is d
 | `npm test` | the test gate — Vitest in headless Chromium via Playwright |
 | `npm run test:live` | the same in watch mode |
 | `npm run test:coverage` | the same with a coverage report in `coverage/` |
-| `npm run build` | tests plus the development and production bundles into `dist/` |
+| `npm run build:types` | the type declarations, generated from the JSDoc beside each source |
+| `npm run build` | the type declarations, tests, and the development and production bundles into `dist/` |
 | `npm run dev` | development server against `WebContent/` |
 | `npm run bench` | the benchmarks under `test/PerformanceTests/`, not part of the test gate |
 

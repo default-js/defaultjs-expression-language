@@ -12,6 +12,7 @@ Every part of the suite has one place:
 | the class **`Executer`**, the interface | `test/executer/interface.Test.js` | the class |
 | what **one executer** guarantees, its interface included | `test/executer/<executer>/` | that executer alone, called as `execute(aStatement, aContext)` |
 | the **public surface** of the package | `test/package/surface.Test.js` | `index.js`, `Executer`, and the paths the `exports` field opens |
+| the **type declarations** of that surface | `test/package/declarations.Test-d.ts`, and each executer's `interface.Test-d.ts` | the committed `.d.ts` files |
 
 ## 1. Where a case belongs
 
@@ -118,8 +119,10 @@ Every case is an ordinary `it` that has to pass. There is no table, no state and
 - **The comment says why, not what.** Where a case cannot tell an implementation apart, or was
   carried over, or deliberately does not assert something, the comment says so.
 - **`describe` / `it` / `expect` with `toBe`, `toBeDefined`, `toBeUndefined`.** Keeping that surface
-  narrow is worth something on its own; widen it only with a reason. `globals: true` stays off — the
-  suite uses the bare identifier `test` as its example of an undefined variable.
+  narrow is worth something on its own; widen it only with a reason. A `*Test-d.ts` file asserts
+  types, with `expectTypeOf` and `// @ts-expect-error` on a call that must not compile.
+  `globals: true` stays off — the suite uses the bare identifier `test` as its example of an
+  undefined variable.
 - Per-suite timeouts go in the options object, `describe(name, { timeout }, fn)`.
 
 ## 6. When cases move
@@ -134,6 +137,8 @@ Moving is where coverage is lost quietly, so both are counted:
 
 Vitest in browser mode, headless Chromium through Playwright — a real browser, because the package
 targets one and the tests reach for `document`, `window` and `document.location`. Shared setup in
-`test/setup.js`, helpers in `test/TestUtils.js`. The benchmarks under `test/PerformanceTests/` are
-never part of the gate; `npm run bench` runs them, and a broken benchmark reports nothing at all
-rather than failing.
+`test/setup.js`, helpers in `test/TestUtils.js`. A `*Test-d.ts` file is never run: `tsc` checks it
+with `skipLibCheck` off, so a case fails where it does not compile, and an error inside a
+declaration fails the whole run. The benchmarks under `test/PerformanceTests/` are never part of
+the gate; `npm run bench` runs them, and a broken benchmark reports nothing at all rather than
+failing.
