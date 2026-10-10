@@ -11,7 +11,7 @@ This file carries the effect of a change, and its reason where a consumer needs 
 
 Versions up to 2.0.4 predate this file — the git history is the record for those.
 
-## [Unreleased]
+## [3.0.0] - 2026-10-11
 
 ### Added
 
