@@ -214,17 +214,6 @@ export default class ResolverContextHandle {
 	}
 
 	/**
-	 * Replaces the object this handle holds, and with it the names it provides.
-	 *
-	 * @param {?object} data the new object; null or undefined leaves the handle without one
-	 */
-	replaceData(data) {
-		this.#data = isNullOrUndefined(data) ? null : data;
-		this.#providesContext = !isNullOrUndefined(data);
-		this.#cache = this.#buildNameCache();
-	}
-
-	/**
 	 * Assigns the keys of an object into the one this handle holds, key by key, creating that object
 	 * where there is none.
 	 *

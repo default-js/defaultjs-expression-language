@@ -16,15 +16,19 @@ let CONTEXT_VAR = "ctx";
  * @param {number} [options.size] the size of the code cache, as `CodeCacheOptions` describes it in
  * `CodeCache.js`
  * @param {string} [options.contextVar] the name a statement addresses the context by, `ctx` until it
- * is set. It holds for every statement this executer runs from then on, whichever resolver hands it
- * over. Null, undefined and a string that is empty after trimming leave the name as it is. A name
- * that cannot be a parameter name is not rejected here: every statement then throws a `SyntaxError`.
+ * is set, taken trimmed. It holds for every statement this executer runs from then on, whichever
+ * resolver hands it over. Null, undefined and a string that is empty after trimming leave the name
+ * as it is. A name that cannot be a parameter name is not rejected here: every statement then
+ * throws a `SyntaxError`.
  * @throws {TypeError} where the size is not a finite number, or the name is neither a string nor
  * null or undefined
  */
 export const setupExecuter = (options) => {
 	EXPRESSION_CACHE.setup(options);
-	CONTEXT_VAR = options?.contextVar == null || options?.contextVar.trim().length === 0 ? CONTEXT_VAR : options?.contextVar;
+	CONTEXT_VAR =
+		options?.contextVar == null || options?.contextVar.trim().length === 0
+			? CONTEXT_VAR
+			: options?.contextVar.trim();
 };
 
 /**
@@ -83,7 +87,7 @@ const getOrCreateFunction = (aStatement) => {
 const EXECUTER = new Executer({
 	execution: (aStatement, aContext) => {
 		const expression = getOrCreateFunction(aStatement);
-	return expression(aContext);
+		return expression(aContext);
 	},
 });
 

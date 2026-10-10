@@ -25,6 +25,13 @@ describe("ResolverContextHandle - a handle without a context", () => {
 		expect(leaf.context.value).toBe("from root");
 	});
 
+	it("contributes nothing to an enumeration and is passed through", () => {
+		const root = new ResolverContextHandle({ value: "from root" });
+		const middle = new ResolverContextHandle(null, root);
+		const leaf = new ResolverContextHandle({ leafOnly: 1 }, middle);
+		expect(Object.keys(leaf.context).sort().join()).toBe("leafOnly,value");
+	});
+
 	it("gains content like any other handle", () => {
 		const root = new ResolverContextHandle({ value: "from root" });
 		const middle = new ResolverContextHandle(null, root);

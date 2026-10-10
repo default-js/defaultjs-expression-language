@@ -607,9 +607,9 @@ import { setupExecuter } from "@default-js/defaultjs-expression-language/src/exe
 setupExecuter({ contextVar: "data" });   // ${ data.user.name }
 ```
 
-`null`, `undefined` and a string that is empty after trimming leave the name as it is, and any other
-value that is not a string is a `TypeError`. A name that cannot be a parameter name is not rejected:
-every statement then throws a `SyntaxError`.
+A name is taken trimmed: `" data "` sets `data`. `null`, `undefined` and a string that is empty after
+trimming leave the name as it is, and any other value that is not a string is a `TypeError`. A name
+that cannot be a parameter name is not rejected: every statement then throws a `SyntaxError`.
 
 **What a context may be: anything.** Plain objects, class instances, arrays, `Map`, `Set`, a
 `NodeList`, a DOM element, an `arguments` object, a frozen object, one without a prototype, one with

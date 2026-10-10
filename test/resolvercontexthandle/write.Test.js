@@ -26,6 +26,13 @@ describe("ResolverContextHandle - writing into the object the caller handed over
 		expect("value" in handed).toBe(false);
 	});
 
+	it("a delete through the proxy leaves a name an ancestor carries where it lives", () => {
+		const rootHanded = { value: "from root" };
+		const root = new ResolverContextHandle(rootHanded);
+		delete new ResolverContextHandle({}, root).context.value;
+		expect(rootHanded.value).toBe("from root");
+	});
+
 	it("mergeData writes into the object the caller handed over", () => {
 		const handed = { value: "before" };
 		new ResolverContextHandle(handed).mergeData({ added: "a" });

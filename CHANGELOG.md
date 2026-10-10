@@ -59,10 +59,11 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
 - **`context-object-executer` takes the name a statement addresses the context by.**
   `setupExecuter({ contextVar: "data" })` from `src/executer/ContextObjectExecuter.js` makes a
   statement read `${data.value}` instead of `${ctx.value}`, for every statement the executer runs
-  from then on, and the new `getContextVar()` answers the name in use. `null`, `undefined` and a
-  string that is empty after trimming leave the name as it is, another value that is not a string
-  is a `TypeError`, and a name that cannot be a parameter name makes every statement throw a
-  `SyntaxError`. Without the option nothing changes: the name is `ctx`.
+  from then on, and the new `getContextVar()` answers the name in use. Any other string is taken
+  trimmed. `null`, `undefined` and a string that is empty after trimming leave the name as it is,
+  another value that is not a string is a `TypeError`, and a name that cannot be a parameter name
+  makes every statement throw a `SyntaxError`. Without the option nothing changes: the name is
+  `ctx`.
 
 ### Changed
 

@@ -44,7 +44,7 @@ The intent of each goal is in `AGENTS.md`; this is where they stand.
 | --- | --- | --- | --- |
 | 1 | Modernize the toolchain | done 2026-08-21 — webpack 5.109, Vitest in Chromium, `npm audit` at 0 (again on 2026-09-30) | — |
 | 2 | Raise code quality | done 2026-10-03 — no `defect` and no `Blocks 3.0.0` entry open | — |
-| 3 | Raise test coverage | largely done | B-30 |
+| 3 | Raise test coverage | done 2026-10-10 — no entry open. Uncovered on purpose: `get parent` of `ResolverContextHandle` and `set`/`delete` of `createGlobalNameCache` (Frank, 2026-10-10), `stringToHashcode` in `src/Utils.js` (Frank, 2026-09-27), the body of `setDebug` in `ContextDeconstructorExecuter.js`, which has nothing observable | — |
 | 4 | Documentation | `SPECIFICATION.md`, `README.md` and the JSDoc written; the specification reviewed | — |
 | 5 | Do not lose performance | standing rule, see `AGENTS.md` | — |
 
@@ -57,8 +57,6 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 
 | ID | Title | Status | Kind | 3.0.0 | Prio |
 | --- | --- | --- | --- | --- | --- |
-| B-30 | Are the uncovered lines of `ResolverContextHandle` dead code? | investigate | refactor | | |
-| B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | agreed | feature | | |
 
 ---
 
@@ -68,58 +66,8 @@ None open.
 
 ## Resolver
 
-### B-30 · Are the uncovered lines of `ResolverContextHandle` dead code?
-
-- **Status:** investigate
-- **Kind:** refactor
-
-`npm run test:coverage` leaves lines of `src/ResolverContextHandle.js` uncovered that no rule asks
-for. Each is checked for a caller; what has none is deleted rather than covered.
-
-1. `set` and `delete` of `createGlobalNameCache` — a global context is not proxied since 2026-08-30,
-   so nothing seems to route a write through the wrapper.
-2. `get parent` and `replaceData` of `ResolverContextHandle`, which is internal (`DECISIONS.md`,
-   2026-09-30).
-3. The `return null` of `findPropertyDescriptor`, and the `get` of the descriptor the
-   `getOwnPropertyDescriptor` trap hands out.
-
-Not part of it: `stringToHashcode` in `src/Utils.js` stays, without a test (Frank, 2026-09-27), and
-the `setDebug` body of `ContextDeconstructorExecuter.js` has nothing observable to test.
+None open.
 
 ## Executers
 
-### B-13 · Should the `ctx` prefix of `ContextObjectExecuter` be configurable?
-
-- **Status:** agreed — Frank's decision and implementation of 2026-10-04, unfinished
-- **Kind:** feature · **Spec:** 9.3
-- **Pinned by:** the two cases on the name `setupExecuter` sets in
-  `test/executer/context-object/context.Test.js`, and "exports getContextVar" in its
-  `interface.Test.js`
-- **Records:** `DECISIONS.md` — JSDoc, `README.md`, `CHANGELOG.md`, 8, 9.2, 9.3 and the decision of
-  2026-10-04 are written
-
-What the option does and why is in `DECISIONS.md`, 2026-10-04. Open:
-
-1. **A regression on the hot path.** `getOrCreateFunction` keys the code cache by
-   `${CONTEXT_VAR}::${aStatement}`, built by concatenation on every execution, a cache hit
-   included. Measured 2026-10-04, `HEAD` against the change, four pairs, strictly alternating with
-   the order swapped, depth 10 and `ResolveText`, change/head per pair:
-
-   | Bench | `context-object` | controls: the other two executers |
-   | --- | --- | --- |
-   | `ResolveText`, 20 distinct | 0.87–0.90 | 0.96–1.06 |
-   | `ResolveText`, one expression 20 times | 0.81–0.88 | 0.96–1.01 |
-   | `ResolveText`, literals | 0.89–0.95 | 0.99–1.02 |
-   | `ResolveText`, no expression | 0.98–1.03 | 0.98–1.03 |
-   | `WarmResolve` | 0.88–0.97 | 0.92–1.07 |
-   | `ColdResolve`, both shapes | 0.98–1.03 | 0.98–1.09, one run 0.25 |
-
-   The alternative, measured the same way against `HEAD`: the statement alone as the key, and
-   `setupExecuter` clears the cache where it changes the name. It comes out level — `ResolveText`
-   0.98–1.13, `WarmResolve` 0.94–1.01, `ColdResolve` 0.94–1.01, the controls 0.92–1.09 — and
-   `test/executer/context-object/` is green under it, 17 of 17. Next: Frank picks; the decision
-   of 2026-10-04 then gets the cache and its numbers.
-2. The guarantees `README.md` states are pinned only in part: that an option left out, `null`,
-   `undefined` and a blank string leave the name as it is, that a value that is not a string is a
-   `TypeError`, and what `getContextVar()` answers have no case.
-3. Line 67 of `src/executer/ContextObjectExecuter.js` carries trailing whitespace.
+None open.

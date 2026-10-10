@@ -23,27 +23,46 @@ A decision that is only a step inside a running undertaking stays in that undert
 
 **Decision:** Yes, for the executer as a whole. `setupExecuter({ contextVar })` sets the name a
 statement addresses the context by, `ctx` until it is set, for every statement the executer runs
-from then on, whichever resolver hands it over. `getContextVar()` answers it and is public. `null`,
-`undefined` and a string that is empty after trimming leave the name as it is; a name that cannot be
-a parameter name is not rejected. `SPECIFICATION.md` 9.3. Frank's decision and implementation.
+from then on, whichever resolver hands it over. `getContextVar()` answers it and is public. A name
+is taken trimmed; `null`, `undefined` and a string that is empty after trimming leave the name as it
+is; a name that cannot be a parameter name is not rejected. `SPECIFICATION.md` 9.3. The code cache
+is keyed by the name and the statement, `${CONTEXT_VAR}::${aStatement}`. Frank's decision and
+implementation, the trimming and the key of 2026-10-10.
 
 **Reasoning:** The idea was raised on 2026-08-24 for a context carrying a key named `ctx`, and that
 case never needed it: the context is not put into scope, so the key is reached as `ctx.ctx`. What
 the option gives is a choice of spelling. `setupExecuter` kept its name on 2026-10-01 as the place
 for such options. An option left out changes nothing, as for `size`: the first version reset the
 name to `ctx` on every call without it, so a later `setupExecuter({ size })` from other code on the
-page would have switched the dialect back silently.
+page would have switched the dialect back silently. A statement compiled under one name does not run
+under another, so a changed name has to miss the cache; with the name in the key it does.
 
 **Alternatives:** A name per executer instance — an `Executer` built with its own name and handed to
 a resolver as an instance (2026-09-01) — scopes the spelling to a chain, the way the inherited
 executer scopes the executer (2026-09-22). It would be the better choice once two chains on one page
 need different spellings. Rejecting a name that cannot be a parameter name with a `TypeError` in
-`setupExecuter`, as for `size` — proposed and not taken.
+`setupExecuter`, as for `size` — proposed and not taken. The statement alone as the cache key, with
+`setupExecuter` clearing the cache where it changes the name: a changed name misses as well, and it
+measured level against the executer before the option, where the key costs what Consequences shows.
+Proposed and not taken.
 
 **Consequences:** The spelling is page-wide: code that sets the name sets it for every other user of
 the executer on the page. A name that is no identifier shows as a `SyntaxError` on every statement
 rather than at the call that set it, and a value that is not a string is rejected with the
 `TypeError` the engine raises for it, not one of the package's own.
+
+The key is built on every execution, a cache hit included. Measured 2026-10-04, the executer before
+the option against the option, four pairs, strictly alternating with the order swapped, depth 10,
+change/before per pair:
+
+| Bench | `context-object` | controls: the other two executers |
+| --- | --- | --- |
+| `ResolveText`, 20 distinct | 0.87–0.90 | 0.96–1.06 |
+| `ResolveText`, one expression 20 times | 0.81–0.88 | 0.96–1.01 |
+| `ResolveText`, literals | 0.89–0.95 | 0.99–1.02 |
+| `ResolveText`, no expression | 0.98–1.03 | 0.98–1.03 |
+| `WarmResolve` | 0.88–0.97 | 0.92–1.07 |
+| `ColdResolve`, both shapes | 0.98–1.03 | 0.98–1.09, one run 0.25 |
 
 ## 2026-10-04 — Does a resolved expression pass `async` functions of the resolver besides the entry point?
 
@@ -445,10 +464,11 @@ stays internal and is not listed in section 8. Frank's decision.
 **Reasoning:** Nothing needs the handle from outside except `resetCache`, which 6.2 names, and the
 getter `contextHandle` reaches it. Exporting the class would add surface for no further use.
 
-**Alternatives:** Exporting the handle from `index.js` and covering `get parent` and `updateData`.
+**Alternatives:** Exporting the handle from `index.js` and covering `get parent`.
 
-**Consequences:** `get parent` and `updateData` of the handle are internal; their coverage is a
-question of reachability, not of surface. The getter `contextHandle` stays public for `resetCache`,
+**Consequences:** `get parent` of the handle is internal, and nothing in the package calls it; it
+stays, uncovered, since its coverage is a question of reachability, not of surface (Frank,
+2026-10-10). The getter `contextHandle` stays public for `resetCache`,
 since the name cache stays (2026-08-22, "Is a context a snapshot or read live?", measured
 2026-10-03).
 

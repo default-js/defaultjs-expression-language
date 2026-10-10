@@ -36,6 +36,23 @@ describe("ResolverContextHandle - names are a snapshot, values are live", () => 
 		expect(handle.context.added).toBe(2);
 	});
 
+	// The other half of the snapshot, written after the behaviour: a key taken off the handed-in object
+	// directly stays among the names until they are rebuilt, and reads as undefined meanwhile.
+	it("keeps listing a key removed from the handed-in object after the handle was built", () => {
+		const handed = { known: 1, removed: 2 };
+		const handle = new ResolverContextHandle(handed);
+		delete handed.removed;
+		expect(Object.keys(handle.context).includes("removed")).toBe(true);
+	});
+
+	// A descriptor of the context reads through a getter rather than carrying the value it had.
+	it("reads a value through a descriptor at the moment its getter is called", () => {
+		const handed = { value: "before" };
+		const descriptor = Object.getOwnPropertyDescriptor(new ResolverContextHandle(handed).context, "value");
+		handed.value = "after";
+		expect(descriptor.get()).toBe("after");
+	});
+
 	it("reads a value at the moment of the lookup, so a mutation is visible immediately", () => {
 		const handed = { holder: { name: "before" } };
 		const handle = new ResolverContextHandle(handed);

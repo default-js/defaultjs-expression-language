@@ -688,6 +688,7 @@ with a `TypeError`; a fraction is rounded down.
 `context-object-executer` takes a second option, `contextVar`: the name a statement addresses the
 context by, `ctx` until it is set, and `getContextVar()` answers it. The name is the executer's, not
 a chain's, so it holds for every statement that executer runs from then on, whichever resolver hands
-it over. `null`, `undefined` and a string that is empty after trimming leave the name as it is, and
-another value that is not a string is rejected with a `TypeError`. A name that cannot be a parameter
-name is not rejected: every statement then fails with a `SyntaxError` (7).
+it over. A name is taken trimmed. `null`, `undefined` and a string that is empty after trimming leave
+the name as it is, and another value that is not a string is rejected with a `TypeError`. A name
+that cannot be a parameter name is not rejected: every statement then fails with a `SyntaxError`
+(7).

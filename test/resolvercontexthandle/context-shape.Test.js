@@ -34,6 +34,12 @@ describe("ResolverContextHandle - every access goes through the proxy", () => {
 		expect(Object.keys(new ResolverContextHandle({ "test-test": "dashed" }).context).includes("test-test")).toBe(true);
 	});
 
+	it("answers no descriptor for a name no handle of the chain carries", () => {
+		const root = new ResolverContextHandle({ rootOnly: "from root" });
+		const leaf = new ResolverContextHandle({ leafOnly: "from leaf" }, root);
+		expect(Object.getOwnPropertyDescriptor(leaf.context, "nowhere")).toBeUndefined();
+	});
+
 	it("answers a symbol key the context carries", () => {
 		const marker = Symbol("marker");
 		expect(new ResolverContextHandle({ [marker]: "from symbol" }).context[marker]).toBe("from symbol");
