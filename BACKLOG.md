@@ -59,7 +59,7 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | --- | --- | --- | --- | --- | --- |
 | B-30 | Are the uncovered lines of `ResolverContextHandle` dead code? | investigate | refactor | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | agreed | feature | | |
-| B-72 | Every executer binds `arguments` | decision | gap | | |
+| B-72 | Every executer binds `arguments` | agreed | gap | | |
 
 ---
 
@@ -127,14 +127,22 @@ What the option does and why is in `DECISIONS.md`, 2026-10-04. Open:
 
 ### B-72 · Every executer binds `arguments`
 
-- **Status:** decision — found 2026-10-10 while checking B-70
+- **Status:** agreed — Frank's change of 2026-10-10, unfinished
 - **Kind:** gap · **Spec:** 9.2
-- **Records:** `README.md`
+- **Records:** `README.md`, `DECISIONS.md` — both still to be decided
 
-All three run the statement in an arrow function inside a function built by `new Function`. An arrow
-function has no `arguments` of its own, so the statement sees the outer one's, and `arguments[0]` is
-the context: over `{ known: 1 }`, `${arguments[0].known}` answers `1` under each executer (checked
-2026-10-10, again after the change of B-71, which renames the parameter but leaves the outer
-function as it is). No global is shadowed, since a browser has no global
-`arguments`, but it is a name for the context that `README.md` does not give. Next: decide whether
-`README.md` names it or the generated code changes.
+`arguments` stays bound, and the executers now rely on it: the function each one builds with
+`new Function` takes no parameter and hands its `arguments[0]` on, so the generated code binds no
+name of its own and nothing can collide with one. A statement sees `arguments` with the context at
+index 0 — `context-object-executer` and `context-deconstruction-executer` run it in an arrow
+function, which sees the outer one's; `with-scoped-executer` in an `async function` called with the
+context. Over `{ known: 1 }`, `${arguments.length}` and `${arguments[0].known}` answer `1` and
+`typeof context` `"undefined"` under all three (checked 2026-10-10); `npm test` 348 of 348. Open:
+
+1. `npm run bench`, `c3f378e` against the change: every execution reads `arguments[0]` where it
+   read a parameter.
+2. Whether `README.md` says that `arguments[0]` is the context under every executer.
+3. Whether `DECISIONS.md` records why the context arrives as `arguments[0]` rather than under a
+   name — `context` shadowed a global of that name, and a random name reserved per executer is what
+   this replaced.
+4. `src/Utils.js` ends without a final newline.

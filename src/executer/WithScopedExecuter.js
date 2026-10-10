@@ -1,13 +1,10 @@
 import { register } from "../ExecuterRegistry.js";
 import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
-import { undeclaredVarname } from "../Utils.js";
 
 /** The name this executer is registered under. */
 export const EXECUTERNAME = "with-scoped-executer";
 const EXPRESSION_CACHE = new CodeCache();
-
-const RESERVED_VARNAME = undeclaredVarname({ prefix: "$WSE_", suffix: "_WSE$", minLength: 32 });
 
 /**
  * Configures the code cache of this executer. `size` is the only option
@@ -30,19 +27,19 @@ let initialCall = true;
  */
 const generate = (aStatement) => {
 	const code = `
-	return (async (${RESERVED_VARNAME}) => {
-		with(${RESERVED_VARNAME}){
+	return (async function (){
+		with(arguments[0] || {}){
 			try{
 				return ${aStatement}
 			}catch(e){
 				throw e;
 			}
 		}
-	})(${RESERVED_VARNAME} || {});
+	})(arguments[0] || {});
 `;
 	//console.log("code", code);
 
-	return new Function(RESERVED_VARNAME, code);
+	return new Function(code);
 };
 
 /**
