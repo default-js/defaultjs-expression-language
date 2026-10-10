@@ -1,12 +1,17 @@
-import {registrate} from "../ExecuterRegistry.js";
+import { register } from "../ExecuterRegistry.js";
 import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 
+/** The name this executer is registered under. */
 export const EXECUTERNAME = "with-scoped-executer";
-const EXPRESSION_CACHE = new CodeCache({ aSize: 5000 });
+const EXPRESSION_CACHE = new CodeCache();
 
 /**
- * @param {import('../CodeCache.js').CodeCacheOptions} options
+ * Configures the code cache of this executer. `size` is the only option
+ * today; an option left out changes nothing.
+ *
+ * @param {import('../CodeCache.js').CodeCacheOptions} [options]
+ * @throws {TypeError} where the size is not a finite number
  */
 export const setupExecuter = (options) => {
 	EXPRESSION_CACHE.setup(options);
@@ -15,30 +20,32 @@ export const setupExecuter = (options) => {
 let initialCall = true;
 
 /**
- * 
- * @param {string} aStatement 
+ * Compiles a statement into a function that runs it inside a `with` block over the context.
+ *
+ * @param {string} aStatement
  * @returns {Function}
  */
 const generate = (aStatement) => {
-const code = `
-	return (async (context) => {
-		with(context){
-			try{ 
+	const code = `
+	return (async function (){
+		with(arguments[0] || {}){
+			try{
 				return ${aStatement}
 			}catch(e){
 				throw e;
 			}
 		}
-	})(context || {});
+	})(arguments[0] || {});
 `;
 	//console.log("code", code);
 
-	return new Function("context", code);
+	return new Function(code);
 };
 
 /**
- * 
- * @param {string} aStatement 
+ * The compiled function for a statement, from the cache or compiled now and cached.
+ *
+ * @param {string} aStatement
  * @returns {Function}
  */
 const getOrCreateFunction = (aStatement) => {
@@ -50,17 +57,27 @@ const getOrCreateFunction = (aStatement) => {
 	return expression;
 };
 
-
-
-const EXECUTER = new Executer({defaultContext: {}, execution: (aStatement, aContext) => {
-		if(initialCall){
+/**
+ * The executer: runs a statement inside a `with` block over the context, so a statement addresses a
+ * context value by its bare name - see `README.md`. Registered under
+ * `EXECUTERNAME` on import.
+ *
+ * @deprecated because `with` is; announces it on the first statement it runs
+ * @type {Executer}
+ */
+const EXECUTER = new Executer({
+	execution: (aStatement, aContext) => {
+		if (initialCall) {
 			initialCall = false;
-			console.warn(new Error(`With Scoped expression execution is marked as deprecated.`));
+			console.warn(
+				new Error(`With Scoped expression execution is marked as deprecated.`),
+			);
 		}
 
 		const expression = getOrCreateFunction(aStatement);
 		return expression(aContext);
-	}});
-registrate(EXECUTERNAME, EXECUTER);
+	},
+});
+register(EXECUTERNAME, EXECUTER);
 
 export default EXECUTER;

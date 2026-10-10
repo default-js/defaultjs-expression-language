@@ -1,0 +1,60 @@
+import { ExpressionResolver } from "../../index.js";
+
+/**
+ * Shared chain construction for the benchmarks.
+ *
+ * Construction must never be part of a measurement, and in a bench file there is nowhere to
+ * put it but the module body: verified 2026-08-21 against vitest 4.1.11 that neither vitest's
+ * own beforeAll nor tinybench's beforeAll option runs for a bench - the hook is silently
+ * skipped, and a bench that then fails is reported as nothing at all.
+ *
+ * One chain therefore serves every depth. A chain of depth 1000000 already contains the
+ * chains of depth 10, 1000 and 100000 as its own tail, so the resolvers at those depths are kept
+ * as entry points instead of building four separate chains. Resolving from the depth 10 entry
+ * walks ten resolvers down to the only match, exactly as a chain built to depth 10 would.
+ */
+
+/** the depths every chain benchmark is run at, ascending */
+export const DEPTHS = [10, 1000, 100000, 1000000];
+
+/**
+ * Answers an entry into the chain that resolves under the given executer.
+ *
+ * The executer of a resolution without a scope prefix is the one of the resolver the call is made
+ * on, and it is carried along the whole walk - `#execute` in `ExpressionResolver`. No benchmark
+ * uses a prefix, which would hand the statement to the executer of the resolver it addresses. So
+ * one chain
+ * serves every executer: a resolver on top of it, built with that executer and an empty context of
+ * its own, resolves over the same resolvers below. Building one chain per executer is not an
+ * option, the deepest is a million resolvers.
+ *
+ * The extra resolver costs one step of the walk, the same for every executer, so a comparison
+ * between them is unaffected.
+ *
+ * @param {ExpressionResolver} aResolver the resolver to resolve over
+ * @param {string} anExecuterName
+ * @returns {ExpressionResolver}
+ */
+export const bindExecuter = (aResolver, anExecuterName) =>
+	new ExpressionResolver({ context: null, name: "entry", parent: aResolver, executer: anExecuterName });
+
+/**
+ * Builds one chain up to the deepest entry of DEPTHS and returns the resolver found at each depth.
+ * The bottom resolver is the only one carrying "first"; every resolver above it has to be walked.
+ *
+ * @param {?object} aContext context handed to every resolver above the bottom one
+ * @returns {Map<number, ExpressionResolver>} depth to the resolver sitting at that depth
+ */
+export const buildChain = (aContext = null) => {
+	const wanted = new Set(DEPTHS);
+	const entries = new Map();
+
+	let resolver = new ExpressionResolver({ context: { first: "first" }, name: "first" });
+	const max = Math.max(...DEPTHS);
+	for (let depth = 1; depth <= max; depth++) {
+		resolver = new ExpressionResolver({ context: aContext, name: "next" + depth, parent: resolver });
+		if (wanted.has(depth)) entries.set(depth, resolver);
+	}
+
+	return entries;
+};

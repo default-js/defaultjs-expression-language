@@ -1,41 +1,48 @@
 {
 	"name": "@default-js/defaultjs-expression-language",
 	"buildname": "defaultjs-expression-language",
-	"version": "2.0.4",
+	"version": "3.0.0",
 	"description": "This provides an expression resolver. You can build an resolver chain to solve hierarchic scopes!",
+	"type": "module",
 	"main": "./index.js",
-	"scripts": {		
-		"build:third-party-licence": "npx generate-license-file --config ./generate-license.config.json --overwrite",
+	"types": "./index.d.ts",
+	"exports": {
+		".": "./index.js",
+		"./browser.js": "./browser.js",
+		"./src/Executer.js": "./src/Executer.js",
+		"./src/executer/*": "./src/executer/*",
+		"./dist/*": "./dist/*",
+		"./package.json": "./package.json"
+	},
+	"scripts": {
+		"generate:version": "node scripts/generate-version.js",
+		"prebuild:dev": "npm run generate:version",
 		"build:dev": "webpack --mode=development --progress",
+		"prebuild:prod": "npm run generate:version",
 		"build:prod": "webpack --mode=production --progress",
-		"build": "npm run test && npm run build:dev && npm run build:prod",
+		"prebuild:types": "npm run generate:version && node scripts/clean-declarations.js",
+		"build:types": "tsc -p tsconfig.json",
+		"build": "npm run build:types && npm run test && npm run build:dev && npm run build:prod",
+		"predev": "npm run generate:version",
 		"dev": "webpack serve --mode=development --progress",
-		"test:live": "karma start --auto-watch",
-		"test": "karma start --no-auto-watch"
+		"test": "vitest run",
+		"test:live": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"bench": "vitest bench --run"
 	},
 	"keywords": [],
 	"author": "Frank Schüler",
 	"license": "MIT",
 	"devDependencies": {
-		"clean-webpack-plugin": "^1.0.1",
-		"copy-webpack-plugin": "^11.0.0",
-		"generate-license-file": "^4.0.0",
-		"http-server": "^14.1.0",
-		"karma": "^6.3.4",
-		"karma-chrome-launcher": "^3.1.0",
-		"karma-coverage": "^2.0.3",
-		"karma-firefox-launcher": "^2.1.1",
-		"karma-html2js-preprocessor": "^1.1.0",
-		"karma-jasmine": "^4.0.1",
-		"karma-safari-launcher": "^1.0.0",
-		"karma-sourcemap-loader": "^0.3.8",
-		"karma-webpack": "^5.0.0",
-		"puppeteer": "^16.1.1",
-		"replace-in-file-webpack-plugin": "^1.0.6",
-		"terser-webpack-plugin": "^5.3.1",
-		"webpack": "^5.74.0",
-		"webpack-cli": "^4.10.0",
-		"webpack-dev-server": "^4.7.4"
+		"@vitest/browser": "^4.1.11",
+		"@vitest/browser-playwright": "^4.1.11",
+		"@vitest/coverage-v8": "^4.1.11",
+		"playwright": "^1.62.1",
+		"typescript": "^7.0.2",
+		"vitest": "^4.1.11",
+		"webpack": "^5.109.2",
+		"webpack-cli": "^7.2.2",
+		"webpack-dev-server": "^6.0.0"
 	},
 	"repository": {
 		"type": "git",
@@ -46,22 +53,20 @@
 	},
 	"homepage": "https://github.com/default-js/defaultjs-expression-language#readme",
 	"dependencies": {
-		"@default-js/defaultjs-common-utils": "latest",
-		"escodegen": "^2.1.0",
-		"espree": "^10.4.0",
-		"esprima": "^4.0.1"
+		"@default-js/defaultjs-common-utils": "^1"
 	},
 	"directories": {
 		"test": "test"
 	},
 	"files": [
 		"index.js",
+		"index.d.ts",
 		"browser.js",
-		"browser-all-executers.js",
+		"browser.d.ts",
 		"src/**",
 		"dist/**",
 		"LICENSE",
-		"LICENSE-OF-THIRD-PARTY",
-		"README.md"
+		"README.md",
+		"CHANGELOG.md"
 	]
 }
