@@ -22,4 +22,14 @@ describe("WithScopedExecuter - the global object from a statement", () => {
 			delete globalThis.planted_global;
 		}
 	});
+
+	// `context` was the parameter of both generated functions, so it shadowed a global of that name.
+	it("reaches a global named context", async () => {
+		globalThis.context = "from global";
+		try {
+			expect(await executer.execute("context", { known: 1 })).toBe("from global");
+		} finally {
+			delete globalThis.context;
+		}
+	});
 });

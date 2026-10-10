@@ -22,4 +22,14 @@ describe("ContextDeconstructorExecuter - the global object from a statement", ()
 			delete globalThis.planted_global;
 		}
 	});
+
+	// `context` was the parameter of the generated outer function, so it shadowed a global of that name.
+	it("reaches a global named context", async () => {
+		globalThis.context = "from global";
+		try {
+			expect(await executer.execute("context", { known: 1 })).toBe("from global");
+		} finally {
+			delete globalThis.context;
+		}
+	});
 });

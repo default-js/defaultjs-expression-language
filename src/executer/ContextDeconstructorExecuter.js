@@ -2,11 +2,14 @@ import { register } from "../ExecuterRegistry.js";
 import Executer from "../Executer.js";
 import CodeCache from "../CodeCache.js";
 import GLOBAL from "@default-js/defaultjs-common-utils/src/Global.js";
+import { undeclaredVarname } from "../Utils.js";
 
 let DEBUG = false;
 /** The name this executer is registered under, and the default executer. */
 export const EXECUTERNAME = "context-deconstruction-executer";
 const EXPRESSION_CACHE = new CodeCache();
+const RESERVED_VARNAME = undeclaredVarname({ prefix: "$CDE_", suffix: "_CDE$", minLength: 32 });
+
 
 /**
  * How many names a context may carry before this executer says that binding them all costs. Every
@@ -127,12 +130,12 @@ return (async ({${thePropertyNameString}}) => {
     }catch(e){
         throw e;
     }
-})(context || {});`;
+})(${RESERVED_VARNAME} || {});`;
 
 	if (DEBUG) console.log("genererated code: \n", code);
 
 	try {
-		return new Function("context", code);
+		return new Function(RESERVED_VARNAME, code);
 	} catch (e) {
 		// only a syntax error can come from a name. Anything else - the EvalError of a Content Security
 		// Policy without 'unsafe-eval' among them - is handed on: asking about the names would be

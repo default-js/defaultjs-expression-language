@@ -1,3 +1,5 @@
+import { GLOBAL } from "@default-js/defaultjs-common-utils";
+
 /**
  * The helpers more than one component uses. Internal to the package: index.js does not export
  * them.
@@ -54,8 +56,28 @@ export const stringToHashcode = (aString) => {
 	const length = aString.length;
 	for (let i = 0; i < length; i++) {
 		const char = aString.charCodeAt(i);
-		hash = ((hash << 5) - hash) + char;
+		hash = (hash << 5) - hash + char;
 		hash |= 0; // Convert to 32bit integer
 	}
 	return hash;
+};
+
+const ID_CHARACTER = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+const generateId = (aLength) => {
+	let id = "";
+	for (let i = 0; i < aLength; i++)
+		id += ID_CHARACTER.charAt(Math.floor(Math.random() * ID_CHARACTER.length));
+	return id;
+};
+
+export const undeclaredVarname = ({ prefix, suffix, minLength = 10 } = {}) => {
+	let count = minLength;
+	do {
+		for (let i = 0; i < ID_CHARACTER.length * count; i++) {
+			const name = `${prefix || ""}${generateId(count)}${suffix || ""}`;
+			if (!GLOBAL.hasOwnProperty(name)) return name;
+		}
+		count += 4;
+	} while (true);
 };

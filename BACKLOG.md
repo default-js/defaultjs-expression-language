@@ -59,8 +59,7 @@ documented in `README.md` rather than pinned (`DECISIONS.md`, 2026-09-26).
 | --- | --- | --- | --- | --- | --- |
 | B-30 | Are the uncovered lines of `ResolverContextHandle` dead code? | investigate | refactor | | |
 | B-13 | Should the `ctx` prefix of `ContextObjectExecuter` be configurable? | agreed | feature | | |
-| B-70 | `context-object-executer` binds `context` beside `ctx` | agreed | gap | | |
-| B-71 | `context-deconstruction-executer` and `with-scoped-executer` bind `context` | decision | gap | | |
+| B-71 | `context-deconstruction-executer` and `with-scoped-executer` bind `context` | agreed | gap | | |
 | B-72 | Every executer binds `arguments` | decision | gap | | |
 
 ---
@@ -127,33 +126,26 @@ What the option does and why is in `DECISIONS.md`, 2026-10-04. Open:
    `TypeError`, and what `getContextVar()` answers have no case.
 3. Line 67 of `src/executer/ContextObjectExecuter.js` carries trailing whitespace.
 
-### B-70 · `context-object-executer` binds `context` beside `ctx`
-
-- **Status:** agreed — Frank's implementation of 2026-10-10, not measured yet
-- **Kind:** gap · **Spec:** 9.2
-- **Pinned by:** "reaches a global named context" in `test/executer/context-object/globals.Test.js`
-- **Records:** `CHANGELOG.md` is written; `README.md` needs nothing, it already says every global is
-  reachable
-
-`generate` in `src/executer/ContextObjectExecuter.js` names the parameter of the outer function
-after the inner one and calls the inner one with it, so `context` is bound nowhere. The case failed
-against a copy of `HEAD`, answering the context object, and passes against the change; `npm test`
-346 of 346. Open: `npm run bench`, `HEAD` against the change, since the compiled code changed.
-Level, and the entry is deleted.
-
 ### B-71 · `context-deconstruction-executer` and `with-scoped-executer` bind `context`
 
-- **Status:** decision — found 2026-10-10 while checking B-70
+- **Status:** agreed — Frank's implementation of 2026-10-10, unfinished
 - **Kind:** gap · **Spec:** 9.2
-- **Records:** `README.md`
+- **Pinned by:** "reaches a global named context" in the `globals.Test.js` of
+  `test/executer/context-deconstruction/` and `test/executer/with-scoped/`
+- **Records:** `CHANGELOG.md` is written; `README.md` needs nothing
 
-Both compile an outer function whose parameter is named `context`, and `with-scoped-executer` takes
-the context under that name in its inner function as well. A name the context does not carry falls
-through to that parameter before it reaches the global object: over `{ known: 1 }`, `${context}`
-answers the context object under both, and a global named `context` is not reached by its bare name
-(checked 2026-10-10), although `README.md` says a name the chain does not carry falls through to the
-global object. Next: decide whether the generated code changes — measured with `npm run bench` — or
-`README.md` names `context` for both.
+Each executer reserves one name when its module loads, from `undeclaredVarname` in `src/Utils.js`
+— a random 32 letters between a prefix and a suffix of its own, not carried by the global object at
+that moment — and takes the context in under it instead of `context`. Both cases failed against a
+copy of `HEAD`, answering the context object, and pass against the change; `npm test` 348 of 348.
+Open:
+
+1. `npm run bench`, `HEAD` against the change.
+2. `src/Utils.js` against the conventions: it imports from the package root, where every other
+   module imports `@default-js/defaultjs-common-utils/src/Global.js`, and imports `UUID` without
+   using it; `undeclaredVarname` and `generateId` carry no JSDoc and end without the `;` of the
+   other helpers; line 79 carries trailing whitespace, `id  +=` a double space, and the file has no
+   final newline.
 
 ### B-72 · Every executer binds `arguments`
 
@@ -164,6 +156,7 @@ global object. Next: decide whether the generated code changes — measured with
 All three run the statement in an arrow function inside a function built by `new Function`. An arrow
 function has no `arguments` of its own, so the statement sees the outer one's, and `arguments[0]` is
 the context: over `{ known: 1 }`, `${arguments[0].known}` answers `1` under each executer (checked
-2026-10-10, after the change of B-70). No global is shadowed, since a browser has no global
+2026-10-10, again after the change of B-71, which renames the parameter but leaves the outer
+function as it is). No global is shadowed, since a browser has no global
 `arguments`, but it is a name for the context that `README.md` does not give. Next: decide whether
 `README.md` names it or the generated code changes.

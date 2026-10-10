@@ -298,12 +298,15 @@ Versions up to 2.0.4 predate this file — the git history is the record for tho
   builds the same resolver; the new name says what it does, filter the context, where the old one
   promised a security the method does not give.
 
-- **`context-object-executer` no longer answers `context` as a second name for the context.** Its
-  generated code took the context in as a parameter named `context` before handing it over as
-  `ctx`, so `${context.value}` answered like `${ctx.value}`, and a global named `context` was out of
-  reach by its bare name. A statement now sees the context under `ctx` alone, or the name
-  `setupExecuter` sets, and a bare `context` is a global like any other name. An expression that
-  reads `${context.value}` reads `${ctx.value}` instead.
+- **No executer answers `context` as a name for the context any more.** The generated code of each
+  took the context in as a parameter named `context`, so a statement saw that name beside the
+  executer's own way of addressing the context: `${context.value}` answered like `${ctx.value}`
+  under `context-object-executer`, and under the other two a bare `context` the context does not
+  carry answered the context itself. Under all three, a global named `context` was out of reach by
+  its bare name. A bare `context` now follows the rule of every other name — a global, or under
+  `context-deconstruction-executer` and `with-scoped-executer` the context value where the context
+  carries that key. An expression that reads `${context.value}` reads `${ctx.value}` under
+  `context-object-executer` instead, and `${value}` under the other two.
 
 ### Deprecated
 
