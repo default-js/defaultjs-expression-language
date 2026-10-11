@@ -1,13 +1,14 @@
 {
 	"name": "@default-js/defaultjs-expression-language",
 	"buildname": "defaultjs-expression-language",
-	"version": "3.0.1",
+	"version": "3.0.2",
 	"description": "This provides an expression resolver. You can build an resolver chain to solve hierarchic scopes!",
 	"type": "module",
 	"main": "./index.js",
 	"types": "./index.d.ts",
 	"exports": {
 		".": "./index.js",
+		"./index.js": "./index.js",
 		"./browser.js": "./browser.js",
 		"./src/*": "./src/*",
 		"./src/executer/*": "./src/executer/*",
